@@ -4,8 +4,8 @@
  * 거리 단위는 타일(1타일 = 월드 1유닛), 시간 단위는 초.
  */
 
-export type FighterId = 'rivet' | 'volley' | 'boulder';
-export type Role = 'scatter' | 'marksman' | 'tank';
+export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako';
+export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper';
 
 /** 기본 공격 형태. 새 캐릭터는 가능하면 이 조합으로 표현하고, 부족할 때만 종류를 추가한다. */
 export type AttackKind =
@@ -15,7 +15,10 @@ export type AttackKind =
   | 'lob' // 지점 조준, 벽을 넘는 포물선
   | 'radial'; // 자기 주변 360도로 발사
 
-export type SuperKind = AttackKind | 'dash';
+export type SuperKind =
+  | AttackKind
+  | 'dash' // 조준 방향으로 긴 돌진
+  | 'leap'; // 조준 지점으로 높이 뛰어 벽을 넘어 이동, 뛴 자리에 폭탄을 떨어뜨림
 
 export interface AttackDef {
   name: string;
@@ -43,6 +46,8 @@ export interface AttackDef {
   lateralOffset?: number;
   /** lob: 착탄 범위 반지름(타일) */
   aoeRadius?: number;
+  /** 거리 비례 피해: 사거리 끝까지 날아갔을 때의 피해량(가까울수록 damage에 가깝다) */
+  damageFar?: number;
 }
 
 export interface SuperDef {
@@ -66,6 +71,10 @@ export interface SuperDef {
   aoeRadius?: number;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일) */
   lateralOffset?: number;
+  /** leap: 공중에 떠 있는 시간(초) */
+  leapTime?: number;
+  /** leap: 폭탄이 떨어져 터지기까지의 시간(초) */
+  fuse?: number;
 }
 
 export interface FighterPalette {
@@ -78,6 +87,8 @@ export interface FighterPalette {
 
 export interface FighterDef {
   id: FighterId;
+  /** 3D 모델: 기본 도형으로 만든 임시 모델 또는 glb 파일(public/models/) */
+  model: { type: 'primitive' } | { type: 'glb'; body: string; weapon?: string };
   name: string;
   role: Role;
   roleLabel: string;
@@ -93,6 +104,7 @@ export interface FighterDef {
 export const FIGHTERS: readonly FighterDef[] = [
   {
     id: 'rivet',
+    model: { type: 'primitive' },
     name: 'RIVET',
     role: 'scatter',
     roleLabel: 'SCATTER',
@@ -130,6 +142,7 @@ export const FIGHTERS: readonly FighterDef[] = [
   },
   {
     id: 'volley',
+    model: { type: 'primitive' },
     name: 'VOLLEY',
     role: 'marksman',
     roleLabel: 'MARKSMAN',
@@ -168,6 +181,7 @@ export const FIGHTERS: readonly FighterDef[] = [
   },
   {
     id: 'boulder',
+    model: { type: 'primitive' },
     name: 'BOULDER',
     role: 'tank',
     roleLabel: 'TANK',
@@ -203,8 +217,49 @@ export const FIGHTERS: readonly FighterDef[] = [
       knockback: 2.5,
     },
   },
+  {
+    id: 'hinako',
+    model: { type: 'glb', body: 'models/hinako.glb', weapon: 'models/hinako_gun.glb' },
+    name: 'HINAKO',
+    role: 'sniper',
+    roleLabel: 'SNIPER',
+    tagline: 'Quiet sharpshooter of the blossom shrine. Distance is her friend.',
+    palette: { primary: '#f29ac0', secondary: '#7a2e45', accent: '#ffd6e8', skin: '#f6dcd2', dark: '#3a1824' },
+    hp: 2400,
+    moveSpeed: 2.8,
+    attack: {
+      name: 'Blossom Round',
+      description: 'A single long-range rifle shot. The farther it travels, the harder it hits.',
+      kind: 'burst',
+      damage: 800,
+      damageFar: 1700,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      range: 10.5,
+      projectileSpeed: 26,
+      ammo: 3,
+      reload: 2.3,
+      superChargePerHit: 0.25,
+    },
+    super: {
+      name: 'Petal Leap',
+      description: 'Leaps far away to a chosen spot over walls, dropping 4 blossom bombs where she took off.',
+      kind: 'leap',
+      damage: 700,
+      count: 4,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 0,
+      range: 7.5,
+      breaksWalls: false,
+      knockback: 0,
+      aoeRadius: 1.3,
+      leapTime: 0.7,
+      fuse: 0.5,
+    },
+  },
 ];
-
 export function getFighter(id: FighterId): FighterDef {
   const f = FIGHTERS.find((x) => x.id === id);
   if (!f) throw new Error(`Unknown fighter: ${id}`);

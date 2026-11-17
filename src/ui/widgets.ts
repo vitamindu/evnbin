@@ -24,7 +24,7 @@ export function iconEl(name: IconName, className = 'ico') {
   return icon(ICONS[name], className);
 }
 
-const ROLE_ICON: Record<Role, IconName> = { scatter: 'scatter', marksman: 'marksman', tank: 'tank' };
+const ROLE_ICON: Record<Role, IconName> = { scatter: 'scatter', marksman: 'marksman', tank: 'tank', sniper: 'sniper' };
 
 export function roleChip(id: FighterId) {
   const f = getFighter(id);

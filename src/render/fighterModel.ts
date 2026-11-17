@@ -346,14 +346,14 @@ function buildBoulder(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
-const BUILDERS: Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig> = {
+const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
   boulder: buildBoulder,
 };
 
 /** 캐릭터마다 다른 대기 동작 속도 */
-const IDLE: Record<FighterId, { speed: number; bob: number }> = {
+const IDLE: Partial<Record<FighterId, { speed: number; bob: number }>> = {
   rivet: { speed: 2.6, bob: 0.025 },
   volley: { speed: 2.0, bob: 0.018 },
   boulder: { speed: 1.6, bob: 0.03 },
@@ -363,12 +363,13 @@ export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = 
   const root = new THREE.Group();
   root.name = `fighter:${def.id}`;
   const g = new GeoBag();
-  const rig = BUILDERS[def.id](def, root, g);
+  const builder = BUILDERS[def.id] ?? buildRivet;
+  const rig = builder(def, root, g);
   if (opts.shadow !== false) root.add(blobShadow(def.id === 'boulder' ? 0.85 : 0.65));
 
   const baseArmL = rig.armL.rotation.x;
   const baseArmR = rig.armR.rotation.x;
-  const idle = IDLE[def.id];
+  const idle = IDLE[def.id] ?? { speed: 2.2, bob: 0.02 };
   const phase = Math.random() * Math.PI * 2;
   let celebrateT = -1;
   let moving = false;

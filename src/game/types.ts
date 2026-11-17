@@ -62,6 +62,7 @@ export interface Fighter extends UnitBase {
    * 진행 중인 행동.
    * - burst: 이동은 가능, 끝날 때까지 새 공격·궁극기 불가
    * - dash, knockback: 이동 입력 무시, 공격 불가
+   * - leap: 공중 점프. 이동·공격 불가, 피해를 받지 않는다. pos는 from→to로 직선 이동(높이는 렌더러가 그림)
    */
   action: FighterAction | null;
 }
@@ -69,7 +70,8 @@ export interface Fighter extends UnitBase {
 export type FighterAction =
   | { kind: 'burst'; remaining: number; nextTick: number; dir: number; isSuper: boolean }
   | { kind: 'dash'; dir: number; remaining: number; speed: number; hitIds: EntityId[] }
-  | { kind: 'knockback'; vx: number; vy: number; untilTick: number };
+  | { kind: 'knockback'; vx: number; vy: number; untilTick: number }
+  | { kind: 'leap'; from: Vec2; to: Vec2; startTick: number; endTick: number };
 
 export interface Dummy extends UnitBase {
   type: 'dummy';
@@ -100,6 +102,10 @@ export interface Projectile {
   breaksWalls: boolean;
   /** 넉백 거리(타일), 0이면 없음 */
   knockback: number;
+  /** 거리 비례 피해: 사거리 끝까지 날아갔을 때의 피해량. 없으면 damage 고정 */
+  damageFar?: number;
+  /** 전체 사거리(거리 비례 피해 계산용) */
+  range?: number;
   /** 관통 여부. true면 hitIds에 있는 대상은 다시 맞히지 않는다 */
   pierce: boolean;
   hitIds: EntityId[];

@@ -79,6 +79,13 @@ export const ICONS = {
       `<path d="M24 3v13M24 32v13M3 24h13M32 24h13" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>` +
       `<path d="M24 3v13M24 32v13M3 24h13M32 24h13" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>`,
   ),
+  sniper: svg(
+    `<circle cx="24" cy="24" r="17" fill="none" stroke="var(--ink)" stroke-width="7"/>` +
+      `<circle cx="24" cy="24" r="17" fill="none" stroke="#ffffff" stroke-width="3"/>` +
+      `<circle cx="24" cy="24" r="4" fill="#ff8fbf" stroke="var(--ink)" stroke-width="2.5"/>` +
+      `<path d="M24 1v9M24 38v9M1 24h9M38 24h9" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>` +
+      `<path d="M24 1v9M24 38v9M1 24h9M38 24h9" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>`,
+  ),
   tank: svg(`<path d="M24 4l17 6v12c0 11-7 18-17 22C14 40 7 33 7 22V10z" fill="#ffffff" ${S}/><path d="M24 12v24" stroke="var(--ink)" stroke-width="3"/>`),
   modeCrystal: svg(
     `<path d="M24 3l18 15-18 27L6 18z" fill="#4fe0c1" ${S}/><path d="M6 18h36M24 3l-8 15 8 27 8-27z" fill="none" stroke="#178a73" stroke-width="2" stroke-linejoin="round"/>`,
