@@ -1,0 +1,38 @@
+import { defineConfig } from '@playwright/test';
+
+/**
+ * Phase 1 E2E (title → lobby → fighter select). Runs against the production build
+ * served by `vite preview` on :4173. Build first (`npm run test:e2e` does it).
+ * Test IDs follow docs/06-test-cases.md.
+ */
+const PORT = 4173;
+
+export default defineConfig({
+  testDir: 'tests',
+  outputDir: 'test-results',
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
+  fullyParallel: true,
+  // swiftshader WebGL is CPU-bound; keep parallelism modest so timing-sensitive checks stay stable.
+  workers: 2,
+  retries: 0,
+  reporter: [['list']],
+  use: {
+    baseURL: `http://localhost:${PORT}`,
+    browserName: 'chromium',
+    viewport: { width: 1280, height: 800 },
+    hasTouch: true,
+    deviceScaleFactor: 1,
+    trace: 'off',
+    screenshot: 'only-on-failure',
+    launchOptions: {
+      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+    },
+  },
+  webServer: {
+    command: `npx vite preview --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}/`,
+    reuseExistingServer: true,
+    timeout: 60_000,
+  },
+});
