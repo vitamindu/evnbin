@@ -53,6 +53,8 @@ import {
   type Team,
   type Unit,
   type Vec2,
+  type MatchMode,
+  type MatchState,
 } from './types';
 import { angleOf, clampLen, dist, fromAngle, len } from './vec';
 import { isVisibleTo } from './visibility';
@@ -82,6 +84,8 @@ export { segmentCircle } from './geom';
 export interface SimOptions {
   map: MapDef;
   seed: number;
+  /** 경기 방식(기본 training) */
+  mode?: MatchMode;
   fighters: SpawnFighter[];
   /** 맵의 더미 생성 여부(연습장) */
   dummies: boolean;
@@ -180,6 +184,8 @@ type DashAction = Extract<FighterAction, { kind: 'dash' }>;
 const NEVER = -9999;
 
 export class Sim implements SimView {
+  /** 경기 진행 상태(점수·시간). teamfight 규칙은 Gameplay 담당 */
+  match: MatchState = { mode: 'training', score: [0, 0], targetScore: 0, ticksLeft: -1, winner: null };
   readonly grid: Grid;
   readonly rng: Rng;
   tick = 0;

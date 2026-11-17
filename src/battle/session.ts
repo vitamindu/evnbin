@@ -1,9 +1,9 @@
 import type { FighterId } from '../data/fighters';
 import { Sim } from '../game/sim';
-import { TICK_DT, type Aim, type EntityId, type Fighter, type FighterInput, type SimEvent, type Vec2 } from '../game/types';
+import { TICK_DT, type Aim, type EntityId, type Fighter, type FighterInput, type MatchMode, type MatchState, type SimEvent, type SimView, type Vec2 } from '../game/types';
 import type { MapDef } from '../game/world';
 import { BattleView } from '../render/battle/battleView';
-import type { View } from '../render/stage';
+import type { BattleLike } from './types';
 
 /**
  * 전투 한 판을 진행한다. Lead 담당.
@@ -15,9 +15,11 @@ export interface BattleOptions {
   fighterId: FighterId;
   map: MapDef;
   seed?: number;
+  mode?: MatchMode;
 }
 
-export class BattleSession implements View {
+export class BattleSession implements BattleLike {
+  readonly kind = 'local' as const;
   readonly sim: Sim;
   readonly view: BattleView;
   readonly playerId: EntityId;
@@ -36,7 +38,8 @@ export class BattleSession implements View {
     this.sim = new Sim({
       map: opts.map,
       seed: opts.seed ?? 1,
-      dummies: true,
+      mode: opts.mode,
+      dummies: (opts.mode ?? 'training') === 'training',
       fighters: [{ fighterId: opts.fighterId, team: 0, controller: 'player', spawnIndex: 0 }],
     });
     this.playerId = this.sim.units[0]!.id;
@@ -49,6 +52,14 @@ export class BattleSession implements View {
   }
   get camera() {
     return this.view.camera;
+  }
+
+  get state(): SimView {
+    return this.sim;
+  }
+
+  get match(): MatchState {
+    return this.sim.match;
   }
 
   get player(): Fighter {

@@ -151,7 +151,9 @@ export type SimEvent =
   | { type: 'explode'; pos: Vec2; radius: number; isSuper: boolean }
   | { type: 'projectileEnd'; id: EntityId; pos: Vec2; reason: 'wall' | 'range' | 'hit' }
   | { type: 'superReady'; unitId: EntityId }
-  | { type: 'noAmmo'; unitId: EntityId };
+  | { type: 'noAmmo'; unitId: EntityId }
+  | { type: 'score'; team: Team; score: [number, number]; killerId: EntityId; victimId: EntityId }
+  | { type: 'matchEnd'; winner: Team | -1; score: [number, number] };
 
 /** 시뮬레이션 시작 설정 */
 export interface SpawnFighter {
@@ -162,8 +164,25 @@ export interface SpawnFighter {
   spawnIndex: number;
 }
 
+/** 경기 방식. training: 연습장(끝 없음), teamfight: 3대3 쓰러뜨리기 대결 */
+export type MatchMode = 'training' | 'teamfight';
+
+/** 경기 진행 상태(점수판·타이머용) */
+export interface MatchState {
+  mode: MatchMode;
+  /** 팀별 점수. teamfight: 상대를 쓰러뜨린 수 */
+  score: [number, number];
+  /** 이 점수에 먼저 닿으면 승리. 0이면 없음 */
+  targetScore: number;
+  /** 남은 시간(틱). -1이면 무제한 */
+  ticksLeft: number;
+  /** 진행 중이면 null, 끝나면 이긴 팀(무승부 -1) */
+  winner: Team | -1 | null;
+}
+
 /** 시뮬레이션 상태 조회(렌더러·UI는 이 인터페이스만 쓴다) */
 export interface SimView {
+  readonly match: MatchState;
   readonly tick: number;
   readonly units: readonly Unit[];
   readonly projectiles: readonly Projectile[];
