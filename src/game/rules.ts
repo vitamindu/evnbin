@@ -81,5 +81,11 @@ export const LEAP_BOMB_RING = 1;
 export const DEFAULT_LEAP_TIME = 0.7;
 export const DEFAULT_FUSE = 0.5;
 
+// ── TEAM FIGHT ──
+/** 이 점수(상대 파이터를 쓰러뜨린 수)에 먼저 닿는 팀이 이긴다 */
+export const TEAMFIGHT_TARGET_SCORE = 10;
+/** 경기 시간. 끝나면 점수가 높은 팀 승리, 같으면 무승부 */
+export const TEAMFIGHT_TICKS = secToTicks(150);
+
 /** 부동소수 누적 오차 허용치(탄창·게이지 비교) */
 export const EPS = 1e-9;
