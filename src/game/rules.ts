@@ -31,7 +31,7 @@ export const DUMMY_RESPAWN_TICKS = secToTicks(2);
 
 // ── 넉백 ──
 /** 넉백으로 밀려나는 시간. 이 동안 이동·공격 불가 */
-export const KNOCKBACK_TICKS = secToTicks(0.25);
+export const KNOCKBACK_TICKS = secToTicks(0.5);
 
 // ── 수풀·노출 ──
 /** 공격하면 이 시간 동안 수풀 안에서도 보인다 */
@@ -55,14 +55,14 @@ export const DUMMY_HP = 6000;
 /** patrol: 시작점 기준 좌우로 오가는 거리 */
 export const PATROL_HALF_WIDTH = 3;
 /** patrol: 이동 속도(타일/초) */
-export const PATROL_SPEED = 2;
+export const PATROL_SPEED = 1.4;
 /** turret: 발사 간격 */
 export const TURRET_INTERVAL_TICKS = secToTicks(1.5);
 /** turret: 조준 사거리(이 안의 적 파이터만 노린다) */
-export const TURRET_RANGE = 8;
+export const TURRET_RANGE = 5.6;
 /** turret: 탄이 날아가는 최대 거리(사거리 끝의 표적에도 닿도록 조금 더 길다) */
-export const TURRET_SHOT_RANGE = 8.5;
-export const TURRET_SHOT_SPEED = 7;
+export const TURRET_SHOT_RANGE = 6;
+export const TURRET_SHOT_SPEED = 5.5;
 export const TURRET_DAMAGE = 400;
 export const TURRET_SHOT_RADIUS = 0.25;
 

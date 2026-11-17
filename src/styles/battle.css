@@ -113,19 +113,22 @@
   border-radius: 8px;
 }
 
-/* 내 탄창 칸(소수 부분 = 재장전 진행도) */
+/* 내 탄창 칸(소수 부분 = 재장전 진행도). 체력 막대와 같은 폭을 정확히 탄창 수만큼 똑같이 나눈다 */
 .ub-ammo {
-  display: flex;
-  gap: 3px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  column-gap: 2px;
   width: 90px;
+  height: 12px;
   margin-top: 4px;
+  border: 2.5px solid var(--ink);
+  border-radius: 6px;
+  background: var(--ink);
+  overflow: hidden;
 }
 .ub-ammo > i {
   position: relative;
-  flex: 1;
-  height: 10px;
-  border: 2px solid var(--ink);
-  border-radius: 4px;
   background: #2a2350;
   overflow: hidden;
 }

@@ -9,14 +9,14 @@ import { toast } from '../overlays/toast';
 import { attachDrag, button, header, iconEl, roleChip, txt } from '../widgets';
 
 function rangeLabel(r: number) {
-  if (r < 5) return 'VERY SHORT';
-  if (r < 8) return 'SHORT';
-  if (r < 9.5) return 'NORMAL';
+  if (r < 3.5) return 'VERY SHORT';
+  if (r < 5.6) return 'SHORT';
+  if (r < 6.65) return 'NORMAL';
   return 'LONG';
 }
 function speedLabel(s: number) {
-  if (s < 2.7) return 'SLOW';
-  if (s < 2.95) return 'NORMAL';
+  if (s < 1.89) return 'SLOW';
+  if (s < 2.05) return 'NORMAL';
   return 'FAST';
 }
 
