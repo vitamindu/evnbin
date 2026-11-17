@@ -60,6 +60,17 @@ export function header(title: string, onBack: () => void, right?: HTMLElement) {
   ]);
 }
 
+/** pointerup 직후 따라오는 click 하나를 화면 어디서든 무시한다(최대 500ms) */
+function swallowNextClick() {
+  const stop = (e: MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    window.removeEventListener('click', stop, true);
+  };
+  window.addEventListener('click', stop, true);
+  window.setTimeout(() => window.removeEventListener('click', stop, true), 500);
+}
+
 /** 손가락 드래그(캐릭터 돌리기)와 짧은 탭을 구분한다. dx는 설계 좌표(px) 기준. */
 export function attachDrag(
   target: HTMLElement,
@@ -88,7 +99,11 @@ export function attachDrag(
     if (e.pointerId !== active) return;
     active = -1;
     h.onEnd?.();
-    if (moved < 8 && e.type === 'pointerup') h.onTap?.();
+    if (moved < 8 && e.type === 'pointerup' && h.onTap) {
+      // 탭으로 화면이 바뀌면, 같은 탭의 click이 새 화면의 버튼을 눌러 버린다(유령 클릭). 바로 뒤 click 하나를 삼킨다.
+      swallowNextClick();
+      h.onTap();
+    }
   };
   target.addEventListener('pointerup', end);
   target.addEventListener('pointercancel', end);

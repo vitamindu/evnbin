@@ -1,9 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Phase 1 E2E (title → lobby → fighter select). Runs against the production build
- * served by `vite preview` on :4173. Build first (`npm run test:e2e` does it).
- * Test IDs follow docs/06-test-cases.md.
+ * E2E: phase 1 (title → lobby → fighter select, tests/phase1.spec.ts) and phase 2
+ * (offline battle, tests/phase2.spec.ts; battle tests open `/?qa` to read `window.__fgBattle`).
+ * Runs against the production build served by `vite preview` on :4173. Build first
+ * (`npm run test:e2e` does it). Test IDs follow docs/06-test-cases.md.
  */
 const PORT = 4173;
 

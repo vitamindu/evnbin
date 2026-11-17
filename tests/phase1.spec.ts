@@ -75,18 +75,19 @@ test('T-02 tap title goes to lobby with default fighter RIVET', async ({ page },
   await shot(page, testInfo, '02-lobby');
 });
 
-test('T-03 FIGHTERS button opens list: 3 cards + MORE SOON, RIVET SELECTED', async ({ page }, testInfo) => {
+test('T-03 FIGHTERS button opens list: 4 cards + MORE SOON, RIVET SELECTED', async ({ page }, testInfo) => {
   await gotoLobby(page);
   await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'fighters');
 
   const cards = page.locator('.fighter-grid .fcard');
-  await expect(cards).toHaveCount(4);
-  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(3);
-  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER']);
+  await expect(cards).toHaveCount(5);
+  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(4);
+  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO']);
   await expect(page.locator('.fcard-soon')).toContainText('MORE SOON');
   await expect(cards.last()).toHaveClass(/fcard-soon/);
+  await expect(page.locator('.fighters-count')).toHaveText('4 / 4 UNLOCKED');
 
   const rivet = page.locator('.fcard[data-fighter="rivet"]');
   await expect(rivet).toHaveClass(/is-selected/);
@@ -95,7 +96,7 @@ test('T-03 FIGHTERS button opens list: 3 cards + MORE SOON, RIVET SELECTED', asy
   await expect(page.locator('.fcard.is-selected')).toHaveCount(1);
 
   // Portraits were rendered (data URLs from the offscreen WebGL pass) and actually decoded.
-  for (const id of ['rivet', 'volley', 'boulder']) {
+  for (const id of ['rivet', 'volley', 'boulder', 'hinako']) {
     const img = page.locator(`.fcard[data-fighter="${id}"] img`);
     await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
   }
@@ -156,7 +157,7 @@ test('T-06 selection persists across reload (VOLLEY)', async ({ page }) => {
   await expect(page.locator('.fcard-selected')).toHaveCount(1);
 });
 
-test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → RIVET', async ({ page }) => {
+test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → HINAKO → RIVET', async ({ page }) => {
   await gotoFighters(page);
   await page.locator('.fcard[data-fighter="rivet"]').tap();
   const name = page.locator('.detail-name');
@@ -166,13 +167,13 @@ test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → RIVET', async ({
 
   const next = page.locator('.arrow-next');
   const prev = page.locator('.arrow-prev');
-  for (const expected of ['VOLLEY', 'BOULDER', 'RIVET']) {
+  for (const expected of ['VOLLEY', 'BOULDER', 'HINAKO', 'RIVET']) {
     await next.tap();
     await expect(name).toHaveText(expected);
     // SELECT label tracks whether the shown fighter is the selected one (RIVET by default).
     await expect(selectBtn).toHaveText(expected === 'RIVET' ? 'SELECTED' : 'SELECT');
   }
-  for (const expected of ['BOULDER', 'VOLLEY', 'RIVET']) {
+  for (const expected of ['HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
     await prev.tap();
     await expect(name).toHaveText(expected);
   }
@@ -208,29 +209,26 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
   }
 });
 
-test('T-09 PLAY opens matchmaking, timer runs, CANCEL closes it', async ({ page }, testInfo) => {
+test('T-09 PLAY opens the Training Yard battle and the back button returns to the lobby', async ({ page }, testInfo) => {
   await gotoLobby(page);
   await page.locator('.btn-play').tap();
-  const panel = page.locator('.mm-panel');
-  await expect(panel).toBeVisible();
-  await expect(panel.locator('.mm-title')).toHaveText('SEARCHING');
-  await expect(panel.locator('.mm-slot')).toHaveCount(6);
-  await expect(panel.locator('.mm-me img')).toHaveAttribute('alt', 'RIVET');
-
-  const time = panel.locator('.mm-time');
-  const seconds = async () => {
-    const [m, s] = (await time.innerText()).split(':').map(Number);
-    return m! * 60 + s!;
-  };
-  await expect(time).toHaveText(/^\d+:\d{2}$/);
-  const start = await seconds();
-  await expect.poll(seconds, { message: 'elapsed time increases', timeout: 6_000 }).toBeGreaterThanOrEqual(start + 2);
-  await shot(page, testInfo, '09-matchmaking');
-
-  await panel.locator('.btn-cancel').tap();
+  await expect(page.locator('.battle')).toBeVisible();
+  await expect(page.locator('#app')).toHaveAttribute('data-bg', 'battle');
+  await expect(page.locator('.battle-label')).toHaveText('TRAINING YARD');
+  await expect(page.locator('.btn-battle-exit')).toBeVisible();
+  await expect(page.locator('.lobby')).toHaveCount(0);
+  // Phase 2: PLAY no longer opens the matchmaking popup.
   await expect(page.locator('.mm-panel')).toHaveCount(0);
   await expect(page.locator('.overlay')).toHaveCount(0);
+  // The player's own HP bar is drawn once the battle loop runs.
+  await expect(page.locator('.ub.is-me .ub-bar')).toBeVisible();
+  await shot(page, testInfo, '09-battle');
+
+  await page.locator('.btn-battle-exit').tap();
   await expect(page.locator('.lobby')).toBeVisible();
+  await expect(page.locator('#app')).toHaveAttribute('data-bg', 'lobby');
+  await expect(page.locator('.battle')).toHaveCount(0);
+  await expect(page.locator('.nameplate .np-name')).toHaveText('RIVET');
 });
 
 test('T-10 settings: GRAPHICS toggles HIGH/LOW, SHOW FPS shows the FPS meter', async ({ page }, testInfo) => {
@@ -290,7 +288,12 @@ test.describe('on a 2x display', () => {
 test('T-11 tapping the lobby fighter opens the fighter list', async ({ page }) => {
   await gotoLobby(page);
   await page.locator('.stage-hit').tap();
+  // Let the browser deliver the click that follows the tap, so a ghost click that falls through
+  // to the newly shown screen (e.g. onto a fighter card) is caught instead of racing it.
+  await page.waitForTimeout(800);
+  await expect(page.locator('#app'), 'ends on the fighter list (not a fighter detail screen)').toHaveAttribute('data-bg', 'fighters');
   await expect(page.locator('.fighters')).toBeVisible();
+  await expect(page.locator('.detail')).toHaveCount(0);
   await expect(page.locator('.lobby')).toHaveCount(0);
 });
 
