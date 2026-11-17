@@ -41,6 +41,8 @@ export interface AttackDef {
   superChargePerHit: number;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
   lateralOffset?: number;
+  /** lob: 착탄 범위 반지름(타일) */
+  aoeRadius?: number;
 }
 
 export interface SuperDef {
@@ -62,6 +64,8 @@ export interface SuperDef {
   knockback: number;
   /** lob/폭발형: 착탄 범위 반지름(타일) */
   aoeRadius?: number;
+  /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일) */
+  lateralOffset?: number;
 }
 
 export interface FighterPalette {

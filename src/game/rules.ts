@@ -22,7 +22,7 @@ export const PROJECTILE_RADIUS = 0.18;
 export const SUPER_PROJECTILE_RADIUS = 0.24;
 /** 데이터에 속도가 없을 때 쓰는 투사체 속도 */
 export const DEFAULT_PROJECTILE_SPEED = 12;
-/** lob 기본 착탄 범위(AttackDef에는 aoeRadius가 없다) */
+/** lob 기본 착탄 범위(데이터에 aoeRadius가 없을 때) */
 export const DEFAULT_LOB_AOE = 1.2;
 
 // ── 사망·부활 ──

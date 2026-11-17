@@ -112,7 +112,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       projectileSpeed: s.projectileSpeed || DEFAULT_PROJECTILE_SPEED,
       breaksWalls: s.breaksWalls,
       knockback: s.knockback,
-      lateralOffset: 0,
+      lateralOffset: s.lateralOffset ?? 0,
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
     };
   }
@@ -129,7 +129,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     breaksWalls: false,
     knockback: 0,
     lateralOffset: a.lateralOffset ?? 0,
-    aoeRadius: DEFAULT_LOB_AOE,
+    aoeRadius: a.aoeRadius ?? DEFAULT_LOB_AOE,
   };
 }
 

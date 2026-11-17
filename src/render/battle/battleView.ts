@@ -3,6 +3,7 @@ import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../config';
 import { getFighter } from '../../data/fighters';
 import type { EntityId, Fighter, SimEvent, SimView, Unit, Vec2 } from '../../game/types';
 import type { Grid } from '../../game/world';
+import { isVisibleTo } from '../../game/visibility';
 import { buildFighterModel, type FighterModel } from '../fighterModel';
 import { addStandardLights } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
@@ -119,7 +120,7 @@ export class BattleView {
       v.facingPrev = v.facingCurr;
       v.facingCurr = u.facing;
       v.model.setMoving(u.type === 'fighter' ? u.moving : false);
-      v.hidden = !u.alive || this.hiddenFromViewer(u);
+      v.hidden = !u.alive || this.hiddenFromViewer(sim, u);
     }
     for (const [id, v] of this.units) {
       if (!seen.has(id)) {
@@ -179,13 +180,10 @@ export class BattleView {
     }
   }
 
-  /** 적 파이터가 수풀 안에 숨어 있어 보이지 않는가 */
-  private hiddenFromViewer(u: Unit): boolean {
-    if (u.type !== 'fighter') return false;
-    const me = this.units.get(this.followId)?.unit;
-    if (!me || u.team === me.team) return false;
-    if (!u.inBush || this.simTick < u.revealedUntil) return false;
-    return Math.hypot(u.pos.x - me.pos.x, u.pos.y - me.pos.y) > 2.5;
+  /** 내 팀에게 보이지 않는 유닛(수풀 속 적 등). 규칙은 src/game/visibility.ts */
+  private hiddenFromViewer(sim: SimView, u: Unit): boolean {
+    const me = sim.getUnit(this.followId);
+    return me ? !isVisibleTo(sim, u, me.team) : false;
   }
 
   private shotMaterial(owner: Unit | undefined, isSuper: boolean) {
