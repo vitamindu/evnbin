@@ -5,3 +5,6 @@ test-results/
 playwright-report/
 *.log
 .DS_Store
+
+# 에이전트 작업 공간(git worktree)
+.claude/worktrees/
