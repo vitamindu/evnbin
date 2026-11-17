@@ -28,6 +28,8 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          # 온라인 대전 서버(Fly.io). 설정 화면에서 바꿀 수도 있다
+          VITE_SERVER_URL: wss://fightguys-evnbin.fly.dev
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
