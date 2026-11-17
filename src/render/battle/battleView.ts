@@ -5,7 +5,7 @@ import type { EntityId, Fighter, SimEvent, SimView, Unit, Vec2 } from '../../gam
 import type { Grid } from '../../game/world';
 import { isVisibleTo } from '../../game/visibility';
 import { buildFighterModel, type FighterModel } from '../fighterModel';
-import { addStandardLights } from '../toon';
+import { addStandardLights, toon } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
 import { buildDummyModel, type DummyModel } from './dummyModel';
 
@@ -37,14 +37,66 @@ interface ShotVisual {
   curr: Vec2;
 }
 
-/** 투사체 색: 바닥(모래색)과 확실히 구분되는 진한 색 + 남색 외곽선 */
+/** 투사체 몸통 색(카툰 명암을 받는다). 빛 테두리·꼬리는 이 색을 흰색 쪽으로 섞은 밝은 색 */
 const SHOT_COLOR: Record<string, string> = {
-  rivet: '#ff7a00',
-  volley: '#0fa8ff',
-  boulder: '#4f5872',
-  hinako: '#ff2f92',
-  dummy: '#ff2338',
+  rivet: '#ee5a00',
+  volley: '#1554e0',
+  boulder: '#4d5270',
+  hinako: '#ec2a7c',
+  dummy: '#cf1d2c',
 };
+
+/** 가로(u) 방향으로 앞→뒤 투명해지고, 세로(v) 가장자리가 부드러운 꼬리 텍스처 */
+function trailTexture(): THREE.CanvasTexture {
+  const w = 128;
+  const h = 32;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  const img = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const v = Math.abs(y / (h - 1) - 0.5) * 2; // 0 가운데 ~ 1 가장자리
+    const edge = Math.max(0, 1 - v * v);
+    for (let x = 0; x < w; x++) {
+      const u = x / (w - 1); // 0 탄 쪽 ~ 1 꼬리 끝
+      const a = Math.pow(1 - u, 1.6) * edge;
+      const i = (y * w + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+      img.data[i + 3] = Math.round(a * 255);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** 부드러운 원형 그림자 텍스처 */
+function softDotTexture(): THREE.CanvasTexture {
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, 'rgba(0,0,0,1)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+/** 앞(x=0)에서 뒤(x=-len)로 가늘어지는 평평한 꼬리 띠(XZ 평면) */
+function trailGeometry(len: number, w0: number, w1: number): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array([0, 0, -w0 / 2, 0, 0, w0 / 2, -len, 0, -w1 / 2, -len, 0, w1 / 2]);
+  const uv = new Float32Array([0, 0, 0, 1, 1, 0, 1, 1]);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex([0, 2, 1, 1, 2, 3]);
+  return geo;
+}
 
 interface Effect {
   obj: THREE.Object3D;
@@ -81,11 +133,11 @@ export class BattleView {
   private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number }>();
   private effects: Effect[] = [];
   private readonly shotGeo = new THREE.SphereGeometry(0.22, 14, 10);
-  private readonly shotMats = new Map<string, THREE.MeshBasicMaterial>();
-  private readonly shotKits = new Map<boolean, { core: THREE.BufferGeometry; inner: THREE.BufferGeometry; trail: THREE.BufferGeometry; shadow: THREE.BufferGeometry; r: number }>();
-  private readonly inkMat = new THREE.MeshBasicMaterial({ color: '#12102a', side: THREE.BackSide });
-  private readonly whiteMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
-  private readonly shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.3, depthWrite: false });
+  private readonly shotKits = new Map<boolean, { core: THREE.BufferGeometry; halo: THREE.BufferGeometry; trail: THREE.BufferGeometry; shadow: THREE.BufferGeometry; r: number }>();
+  private readonly trailTex = trailTexture();
+  private readonly dotTex = softDotTexture();
+  private readonly shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', map: this.dotTex, transparent: true, opacity: 0.32, depthWrite: false });
+  private readonly glowMats = new Map<string, { halo: THREE.MeshBasicMaterial; trail: THREE.MeshBasicMaterial }>();
   private dustTimer = 0;
   private readonly camTarget = new THREE.Vector3();
   private camInit = false;
@@ -174,12 +226,13 @@ export class BattleView {
       lobSeen.add(l.id);
       if (!this.lobs.has(l.id)) {
         const owner = sim.getUnit(l.ownerId);
-        const shellMat = this.shotMaterial(owner, l.isSuper).clone();
+        const baseColor = this.shotColor(owner);
+        const shellMat = new THREE.MeshToonMaterial({ color: baseColor });
         const shell = new THREE.Mesh(this.shotGeo, shellMat);
-        const shellOutline = new THREE.Mesh(this.shotGeo, this.inkMat);
-        shellOutline.scale.setScalar(1.25);
-        shell.add(shellOutline);
-        shell.scale.setScalar(1.3);
+        const shellGlow = new THREE.Mesh(this.shotGeo, this.glow(baseColor).halo);
+        shellGlow.scale.setScalar(1.4);
+        shell.add(shellGlow);
+        shell.scale.setScalar(1.1);
         const marker = new THREE.Mesh(
           new THREE.RingGeometry(Math.max(0.1, l.aoeRadius - 0.08), l.aoeRadius, 40),
           new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.55, depthWrite: false }),
@@ -187,7 +240,7 @@ export class BattleView {
         marker.rotation.x = -Math.PI / 2;
         marker.position.set(l.to.x, 0.04, l.to.y);
         this.scene.add(shell, marker);
-        shell.userData.baseColor = '#' + shellMat.color.getHexString();
+        shell.userData.baseColor = baseColor;
         this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick });
       }
     }
@@ -227,50 +280,53 @@ export class BattleView {
     return (owner.type === 'fighter' ? SHOT_COLOR[owner.fighterId] : SHOT_COLOR.dummy) ?? '#ff7a00';
   }
 
-  private shotMaterial(owner: Unit | undefined, _isSuper: boolean) {
-    const color = this.shotColor(owner);
-    let m = this.shotMats.get(color);
-    if (!m) {
-      m = new THREE.MeshBasicMaterial({ color });
-      this.shotMats.set(color, m);
+  /** 몸통 재질(카툰 명암) */
+  private shotMaterial(owner: Unit | undefined, _isSuper: boolean): THREE.Material {
+    return toon(this.shotColor(owner));
+  }
+
+  private glow(color: string) {
+    let g = this.glowMats.get(color);
+    if (!g) {
+      const light = new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.45);
+      g = {
+        halo: new THREE.MeshBasicMaterial({ color: light, transparent: true, opacity: 0.5, depthWrite: false }),
+        trail: new THREE.MeshBasicMaterial({ color: light, map: this.trailTex, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+      };
+      this.glowMats.set(color, g);
     }
-    return m;
+    return g;
   }
 
   /**
-   * 잘 보이는 투사체: 진행 방향으로 길쭉한 탄 + 남색 외곽선 + 흰 심 + 뒤로 꼬리 + 바닥 그림자 점.
+   * 투사체: 카툰 명암을 받는 둥근 탄 + 밝은 반투명 빛 테두리 + 뒤로 흐려지는 꼬리 + 흐릿한 바닥 그림자.
    * 로컬 +x가 진행 방향(그룹을 y축으로 돌려서 맞춘다).
    */
   private buildShot(owner: Unit | undefined, isSuper: boolean): THREE.Group {
     let kit = this.shotKits.get(isSuper);
     if (!kit) {
-      const r = isSuper ? 0.27 : 0.2;
-      const len = isSuper ? 0.5 : 0.35;
-      const core = new THREE.CapsuleGeometry(r, len, 4, 12).rotateZ(Math.PI / 2);
-      const inner = new THREE.CapsuleGeometry(r * 0.45, len * 0.85, 3, 8).rotateZ(Math.PI / 2);
-      const trailLen = isSuper ? 0.7 : 0.6;
-      const trail = new THREE.ConeGeometry(r * 0.9, trailLen, 12, 1, true).rotateZ(Math.PI / 2).translate(-(len / 2 + trailLen / 2), 0, 0);
-      const shadow = new THREE.CircleGeometry(r * 1.15, 16).rotateX(-Math.PI / 2);
-      kit = { core, inner, trail, shadow, r };
+      const r = isSuper ? 0.25 : 0.19;
+      const len = isSuper ? 0.42 : 0.3;
+      const core = new THREE.CapsuleGeometry(r, len, 6, 14).rotateZ(Math.PI / 2);
+      const halo = new THREE.CapsuleGeometry(r * 1.45, len * 1.1, 6, 14).rotateZ(Math.PI / 2);
+      const trailLen = isSuper ? 2.0 : 1.5;
+      const trail = trailGeometry(trailLen, r * 2.3, r * 0.5).translate(-len / 2, 0, 0);
+      const shadow = new THREE.PlaneGeometry(len + r * 3, r * 2.6).rotateX(-Math.PI / 2);
+      kit = { core, halo, trail, shadow, r };
       this.shotKits.set(isSuper, kit);
     }
     const color = this.shotColor(owner);
+    const glow = this.glow(color);
     const g = new THREE.Group();
+    const trail = new THREE.Mesh(kit.trail, glow.trail);
+    trail.renderOrder = 1;
+    const halo = new THREE.Mesh(kit.halo, glow.halo);
+    halo.renderOrder = 2;
     const core = new THREE.Mesh(kit.core, this.shotMaterial(owner, isSuper));
-    const outline = new THREE.Mesh(kit.core, this.inkMat);
-    outline.scale.setScalar(1.3);
-    const inner = new THREE.Mesh(kit.inner, this.whiteMat);
-    inner.position.y = kit.r * 0.35;
-    const trailKey = `trail|${color}`;
-    let trailMat = this.shotMats.get(trailKey);
-    if (!trailMat) {
-      trailMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false });
-      this.shotMats.set(trailKey, trailMat);
-    }
-    const trail = new THREE.Mesh(kit.trail, trailMat);
+    core.renderOrder = 3;
     const shadow = new THREE.Mesh(kit.shadow, this.shadowMat);
-    shadow.position.y = -0.58;
-    g.add(outline, core, inner, trail, shadow);
+    shadow.position.y = -0.56;
+    g.add(shadow, trail, halo, core);
     return g;
   }
 
@@ -343,8 +399,8 @@ export class BattleView {
         const left = Math.max(0, (l.end - tickF) / 30);
         const freq = left > 1 ? 3 : left > 0.4 ? 7 : 14;
         const on = Math.sin(t * freq * Math.PI * 2) > 0;
-        (l.shell.material as THREE.MeshBasicMaterial).color.set(on ? '#ffffff' : this.shotColorFromMarker(l));
-        l.shell.scale.setScalar(1.3 + (on ? 0.15 : 0));
+        (l.shell.material as THREE.MeshToonMaterial).color.set(on ? '#ffffff' : this.shotColorFromMarker(l));
+        l.shell.scale.setScalar(1.1 + (on ? 0.15 : 0));
       }
     }
     // 돌진 중이면 발밑에서 먼지
@@ -615,10 +671,10 @@ export class BattleView {
     for (const e of this.effects) e.dispose();
     this.map.dispose();
     this.shotGeo.dispose();
-    for (const m of this.shotMats.values()) m.dispose();
-    for (const k of this.shotKits.values()) for (const g of [k.core, k.inner, k.trail, k.shadow]) g.dispose();
-    this.inkMat.dispose();
-    this.whiteMat.dispose();
+    for (const k of this.shotKits.values()) for (const g of [k.core, k.halo, k.trail, k.shadow]) g.dispose();
+    for (const g of this.glowMats.values()) (g.halo.dispose(), g.trail.dispose());
+    this.trailTex.dispose();
+    this.dotTex.dispose();
     this.shadowMat.dispose();
     this.scene.clear();
   }
