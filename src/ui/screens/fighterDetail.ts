@@ -95,7 +95,12 @@ export function createFighterDetailScreen(ctx: AppContext) {
     const a = f.attack;
     stats.replaceChildren(
       statRow('HEALTH', f.hp, STAT_MAX.hp, String(f.hp)),
-      statRow('DAMAGE', a.damage * a.count, STAT_MAX.damage, a.count > 1 ? `${a.damage} × ${a.count}` : String(a.damage)),
+      statRow(
+        'DAMAGE',
+        (a.damageFar ?? a.damage) * a.count,
+        STAT_MAX.damage,
+        a.damageFar ? `${a.damage}–${a.damageFar}` : a.count > 1 ? `${a.damage} × ${a.count}` : String(a.damage),
+      ),
       statRow('RANGE', a.range, STAT_MAX.range, rangeLabel(a.range)),
       statRow('SPEED', f.moveSpeed, STAT_MAX.speed, speedLabel(f.moveSpeed)),
     );

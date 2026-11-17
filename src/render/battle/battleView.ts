@@ -14,7 +14,9 @@ import { buildDummyModel, type DummyModel } from './dummyModel';
  * 시뮬레이션(평면 x, y)을 3D(x, 0, z=y)로 옮겨 그린다. 틱 사이는 보간한다.
  */
 
-const MODEL_SCALE = 0.72;
+const MODEL_SCALE = 0.85;
+/** 발밑 팀 표시 원: 나 / 아군 / 적 */
+const TEAM_RING = { me: '#3ec8ff', ally: '#4f8bff', enemy: '#ff4f5e' };
 const CAM_PITCH = THREE.MathUtils.degToRad(56);
 const CAM_DIST = 17;
 const LOB_HEIGHT = 2.6;
@@ -108,6 +110,7 @@ export class BattleView {
       if (!v) {
         const model = u.type === 'fighter' ? buildFighterModel(getFighter(u.fighterId)) : buildDummyModel(u.behavior);
         model.root.scale.setScalar(MODEL_SCALE);
+        if (u.type === 'fighter') model.root.add(this.teamRing(u));
         this.scene.add(model.root);
         v = { unit: u, model, prev: { ...u.pos }, curr: { ...u.pos }, facingPrev: u.facing, facingCurr: u.facing, hidden: false };
         this.units.set(u.id, v);
@@ -186,6 +189,19 @@ export class BattleView {
     return me ? !isVisibleTo(sim, u, me.team) : false;
   }
 
+  /** 발밑 팀 색 원(모델 크기에 맞춰 함께 커진다) */
+  private teamRing(u: Unit): THREE.Mesh {
+    const color = u.id === this.followId ? TEAM_RING.me : u.team === 0 ? TEAM_RING.ally : TEAM_RING.enemy;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.7, 40),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    ring.renderOrder = -1;
+    return ring;
+  }
+
   private shotMaterial(owner: Unit | undefined, isSuper: boolean) {
     const color = owner?.type === 'fighter' ? getFighter(owner.fighterId).palette.accent : '#ff6060';
     const key = `${color}|${isSuper}`;
@@ -234,10 +250,18 @@ export class BattleView {
 
   /** alpha: 이전 틱→현재 틱 사이 진행률(0~1) */
   frame(t: number, dt: number, alpha: number) {
+    const tickF = this.simTick + alpha;
     for (const v of this.units.values()) {
       const x = lerp(v.prev.x, v.curr.x, alpha);
       const y = lerp(v.prev.y, v.curr.y, alpha);
-      v.model.root.position.set(x, 0, y);
+      let h = 0;
+      const act = v.unit.type === 'fighter' ? v.unit.action : null;
+      if (act?.kind === 'leap') {
+        const k = Math.min(1, Math.max(0, (tickF - act.startTick) / Math.max(1, act.endTick - act.startTick)));
+        const dist = Math.hypot(act.to.x - act.from.x, act.to.y - act.from.y);
+        h = 4 * (0.8 + dist * 0.18) * k * (1 - k);
+      }
+      v.model.root.position.set(x, h, y);
       v.model.root.rotation.y = yawOf(lerpAngle(v.facingPrev, v.facingCurr, Math.min(1, alpha * 1.5)));
       v.model.root.visible = !v.hidden;
       v.model.update(t, dt);
@@ -245,7 +269,6 @@ export class BattleView {
     for (const s of this.shots.values()) {
       s.mesh.position.set(lerp(s.prev.x, s.curr.x, alpha), 0.65, lerp(s.prev.y, s.curr.y, alpha));
     }
-    const tickF = this.simTick + alpha;
     for (const l of this.lobs.values()) {
       const k = Math.min(1, Math.max(0, (tickF - l.start) / Math.max(1, l.end - l.start)));
       l.shell.position.set(lerp(l.from.x, l.to.x, k), 0.6 + 4 * LOB_HEIGHT * k * (1 - k), lerp(l.from.y, l.to.y, k));
@@ -337,6 +360,11 @@ export class BattleView {
         target.name = 'lobTarget';
         break;
       }
+      case 'leap': {
+        flat(new THREE.CircleGeometry(0.7, 32));
+        flat(new THREE.RingGeometry(0.8, 0.95, 32));
+        break;
+      }
     }
     obj = group;
     obj.position.y = 0.03;
@@ -358,9 +386,10 @@ export class BattleView {
     const p = v.model.root.position;
     const dir = Math.atan2(a.aim.y, a.aim.x);
     const k = Math.min(1, Math.hypot(a.aim.x, a.aim.y));
-    if (shape.userData.kind === 'lob') {
+    if (shape.userData.kind === 'lob' || shape.userData.kind === 'leap') {
       const r = shape.userData.range as number;
-      shape.position.set(p.x + Math.cos(dir) * r * k, 0.03, p.z + Math.sin(dir) * r * k);
+      const kk = shape.userData.kind === 'leap' ? Math.max(2 / r, k) : k;
+      shape.position.set(p.x + Math.cos(dir) * r * kk, 0.03, p.z + Math.sin(dir) * r * kk);
       shape.rotation.y = 0;
     } else {
       shape.position.set(p.x, 0.03, p.z);

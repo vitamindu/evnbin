@@ -33,6 +33,16 @@ export function toon(color: THREE.ColorRepresentation, emissive?: THREE.ColorRep
   return m;
 }
 
+/** 텍스처가 있는 모델(glb)용 카툰 재질. 텍스처 색은 유지하고 명암만 3단으로 */
+export function toonTextured(src: { map?: THREE.Texture | null; normalMap?: THREE.Texture | null; color?: THREE.Color }): THREE.MeshToonMaterial {
+  return new THREE.MeshToonMaterial({
+    map: src.map ?? null,
+    normalMap: src.normalMap ?? null,
+    color: src.color ?? new THREE.Color('#ffffff'),
+    gradientMap: gradientMap(),
+  });
+}
+
 export const OUTLINE_COLOR = '#12102a';
 
 const outlineMat = new THREE.ShaderMaterial({

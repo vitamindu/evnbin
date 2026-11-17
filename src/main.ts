@@ -9,6 +9,7 @@ import { el } from './core/dom';
 import { setupLayout } from './core/layout';
 import { ScreenManager } from './core/screens';
 import { Stage } from './render/stage';
+import { preloadGlbFighters } from './render/glbFighter';
 import { renderPortraits } from './render/thumbnails';
 import { getSettings, onSettingsChange } from './state/settings';
 import type { AppContext } from './ui/context';
@@ -70,7 +71,10 @@ async function boot() {
     Promise.all([document.fonts.load('40px "Lilita One"'), document.fonts.load('40px "Black Han Sans"', '가')]),
     4000,
   );
-  title.setProgress(0.5);
+  title.setProgress(0.4);
+  // glb 캐릭터 모델(초상화를 그리기 전에 받아 둔다)
+  await withTimeout(preloadGlbFighters(), 15000);
+  title.setProgress(0.6);
   await nextFrame();
 
   const portraits = renderPortraits();

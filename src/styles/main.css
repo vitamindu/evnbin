@@ -673,8 +673,8 @@ img {
   left: 50%;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, 264px);
-  gap: 26px;
+  grid-template-columns: repeat(5, 224px);
+  gap: 18px;
 }
 .fcard {
   height: 450px;
@@ -763,7 +763,7 @@ img {
   gap: 6px;
 }
 .fcard-name {
-  font-size: 34px;
+  font-size: 30px;
   --o: 3px;
 }
 .fcard-soon {

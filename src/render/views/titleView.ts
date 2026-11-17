@@ -14,12 +14,14 @@ export class TitleView implements View {
     addStandardLights(this.scene);
     this.camera.position.set(0, 1.5, 9.5);
     this.camera.lookAt(0, 1.8, 0);
-    const xs = [-1.9, 0, 1.9];
-    const yaws = [0.4, 0, -0.4];
+    // 캐릭터 수에 맞춰 가로로 나란히(가운데 쪽이 조금 앞으로)
+    const n = FIGHTERS.length;
+    const gap = n > 3 ? 1.75 : 1.9;
     FIGHTERS.forEach((def, i) => {
       const m = buildFighterModel(def);
-      m.root.position.set(xs[i] ?? 0, 0, i === 1 ? 0.4 : 0);
-      m.root.rotation.y = yaws[i] ?? 0;
+      const k = i - (n - 1) / 2;
+      m.root.position.set(k * gap, 0, 0.4 - Math.abs(k) * 0.25);
+      m.root.rotation.y = -k * 0.28;
       this.scene.add(m.root);
       this.models.push(m);
     });

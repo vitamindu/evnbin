@@ -1,6 +1,6 @@
 import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
-import { getFighter } from '../../data/fighters';
+import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import type { AppContext } from '../context';
@@ -91,7 +91,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     el('div', 'lb-top-right', [currencyBar(comingSoon), button('icon-btn', [iconEl('gear')], () => openSettings(ctx))]),
     el('div', 'lb-side lb-side-left', [
       sideBtn('SHOP', 'shop', comingSoon),
-      sideBtn('FIGHTERS', 'fighters', () => ctx.go.fighters(), '3'),
+      sideBtn('FIGHTERS', 'fighters', () => ctx.go.fighters(), String(FIGHTERS.length)),
       sideBtn('NEWS', 'news', comingSoon),
     ]),
     el('div', 'lb-side lb-side-right', [

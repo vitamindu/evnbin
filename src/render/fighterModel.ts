@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { FighterDef, FighterId } from '../data/fighters';
 import { blobShadow, part, toon } from './toon';
+import { buildGlbFighterModel } from './glbFighter';
 
 /**
  * 스켈레톤(임시) 3D 캐릭터. 기본 도형을 조합해 만들며, 최종 모델(glTF)이 준비되면
@@ -360,6 +361,7 @@ const IDLE: Partial<Record<FighterId, { speed: number; bob: number }>> = {
 };
 
 export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = {}): FighterModel {
+  if (def.model.type === 'glb') return buildGlbFighterModel(def, opts);
   const root = new THREE.Group();
   root.name = `fighter:${def.id}`;
   const g = new GeoBag();
