@@ -31,6 +31,7 @@ function scenario(seed: number) {
       { id: 'volley', team: 0, spawnIndex: 1 },
       { id: 'boulder', team: 0, spawnIndex: 2 },
       { id: 'rivet', team: 1, spawnIndex: 0 },
+      { id: 'hinako', team: 1, spawnIndex: 1 },
     ],
     { seed },
   );
@@ -64,7 +65,7 @@ describe('결정성', () => {
     expect(snapshot(b.sim, b.log)).toBe(snapshot(a.sim, a.log));
     // 시나리오가 실제로 여러 규칙을 거쳤는지
     const types = new Set(a.log.flat().map((e) => e.type));
-    for (const t of ['attack', 'hit', 'projectileEnd', 'wallsBroken'] as const) expect(types.has(t)).toBe(true);
+    for (const t of ['attack', 'hit', 'projectileEnd', 'wallsBroken', 'explode'] as const) expect(types.has(t)).toBe(true);
   });
 });
 

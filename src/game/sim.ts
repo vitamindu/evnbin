@@ -1,9 +1,11 @@
 import { getFighter, type FighterDef, type SuperKind } from '../data/fighters';
-import { resolveAim } from './aim';
+import { resolveAim, resolveLeapAim } from './aim';
 import { angleDiff, lerpVec, segmentCircle, segmentCircleT } from './geom';
 import { Rng } from './rng';
 import {
   DASH_BREAK_MARGIN,
+  DEFAULT_FUSE,
+  DEFAULT_LEAP_TIME,
   DEFAULT_LOB_AOE,
   DEFAULT_PROJECTILE_SPEED,
   DUMMY_HP,
@@ -14,6 +16,9 @@ import {
   EPS,
   FIGHTER_RESPAWN_TICKS,
   KNOCKBACK_TICKS,
+  LEAP_BOMB_RING,
+  LEAP_LAND_SEARCH,
+  MIN_LEAP_DIST,
   PATROL_HALF_WIDTH,
   PATROL_SPEED,
   PROJECTILE_RADIUS,
@@ -28,7 +33,9 @@ import {
   TURRET_SHOT_RANGE,
   TURRET_SHOT_SPEED,
   fighterRadius,
+  secToTicks,
 } from './rules';
+import { isHittable } from './status';
 import {
   TICK_DT,
   TICK_RATE,
@@ -96,6 +103,12 @@ export interface ShotSpec {
   lateralOffset: number;
   /** lob: 착탄 범위 */
   aoeRadius: number;
+  /** 거리 비례 피해: 사거리 끝에서의 피해량(기본 공격만) */
+  damageFar?: number;
+  /** leap: 공중에 떠 있는 시간(초) */
+  leapTime: number;
+  /** leap: 폭탄이 터지기까지(초) */
+  fuse: number;
 }
 
 export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
@@ -114,6 +127,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       knockback: s.knockback,
       lateralOffset: s.lateralOffset ?? 0,
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
+      leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
+      fuse: s.fuse ?? DEFAULT_FUSE,
     };
   }
   const a = def.attack;
@@ -130,7 +145,20 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     knockback: 0,
     lateralOffset: a.lateralOffset ?? 0,
     aoeRadius: a.aoeRadius ?? DEFAULT_LOB_AOE,
+    damageFar: a.damageFar,
+    leapTime: DEFAULT_LEAP_TIME,
+    fuse: DEFAULT_FUSE,
   };
+}
+
+/**
+ * 거리 비례 피해. damageFar가 있으면 damage + (damageFar − damage) × clamp(traveled / range, 0, 1)을
+ * 정수로 반올림한다(피해 숫자 표시용). 없으면 damage 그대로.
+ */
+export function distanceDamage(p: Pick<Projectile, 'damage' | 'damageFar' | 'range'>, traveled: number): number {
+  if (p.damageFar === undefined || !p.range || p.range <= 0) return p.damage;
+  const k = Math.max(0, Math.min(1, traveled / p.range));
+  return Math.round(p.damage + (p.damageFar - p.damage) * k);
 }
 
 /** 넉백 상태(파이터는 action 'knockback'과 같은 값) */
@@ -258,7 +286,11 @@ export class Sim implements SimView {
     }
     f.moving = false;
 
-    // 넉백(2단계에서 이미 밀려남)·돌진 중에는 이동·공격 입력을 받지 않는다
+    // 점프·넉백(2단계에서 이미 밀려남)·돌진 중에는 이동·공격 입력을 받지 않는다
+    if (f.action?.kind === 'leap') {
+      this.stepLeap(f, f.action);
+      return;
+    }
     if (f.action?.kind === 'knockback') {
       f.inBush = isInBush(this.grid, f.pos);
       return;
@@ -294,7 +326,7 @@ export class Sim implements SimView {
 
   private startAttack(f: Fighter, def: FighterDef, isSuper: boolean, aim: Aim) {
     const spec = shotSpec(def, isSuper);
-    const { dir, ratio } = resolveAim(this, f, aim, spec.range);
+    const { dir, ratio } = spec.kind === 'leap' ? resolveLeapAim(this, f, aim) : resolveAim(this, f, aim, spec.range);
     if (isSuper) f.superCharge = 0;
     else f.ammo = Math.max(0, f.ammo - 1);
     f.facing = dir;
@@ -321,6 +353,9 @@ export class Sim implements SimView {
         break;
       case 'lob':
         this.fireLob(f, spec, dir, ratio);
+        break;
+      case 'leap':
+        this.startLeap(f, spec, dir, ratio);
         break;
     }
   }
@@ -350,7 +385,8 @@ export class Sim implements SimView {
     f.facing = act.dir;
     while (act.remaining > 0 && this.tick + 1e-6 >= act.nextTick) {
       const index = spec.count - act.remaining;
-      const side = spec.lateralOffset ? (index % 2 === 0 ? 1 : -1) * spec.lateralOffset : 0;
+      // 한 발짜리 연사(저격 등)는 옆으로 띄우지 않는다
+      const side = spec.lateralOffset && spec.count > 1 ? (index % 2 === 0 ? 1 : -1) * spec.lateralOffset : 0;
       this.spawnShot(f, spec, act.dir, side);
       act.remaining--;
       act.nextTick += interval;
@@ -382,6 +418,7 @@ export class Sim implements SimView {
       isSuper: spec.isSuper,
       breaksWalls: spec.breaksWalls,
       knockback: spec.knockback,
+      ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
       pierce: false,
       hitIds: [],
     });
@@ -396,7 +433,7 @@ export class Sim implements SimView {
       this.broken.push(...breakWallsInCircle(this.grid, c, spec.range * 0.5));
     }
     for (const u of this.units) {
-      if (!u.alive || u.team === f.team) continue;
+      if (!isHittable(u) || u.team === f.team) continue;
       const d = dist(f.pos, u.pos);
       if (d - u.radius > spec.range) continue;
       const tol = d > u.radius ? Math.asin(u.radius / d) : Math.PI;
@@ -465,7 +502,7 @@ export class Sim implements SimView {
     act.remaining -= stepLen;
 
     for (const u of this.units) {
-      if (!u.alive || u.team === f.team || act.hitIds.includes(u.id)) continue;
+      if (!isHittable(u) || u.team === f.team || act.hitIds.includes(u.id)) continue;
       if (!segmentCircle(from, to, u.pos, f.radius + u.radius)) continue;
       act.hitIds.push(u.id);
       this.damage(u, spec.damage, f.id, true);
@@ -474,6 +511,88 @@ export class Sim implements SimView {
 
     if (blocked || act.remaining <= 1e-6) {
       if (f.action === act) f.action = null;
+    }
+  }
+
+  /**
+   * 점프(leap) 시작: 목표 = 현재 위치 + dir × max(MIN_LEAP_DIST, range × ratio).
+   * 벽·물을 넘어가고, 착지 지점은 findLanding으로 맵 안의 막히지 않은 곳으로 고른다.
+   * 뛴 자리에 count개의 폭탄(lob)을 반지름 LEAP_BOMB_RING 원 위에 균등하게 떨어뜨린다(첫 폭탄은 점프 반대 방향).
+   */
+  private startLeap(f: Fighter, spec: ShotSpec, dir: number, ratio: number) {
+    const from = { ...f.pos };
+    const d = Math.max(MIN_LEAP_DIST, spec.range * Math.max(0, Math.min(1, ratio)));
+    const raw = { x: from.x + Math.cos(dir) * d, y: from.y + Math.sin(dir) * d };
+    const to = this.findLanding(from, raw, f.radius);
+    const ticks = Math.max(1, secToTicks(spec.leapTime));
+    f.action = { kind: 'leap', from, to, startTick: this.tick, endTick: this.tick + ticks };
+    f.moving = false;
+    f.inBush = false;
+
+    const fuse = Math.max(1, secToTicks(spec.fuse));
+    for (let i = 0; i < spec.count; i++) {
+      const a = dir + Math.PI + (i * Math.PI * 2) / spec.count;
+      this.lobs.push({
+        id: this.nextId++,
+        type: 'lob',
+        ownerId: f.id,
+        team: f.team,
+        from: { ...from },
+        to: this.clampToMap({ x: from.x + Math.cos(a) * LEAP_BOMB_RING, y: from.y + Math.sin(a) * LEAP_BOMB_RING }),
+        startTick: this.tick,
+        endTick: this.tick + fuse,
+        damage: spec.damage,
+        aoeRadius: spec.aoeRadius,
+        isSuper: true,
+        breaksWalls: spec.breaksWalls,
+      });
+    }
+  }
+
+  /**
+   * 반지름 r인 몸이 내려앉을 곳. target이 막히지 않았으면 그대로.
+   * 막혔으면 target에서 LEAP_LAND_SEARCH 안의 가장 가까운 빈 곳(0.1타일 간격 동심원, 같은 거리면 출발점 쪽부터),
+   * 그것도 없으면 target에서 출발점 쪽으로 직선을 따라 물러나며 처음 비는 곳. 맵 밖은 막힌 것으로 본다.
+   */
+  private findLanding(from: Vec2, target: Vec2, r: number): Vec2 {
+    const free = (p: Vec2) => !circleBlocked(this.grid, p.x, p.y, r);
+    if (free(target)) return { ...target };
+    const back = Math.atan2(from.y - target.y, from.x - target.x);
+    const RING = 0.1;
+    for (let k = 1; k * RING <= LEAP_LAND_SEARCH + 1e-9; k++) {
+      const rr = k * RING;
+      const n = Math.max(8, Math.ceil((Math.PI * 2 * rr) / RING));
+      for (let i = 0; i < n; i++) {
+        const a = back + (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * ((Math.PI * 2) / n);
+        const p = { x: target.x + Math.cos(a) * rr, y: target.y + Math.sin(a) * rr };
+        if (free(p)) return p;
+      }
+    }
+    const total = dist(from, target);
+    const STEP = 0.05;
+    for (let k = 1; k * STEP < total; k++) {
+      const p = lerpVec(target, from, (k * STEP) / total);
+      if (free(p)) return p;
+    }
+    return { ...from };
+  }
+
+  private clampToMap(p: Vec2): Vec2 {
+    return { x: Math.max(0, Math.min(this.grid.width, p.x)), y: Math.max(0, Math.min(this.grid.height, p.y)) };
+  }
+
+  /** 점프 중: from→to로 직선 이동. endTick에 착지하고, 그 틱에는 아직 이동·공격하지 않는다 */
+  private stepLeap(f: Fighter, act: Extract<FighterAction, { kind: 'leap' }>) {
+    const span = Math.max(1, act.endTick - act.startTick);
+    const k = Math.max(0, Math.min(1, (this.tick - act.startTick) / span));
+    f.pos = lerpVec(act.from, act.to, k);
+    if (dist(act.from, act.to) > 1e-9) f.facing = Math.atan2(act.to.y - act.from.y, act.to.x - act.from.x);
+    f.moving = false;
+    f.inBush = false;
+    if (this.tick >= act.endTick) {
+      f.pos = { ...act.to };
+      if (f.action === act) f.action = null;
+      f.inBush = isInBush(this.grid, f.pos);
     }
   }
 
@@ -545,7 +664,7 @@ export class Sim implements SimView {
     let best: Fighter | null = null;
     let bestD = Infinity;
     for (const u of this.units) {
-      if (u.type !== 'fighter' || !u.alive || u.team === d.team) continue;
+      if (u.type !== 'fighter' || !isHittable(u) || u.team === d.team) continue;
       const dd = dist(d.pos, u.pos);
       if (dd > TURRET_RANGE || dd >= bestD) continue;
       if (!isVisibleTo(this, u, d.team)) continue;
@@ -578,9 +697,12 @@ export class Sim implements SimView {
     }
     const to = { x: p.pos.x + (p.vel.x / speed) * stepLen, y: p.pos.y + (p.vel.y / speed) * stepLen };
 
+    /** 이번 틱 전까지 날아간 거리(range가 있는 투사체만 의미 있음) */
+    const flown = p.range !== undefined ? p.range - p.remaining : 0;
     const hits: { u: Unit; t: number }[] = [];
     for (const u of this.units) {
-      if (!u.alive || u.team === p.team || p.hitIds.includes(u.id)) continue;
+      // 점프 중인 유닛은 투사체가 그대로 지나간다
+      if (!isHittable(u) || u.team === p.team || p.hitIds.includes(u.id)) continue;
       const t = segmentCircleT(p.pos, to, u.pos, u.radius + p.radius);
       if (t >= 0) hits.push({ u, t });
     }
@@ -596,12 +718,13 @@ export class Sim implements SimView {
       for (const h of hits) {
         if (sweep.hit && h.t * stepLen > traveled + 1e-9) break;
         p.hitIds.push(h.u.id);
-        this.projectileHit(p, h.u);
+        this.projectileHit(p, h.u, flown + h.t * stepLen);
       }
     } else if (first && !sweep.hit) {
       const at = { ...reach };
+      const traveled = flown + dist(p.pos, reach);
       p.pos = at;
-      this.projectileHit(p, first.u);
+      this.projectileHit(p, first.u, traveled);
       this.events.push({ type: 'projectileEnd', id: p.id, pos: at, reason: 'hit' });
       return false;
     }
@@ -621,8 +744,9 @@ export class Sim implements SimView {
     return true;
   }
 
-  private projectileHit(p: Projectile, u: Unit) {
-    this.damage(u, p.damage, p.ownerId, p.isSuper);
+  /** traveled: 발사 지점부터 맞은 지점까지 날아간 거리(거리 비례 피해용) */
+  private projectileHit(p: Projectile, u: Unit, traveled: number) {
+    this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper);
     if (u.alive && p.knockback > 0) this.applyKnockback(u, p.vel.x, p.vel.y, p.knockback, angleOf(p.vel));
     if (!p.isSuper) {
       const owner = this.getUnit(p.ownerId);
@@ -642,7 +766,7 @@ export class Sim implements SimView {
       if (l.breaksWalls) this.broken.push(...breakWallsInCircle(this.grid, l.to, l.aoeRadius));
       const owner = this.getUnit(l.ownerId);
       for (const u of this.units) {
-        if (!u.alive || u.team === l.team) continue;
+        if (!isHittable(u) || u.team === l.team) continue;
         if (dist(u.pos, l.to) > l.aoeRadius + u.radius) continue;
         this.damage(u, l.damage, l.ownerId, l.isSuper);
         if (!l.isSuper && owner?.type === 'fighter') this.chargeFromHit(owner);
@@ -664,7 +788,7 @@ export class Sim implements SimView {
   }
 
   private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean) {
-    if (!u.alive || amount <= 0) return;
+    if (!isHittable(u) || amount <= 0) return;
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;
     const killed = u.hp <= 0;
@@ -690,7 +814,7 @@ export class Sim implements SimView {
    * 돌진 중인 파이터는 밀리지 않는다. 방향 벡터가 0이면 fallbackDir(라디안) 방향.
    */
   private applyKnockback(u: Unit, dirX: number, dirY: number, distance: number, fallbackDir: number) {
-    if (!u.alive || distance <= 0) return;
+    if (!isHittable(u) || distance <= 0) return;
     if (u.type === 'fighter' && u.action?.kind === 'dash') return;
     let l = Math.hypot(dirX, dirY);
     if (l < 1e-6) {
