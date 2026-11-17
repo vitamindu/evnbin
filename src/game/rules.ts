@@ -70,5 +70,16 @@ export const TURRET_SHOT_RADIUS = 0.25;
 /** 돌진 중 몸 반지름에 더해 벽을 부수는 여유 거리 */
 export const DASH_BREAK_MARGIN = 0.15;
 
+// ── leap ──
+/** 가장 짧은 점프 거리(조준을 짧게 해도 이만큼은 뛴다) */
+export const MIN_LEAP_DIST = 2;
+/** 착지 지점이 막혔을 때 빈 곳을 찾는 반경 */
+export const LEAP_LAND_SEARCH = 1.5;
+/** 점프한 자리에 떨어뜨리는 폭탄이 놓이는 원의 반지름 */
+export const LEAP_BOMB_RING = 1;
+/** 데이터에 leapTime·fuse가 없을 때 */
+export const DEFAULT_LEAP_TIME = 0.7;
+export const DEFAULT_FUSE = 0.5;
+
 /** 부동소수 누적 오차 허용치(탄창·게이지 비교) */
 export const EPS = 1e-9;

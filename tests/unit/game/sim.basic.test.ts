@@ -39,8 +39,8 @@ describe('Sim 기본', () => {
     expect(b!.radius).toBe(0.5);
   });
 
-  it('연습장에서 세 파이터가 공격·궁극기를 계속 써도 상태 값이 유효하다', () => {
-    for (const id of ['rivet', 'volley', 'boulder'] as const) {
+  it('연습장에서 모든 파이터가 공격·궁극기를 계속 써도 상태 값이 유효하다', () => {
+    for (const id of ['rivet', 'volley', 'boulder', 'hinako'] as const) {
       const sim = new Sim({ map: TRAINING_YARD, seed: 3, dummies: true, fighters: [{ fighterId: id, team: 0, controller: 'player', spawnIndex: 0 }] });
       const p = fighters(sim)[0]!;
       for (let i = 0; i < 600; i++) {
