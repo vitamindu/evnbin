@@ -15,10 +15,25 @@ export enum Tile {
 }
 
 /**
- * 맵 정의. rows의 각 글자가 타일 하나.
- *  .  바닥      #  벽(부서짐)   X  단단한 벽   B  수풀   W  물
+ * 바닥 무늬(표현 전용). 로직은 쓰지 않는다 — 렌더러가 바닥을 그릴 때만 읽는다.
+ * 벽·물 아래는 Yard, 수풀 아래는 Grass.
+ */
+export enum Ground {
+  /** 다져진 흙 마당(기본) */
+  Yard = 0,
+  /** 풀밭 */
+  Grass = 1,
+  /** 사격장 레인(거리 눈금이 그려지는 포장 바닥) */
+  Lane = 2,
+}
+
+/**
+ * 맵 정의. rows의 각 글자가 타일 하나. 모든 줄은 같은 길이로 쓴다(짧으면 나머지는 단단한 벽).
+ *  .  바닥(흙 마당)   ,  바닥(풀밭)   =  바닥(사격장 레인)  — 셋 다 로직에서는 같은 바닥
+ *  #  벽(부서짐)      X  단단한 벽    B  수풀              W  물
  *  A  팀0 출발 지점(바닥)       Z  팀1 출발 지점(바닥)
  *  d  더미(가만히)  p  더미(왕복)  t  더미(마주 쏨)   — 모두 바닥 위
+ * 출발 지점·더미 칸의 바닥 무늬는 왼쪽 칸의 바닥 무늬를 따른다.
  */
 export interface MapDef {
   id: string;
@@ -33,6 +48,8 @@ export interface DummySpawn {
 
 const CHAR_TILE: Record<string, Tile> = {
   '.': Tile.Floor,
+  ',': Tile.Floor,
+  '=': Tile.Floor,
   '#': Tile.Wall,
   X: Tile.HardWall,
   B: Tile.Bush,
@@ -44,27 +61,38 @@ const CHAR_TILE: Record<string, Tile> = {
   t: Tile.Floor,
 };
 
+const CHAR_GROUND: Record<string, Ground> = { ',': Ground.Grass, '=': Ground.Lane, B: Ground.Grass };
+
+/** 바닥 무늬를 왼쪽 칸에서 물려받는 글자 */
+const INHERITS_GROUND = new Set(['A', 'Z', 'd', 'p', 't']);
+
 const DUMMY_CHAR: Record<string, DummyBehavior> = { d: 'idle', p: 'patrol', t: 'turret' };
 
 export class Grid {
+  readonly id: string;
   readonly width: number;
   readonly height: number;
   private readonly tiles: Uint8Array;
+  private readonly grounds: Uint8Array;
   readonly teamSpawns: [Vec2[], Vec2[]] = [[], []];
   readonly dummySpawns: DummySpawn[] = [];
   /** 타일이 바뀔 때마다 1씩 증가(렌더러가 다시 그릴지 판단) */
   version = 0;
 
   constructor(def: MapDef) {
+    this.id = def.id;
     this.height = def.rows.length;
     this.width = Math.max(...def.rows.map((r) => r.length));
     this.tiles = new Uint8Array(this.width * this.height);
+    this.grounds = new Uint8Array(this.width * this.height);
     def.rows.forEach((row, ty) => {
       for (let tx = 0; tx < this.width; tx++) {
         const ch = row[tx] ?? 'X';
         const tile = CHAR_TILE[ch];
         if (tile === undefined) throw new Error(`Unknown map char '${ch}' at ${tx},${ty} in ${def.id}`);
-        this.tiles[ty * this.width + tx] = tile;
+        const i = ty * this.width + tx;
+        this.tiles[i] = tile;
+        this.grounds[i] = INHERITS_GROUND.has(ch) && tx > 0 ? this.grounds[i - 1]! : (CHAR_GROUND[ch] ?? Ground.Yard);
         const center = { x: tx + 0.5, y: ty + 0.5 };
         if (ch === 'A') this.teamSpawns[0].push(center);
         if (ch === 'Z') this.teamSpawns[1].push(center);
@@ -90,6 +118,12 @@ export class Grid {
     if (this.tiles[i] === t) return;
     this.tiles[i] = t;
     this.version++;
+  }
+
+  /** 바닥 무늬(표현 전용). 맵 밖은 Grass */
+  ground(tx: number, ty: number): Ground {
+    if (!this.inBounds(tx, ty)) return Ground.Grass;
+    return this.grounds[ty * this.width + tx] as Ground;
   }
 
   /** 걸어서 지나갈 수 없는 타일 */
