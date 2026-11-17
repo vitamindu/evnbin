@@ -1,0 +1,40 @@
+/**
+ * 효과음. 지금은 WebAudio로 합성한 임시 소리이며, Visual & Audio 단계에서 실제 음원으로 교체한다.
+ * 브라우저는 첫 터치 전에는 소리를 막기 때문에 타이틀 화면의 첫 탭에서 unlockAudio()를 부른다.
+ */
+let ctx: AudioContext | null = null;
+
+export function unlockAudio() {
+  try {
+    ctx ??= new AudioContext();
+    if (ctx.state === 'suspended') void ctx.resume();
+  } catch {
+    ctx = null;
+  }
+}
+
+type Sfx = 'tap' | 'back' | 'select' | 'start' | 'deny';
+
+const PRESETS: Record<Sfx, { f0: number; f1: number; dur: number; type: OscillatorType; vol: number }> = {
+  tap: { f0: 660, f1: 880, dur: 0.07, type: 'triangle', vol: 0.18 },
+  back: { f0: 520, f1: 330, dur: 0.08, type: 'triangle', vol: 0.16 },
+  select: { f0: 520, f1: 1240, dur: 0.18, type: 'square', vol: 0.08 },
+  start: { f0: 300, f1: 900, dur: 0.25, type: 'sawtooth', vol: 0.07 },
+  deny: { f0: 220, f1: 180, dur: 0.12, type: 'square', vol: 0.06 },
+};
+
+export function sfx(kind: Sfx) {
+  if (!ctx || ctx.state !== 'running') return;
+  const p = PRESETS[kind];
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = p.type;
+  osc.frequency.setValueAtTime(p.f0, t);
+  osc.frequency.exponentialRampToValueAtTime(p.f1, t + p.dur);
+  gain.gain.setValueAtTime(p.vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + p.dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + p.dur + 0.02);
+}

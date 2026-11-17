@@ -1,0 +1,51 @@
+import { el } from '../../core/dom';
+import { getFighter } from '../../data/fighters';
+import { getProfile } from '../../state/profile';
+import type { AppContext } from '../context';
+import { button, txt } from '../widgets';
+
+/**
+ * 매칭 대기 화면(흐름 확인용 임시). 전투·서버가 붙으면 실제 매칭 상태로 바뀐다.
+ */
+export function openMatchmaking(ctx: AppContext) {
+  const p = getProfile();
+  const f = getFighter(p.selected);
+  const me = el('span', 'mm-slot mm-me');
+  const img = el('img');
+  img.src = ctx.portraits[f.id];
+  img.alt = f.name;
+  me.append(img);
+  me.style.setProperty('--c', f.palette.primary);
+
+  const empty = () => el('span', 'mm-slot mm-empty', [txt('?')]);
+  const time = txt('0:00', 'mm-time');
+
+  const overlay = el('div', 'overlay', [
+    el('div', 'mm-panel panel', [
+      txt('SEARCHING', 'mm-title'),
+      el('div', 'mm-dots', [el('i'), el('i'), el('i')]),
+      txt('CRYSTAL RUSH · TRAINING YARD', 'mm-mode'),
+      el('div', 'mm-teams', [
+        el('div', 'mm-team mm-blue', [me, empty(), empty()]),
+        txt('VS', 'mm-vs'),
+        el('div', 'mm-team mm-red', [empty(), empty(), empty()]),
+      ]),
+      time,
+      el('p', 'mm-note', ['Battles arrive in the next build. Online 3v3 needs the game server.']),
+      button('btn-cancel', [txt('CANCEL')], () => close(), 'back'),
+    ]),
+  ]);
+
+  const started = performance.now();
+  const timer = window.setInterval(() => {
+    const s = Math.floor((performance.now() - started) / 1000);
+    time.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }, 250);
+
+  function close() {
+    window.clearInterval(timer);
+    overlay.remove();
+  }
+
+  ctx.overlayLayer.append(overlay);
+}

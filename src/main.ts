@@ -1,0 +1,103 @@
+import '@fontsource/lilita-one/400.css';
+import '@fontsource/black-han-sans/400.css';
+import './styles/main.css';
+
+import { sfx, unlockAudio } from './audio/sfx';
+import { GAME_TITLE } from './config';
+import { blockBrowserGestures, enterFullscreen } from './core/device';
+import { el } from './core/dom';
+import { setupLayout } from './core/layout';
+import { ScreenManager } from './core/screens';
+import { Stage } from './render/stage';
+import { renderPortraits } from './render/thumbnails';
+import { getSettings, onSettingsChange } from './state/settings';
+import type { AppContext } from './ui/context';
+import { ICONS } from './ui/icons';
+import { initToast } from './ui/overlays/toast';
+import { createFighterDetailScreen } from './ui/screens/fighterDetail';
+import { createFightersScreen } from './ui/screens/fighters';
+import { createLobbyScreen } from './ui/screens/lobby';
+import { createTitleScreen } from './ui/screens/title';
+
+const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+const withTimeout = <T>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<void>((r) => setTimeout(r, ms))]);
+
+async function boot() {
+  document.title = GAME_TITLE;
+  const app = document.getElementById('app')!;
+  const ui = document.getElementById('ui')!;
+  const canvas = document.getElementById('scene') as HTMLCanvasElement;
+  blockBrowserGestures();
+
+  // 세로 화면 안내 + FPS 표시(설계 좌표 밖, 실제 화면 기준)
+  const rotate = el('div', 'rotate-overlay', [el('div', 'rotate-box', [el('span', 'rotate-ico'), el('p', '', ['ROTATE YOUR DEVICE'])])]);
+  rotate.querySelector('.rotate-ico')!.innerHTML = ICONS.rotate;
+  const fpsEl = el('div', 'fps');
+  app.append(rotate, fpsEl);
+
+  const stage = new Stage(canvas);
+  const applySettings = () => {
+    const s = getSettings();
+    stage.setQuality(s.quality);
+    fpsEl.hidden = !s.showFps;
+  };
+  setupLayout(ui, (w, h) => stage.resize(w, h));
+  applySettings();
+  onSettingsChange(applySettings);
+  window.setInterval(() => {
+    if (!fpsEl.hidden) fpsEl.textContent = `${stage.fps} FPS`;
+  }, 500);
+
+  const screens = new ScreenManager(app, ui);
+  const overlayLayer = el('div', 'overlay-layer');
+  ui.append(overlayLayer);
+  initToast(overlayLayer);
+
+  let lobbyScreen: ReturnType<typeof createLobbyScreen> | null = null;
+  const title = createTitleScreen(stage, () => {
+    unlockAudio();
+    sfx('start');
+    void enterFullscreen();
+    if (lobbyScreen) screens.show(lobbyScreen);
+  });
+  screens.show(title);
+  stage.start();
+  title.setProgress(0.1);
+
+  // 폰트 로딩(한글은 필요한 글자 묶음만 받는다)
+  await withTimeout(
+    Promise.all([document.fonts.load('40px "Lilita One"'), document.fonts.load('40px "Black Han Sans"', '가')]),
+    4000,
+  );
+  title.setProgress(0.5);
+  await nextFrame();
+
+  const portraits = renderPortraits();
+  title.setProgress(0.8);
+  await nextFrame();
+
+  const ctx: AppContext = {
+    stage,
+    screens,
+    overlayLayer,
+    portraits,
+    go: {
+      lobby: () => screens.show(lobby),
+      fighters: () => screens.show(fighters),
+      fighterDetail: (id) => {
+        detail.setFighter(id);
+        screens.show(detail);
+      },
+    },
+  };
+  const lobby = createLobbyScreen(ctx);
+  const fighters = createFightersScreen(ctx);
+  const detail = createFighterDetailScreen(ctx);
+  lobbyScreen = lobby;
+
+  title.setProgress(1);
+  await nextFrame();
+  title.setReady();
+}
+
+void boot();
