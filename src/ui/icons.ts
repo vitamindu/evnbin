@@ -83,6 +83,21 @@ export const ICONS = {
   modeCrystal: svg(
     `<path d="M24 3l18 15-18 27L6 18z" fill="#4fe0c1" ${S}/><path d="M6 18h36M24 3l-8 15 8 27 8-27z" fill="none" stroke="#178a73" stroke-width="2" stroke-linejoin="round"/>`,
   ),
+  // 전투 조작
+  /** 기본 공격: 오른쪽 위로 날아가는 탄 + 속도선 */
+  attack: svg(
+    `<g transform="rotate(-32 24 24)">` +
+      `<path d="M3 19h7M1 24h9M3 29h7" stroke="var(--ink)" stroke-width="6" stroke-linecap="round"/>` +
+      `<path d="M3 19h7M1 24h9M3 29h7" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>` +
+      `<path d="M14 16h15c7 0 12 4 15 8-3 4-8 8-15 8H14z" fill="#ffffff" ${S}/>` +
+      `<path d="M21 16v16" stroke="var(--ink)" stroke-width="3"/>` +
+      `</g>`,
+  ),
+  /** 궁극기: 여덟 갈래 폭발 + 번개 */
+  super: svg(
+    `<path d="M24 3l5 9 9.8-2.8L36 19l9 5-9 5 2.8 9.8L29 36l-5 9-5-9-9.8 2.8L12 29l-9-5 9-5-2.8-9.8L19 12z" fill="#ffd34d" ${S}/>` +
+      `<path d="M27.5 11L17 26h6.5l-3 11L31.5 21H25z" fill="#ffffff" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>`,
+  ),
   rotate: svg(
     `<rect x="14" y="6" width="20" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/>` +
       `<path d="M6 30a18 18 0 0 0 14 13M42 18A18 18 0 0 0 28 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>` +
