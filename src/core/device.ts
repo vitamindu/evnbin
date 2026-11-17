@@ -49,7 +49,8 @@ export function blockBrowserGestures() {
   document.addEventListener(
     'touchmove',
     (e) => {
-      if (e.touches.length > 1) e.preventDefault();
+      // 취소 가능한 이벤트만 막는다(스크롤 중인 이벤트를 막으려 하면 크롬이 콘솔 오류를 낸다)
+      if (e.touches.length > 1 && e.cancelable) e.preventDefault();
     },
     { passive: false },
   );
