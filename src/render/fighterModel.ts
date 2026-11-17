@@ -14,6 +14,10 @@ export interface FighterModel {
   update(t: number, dt: number): void;
   /** 선택했을 때의 짧은 점프+회전 */
   celebrate(): void;
+  /** 걷기 동작 켜기/끄기 */
+  setMoving(moving: boolean): void;
+  /** 공격 반동 */
+  attack(): void;
   dispose(): void;
 }
 
@@ -33,6 +37,7 @@ interface Proportions {
 }
 
 interface Rig {
+  legs: THREE.Group[];
   body: THREE.Group;
   torso: THREE.Mesh;
   head: THREE.Group;
@@ -59,17 +64,22 @@ const EYE_WHITE = '#ffffff';
 const METAL = '#9aa3b5';
 
 function buildHumanoid(root: THREE.Group, g: GeoBag, p: Proportions, c: { top: string; legs: string; shoes: string; skin: string; hands?: string }): Rig {
-  // 신발 + 다리
+  // 신발 + 다리(엉덩이 높이를 축으로 흔들리도록 그룹으로 묶는다)
   const legH = p.legLen + p.legR * 2;
-  for (const sx of [-1, 1]) {
-    const shoe = part(g.add(new RoundedBoxGeometry(p.legR * 2.1, p.shoeH, p.legR * 2.8, 3, p.shoeH * 0.45)), toon(c.shoes));
-    shoe.position.set(sx * p.legX, p.shoeH / 2, p.legR * 0.35);
-    root.add(shoe);
-    const leg = part(g.add(new THREE.CapsuleGeometry(p.legR, p.legLen, 6, 14)), toon(c.legs));
-    leg.position.set(sx * p.legX, p.shoeH * 0.6 + legH / 2, 0);
-    root.add(leg);
-  }
   const hipY = p.shoeH * 0.6 + legH - p.legR;
+  const legs: THREE.Group[] = [];
+  for (const sx of [-1, 1]) {
+    const hip = new THREE.Group();
+    hip.position.set(sx * p.legX, hipY, 0);
+    const shoe = part(g.add(new RoundedBoxGeometry(p.legR * 2.1, p.shoeH, p.legR * 2.8, 3, p.shoeH * 0.45)), toon(c.shoes));
+    shoe.position.set(0, p.shoeH / 2 - hipY, p.legR * 0.35);
+    hip.add(shoe);
+    const leg = part(g.add(new THREE.CapsuleGeometry(p.legR, p.legLen, 6, 14)), toon(c.legs));
+    leg.position.set(0, p.shoeH * 0.6 + legH / 2 - hipY, 0);
+    hip.add(leg);
+    root.add(hip);
+    legs.push(hip);
+  }
 
   const body = new THREE.Group();
   root.add(body);
@@ -103,7 +113,7 @@ function buildHumanoid(root: THREE.Group, g: GeoBag, p: Proportions, c: { top: s
   const l = makeArm(-1);
   const r = makeArm(1);
 
-  return { body, torso, head, armL: l.pivot, armR: r.pivot, handL: l.hand, handR: r.hand, bodyBaseY: 0 };
+  return { legs, body, torso, head, armL: l.pivot, armR: r.pivot, handL: l.hand, handR: r.hand, bodyBaseY: 0 };
 }
 
 /** 구 표면 위 (x, y) 지점의 z 좌표 */
@@ -361,18 +371,37 @@ export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = 
   const idle = IDLE[def.id];
   const phase = Math.random() * Math.PI * 2;
   let celebrateT = -1;
+  let moving = false;
+  /** 0(서 있음)~1(걷기) 사이를 부드럽게 오간다 */
+  let walk = 0;
+  let walkPhase = 0;
+  let recoil = 0;
 
   return {
     id: def.id,
     root,
     update(t, dt) {
+      walk += ((moving ? 1 : 0) - walk) * Math.min(1, dt * 12);
+      if (moving) walkPhase += dt * 13;
+      const stride = Math.sin(walkPhase);
       const s = Math.sin(t * idle.speed + phase);
-      rig.body.position.y = rig.bodyBaseY + s * idle.bob;
+      rig.body.position.y = rig.bodyBaseY + s * idle.bob * (1 - walk) + Math.abs(stride) * 0.06 * walk;
+      rig.body.rotation.x = 0.12 * walk;
+      rig.legs[0]!.rotation.x = stride * 0.6 * walk;
+      rig.legs[1]!.rotation.x = -stride * 0.6 * walk;
       rig.torso.scale.set(1 + s * 0.012, 1 + s * 0.02, 1 + s * 0.012);
-      rig.head.rotation.y = Math.sin(t * 0.55 + phase) * 0.14;
+      rig.head.rotation.y = Math.sin(t * 0.55 + phase) * 0.14 * (1 - walk);
       rig.head.rotation.z = Math.sin(t * 0.9 + phase) * 0.04;
-      rig.armL.rotation.x = baseArmL + Math.sin(t * idle.speed + phase + 0.8) * 0.05;
+      rig.armL.rotation.x = baseArmL + Math.sin(t * idle.speed + phase + 0.8) * 0.05 - stride * 0.25 * walk;
       rig.armR.rotation.x = baseArmR + Math.sin(t * idle.speed + phase + 1.6) * 0.04;
+
+      if (recoil > 0) {
+        recoil = Math.max(0, recoil - dt * 6);
+        rig.body.position.z = -recoil * 0.12;
+        rig.armR.rotation.x = baseArmR - recoil * 0.5;
+      } else {
+        rig.body.position.z = 0;
+      }
 
       if (celebrateT >= 0) {
         celebrateT += dt;
@@ -388,6 +417,12 @@ export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = 
     },
     celebrate() {
       celebrateT = 0;
+    },
+    setMoving(m) {
+      moving = m;
+    },
+    attack() {
+      recoil = 1;
     },
     dispose() {
       g.dispose();

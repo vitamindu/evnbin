@@ -39,6 +39,8 @@ export interface AttackDef {
   reload: number;
   /** 적중 1회당 궁극기 충전량(0~1). count발 모두 맞으면 count배 */
   superChargePerHit: number;
+  /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
+  lateralOffset?: number;
 }
 
 export interface SuperDef {
@@ -47,11 +49,19 @@ export interface SuperDef {
   kind: SuperKind;
   damage: number;
   count: number;
+  /** spread: 전체 퍼짐 각도(도) */
+  spreadDeg: number;
+  /** burst: 발사 간격(초) */
+  burstInterval: number;
+  /** 투사체 속도(타일/초). dash면 돌진 속도 */
+  projectileSpeed: number;
   range: number;
   /** 벽 파괴 여부 */
   breaksWalls: boolean;
   /** 넉백 거리(타일). 0이면 없음 */
   knockback: number;
+  /** lob/폭발형: 착탄 범위 반지름(타일) */
+  aoeRadius?: number;
 }
 
 export interface FighterPalette {
@@ -88,27 +98,30 @@ export const FIGHTERS: readonly FighterDef[] = [
     moveSpeed: 2.8,
     attack: {
       name: 'Rivet Spray',
-      description: 'Fires a wide fan of 5 rivets. Deals the most damage up close.',
+      description: 'Fires a fan of 5 rivets. The closer the target, the more rivets hit.',
       kind: 'spread',
-      damage: 320,
+      damage: 300,
       count: 5,
-      spreadDeg: 32,
+      spreadDeg: 30,
       burstInterval: 0,
-      range: 7,
-      projectileSpeed: 15,
+      range: 7.5,
+      projectileSpeed: 16,
       ammo: 3,
-      reload: 1.6,
-      superChargePerHit: 0.045,
+      reload: 1.5,
+      superChargePerHit: 0.04,
     },
     super: {
-      name: 'Nail Nova',
-      description: 'Blasts 12 rivets in every direction and pushes nearby enemies away.',
-      kind: 'radial',
-      damage: 380,
-      count: 12,
-      range: 5,
-      breaksWalls: false,
-      knockback: 2,
+      name: 'Scrap Cannon',
+      description: 'Fires a wider, longer fan of 9 heavy rivets that smash walls and knock enemies back.',
+      kind: 'spread',
+      damage: 320,
+      count: 9,
+      spreadDeg: 46,
+      burstInterval: 0,
+      projectileSpeed: 16,
+      range: 8.5,
+      breaksWalls: true,
+      knockback: 2.5,
     },
   },
   {
@@ -122,25 +135,29 @@ export const FIGHTERS: readonly FighterDef[] = [
     moveSpeed: 3.0,
     attack: {
       name: 'Pulse Burst',
-      description: 'Fires 4 fast shots in a straight line. Long range, low spread.',
+      description: 'Fires 6 quick shots in a straight line, alternating left and right.',
       kind: 'burst',
-      damage: 360,
-      count: 4,
+      damage: 320,
+      count: 6,
       spreadDeg: 0,
-      burstInterval: 0.09,
+      burstInterval: 0.08,
       range: 9.5,
       projectileSpeed: 20,
       ammo: 3,
-      reload: 1.5,
-      superChargePerHit: 0.06,
+      reload: 1.55,
+      superChargePerHit: 0.03,
+      lateralOffset: 0.15,
     },
     super: {
-      name: 'Sky Volley',
-      description: 'Launches 6 shells over walls onto a target area.',
-      kind: 'lob',
-      damage: 700,
-      count: 6,
-      range: 8,
+      name: 'Overdrive',
+      description: 'Unloads a long burst of 12 shots with extra range. Shots smash through walls.',
+      kind: 'burst',
+      damage: 320,
+      count: 12,
+      spreadDeg: 0,
+      burstInterval: 0.07,
+      projectileSpeed: 22,
+      range: 11,
       breaksWalls: true,
       knockback: 0,
     },
@@ -155,26 +172,29 @@ export const FIGHTERS: readonly FighterDef[] = [
     hp: 5600,
     moveSpeed: 3.0,
     attack: {
-      name: 'Rock Slam',
-      description: 'Smashes the ground in front, hitting everything in a short cone.',
-      kind: 'melee',
-      damage: 1250,
-      count: 1,
-      spreadDeg: 80,
+      name: 'Rock Buster',
+      description: 'Blasts 5 stone shards in a short, wide fan. Devastating up close.',
+      kind: 'spread',
+      damage: 420,
+      count: 5,
+      spreadDeg: 34,
       burstInterval: 0,
-      range: 2.6,
-      projectileSpeed: 0,
+      range: 4,
+      projectileSpeed: 14,
       ammo: 3,
-      reload: 1.4,
-      superChargePerHit: 0.2,
+      reload: 1.7,
+      superChargePerHit: 0.05,
     },
     super: {
       name: 'Avalanche Roll',
-      description: 'Curls into a boulder and rolls forward, smashing walls and knocking enemies back.',
+      description: 'Charges forward a long way, smashing walls and knocking enemies back.',
       kind: 'dash',
-      damage: 1100,
+      damage: 900,
       count: 1,
-      range: 7,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 9,
+      range: 9,
       breaksWalls: true,
       knockback: 2.5,
     },
@@ -190,7 +210,7 @@ export function getFighter(id: FighterId): FighterDef {
 /** UI 스탯 막대용 최댓값 */
 export const STAT_MAX = {
   hp: 6000,
-  damage: 2000, // 한 번 공격(모든 투사체) 기준
+  damage: 2400, // 한 번 공격(모든 투사체) 기준
   range: 10,
   speed: 3.6,
 };

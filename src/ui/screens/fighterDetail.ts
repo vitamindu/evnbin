@@ -9,9 +9,9 @@ import { toast } from '../overlays/toast';
 import { attachDrag, button, header, iconEl, roleChip, txt } from '../widgets';
 
 function rangeLabel(r: number) {
-  if (r < 3.5) return 'VERY SHORT';
-  if (r < 7.5) return 'SHORT';
-  if (r < 9) return 'NORMAL';
+  if (r < 5) return 'VERY SHORT';
+  if (r < 8) return 'SHORT';
+  if (r < 9.5) return 'NORMAL';
   return 'LONG';
 }
 function speedLabel(s: number) {

@@ -14,6 +14,7 @@ import { getSettings, onSettingsChange } from './state/settings';
 import type { AppContext } from './ui/context';
 import { ICONS } from './ui/icons';
 import { initToast } from './ui/overlays/toast';
+import { createBattleScreen } from './ui/screens/battle';
 import { createFighterDetailScreen } from './ui/screens/fighterDetail';
 import { createFightersScreen } from './ui/screens/fighters';
 import { createLobbyScreen } from './ui/screens/lobby';
@@ -88,11 +89,13 @@ async function boot() {
         detail.setFighter(id);
         screens.show(detail);
       },
+      battle: () => screens.show(battle),
     },
   };
   const lobby = createLobbyScreen(ctx);
   const fighters = createFightersScreen(ctx);
   const detail = createFighterDetailScreen(ctx);
+  const battle = createBattleScreen(ctx);
   lobbyScreen = lobby;
 
   title.setProgress(1);

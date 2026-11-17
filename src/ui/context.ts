@@ -13,5 +13,6 @@ export interface AppContext {
     lobby(): void;
     fighters(): void;
     fighterDetail(id: FighterId): void;
+    battle(): void;
   };
 }

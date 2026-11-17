@@ -4,7 +4,6 @@ import { getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import type { AppContext } from '../context';
-import { openMatchmaking } from '../overlays/matchmaking';
 import { openSettings } from '../overlays/settings';
 import { comingSoon } from '../overlays/toast';
 import { attachDrag, button, currencyBar, iconEl, roleChip, txt } from '../widgets';
@@ -79,12 +78,12 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     'mode-card',
     [
       iconEl('modeCrystal', 'ico mode-ico'),
-      el('span', 'mode-text', [txt('CRYSTAL RUSH', 'mode-name'), txt('TRAINING YARD', 'mode-map')]),
+      el('span', 'mode-text', [txt('TRAINING', 'mode-name'), txt('TRAINING YARD', 'mode-map')]),
       txt('MODE', 'mode-tag'),
     ],
     comingSoon,
   );
-  const playBtn = button('btn-play', [txt('PLAY')], () => openMatchmaking(ctx), 'select');
+  const playBtn = button('btn-play', [txt('PLAY')], () => ctx.go.battle(), 'select');
 
   const root = el('div', 'lobby', [
     hit,

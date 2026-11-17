@@ -9,6 +9,9 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: 'tests',
+  // 단위 테스트(tests/unit, vitest)는 제외하고 브라우저 시나리오만 실행
+  testMatch: '*.spec.ts',
+  testIgnore: 'unit/**',
   outputDir: 'test-results',
   timeout: 60_000,
   expect: { timeout: 10_000 },

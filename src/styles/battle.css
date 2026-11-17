@@ -1,0 +1,33 @@
+/* 전투 화면 스타일. UI 담당. 설계 좌표 1280×800 px. */
+#app[data-bg='battle'] #bg {
+  background: #1c2a52;
+}
+#app[data-bg='battle'] .bg-rays,
+#app[data-bg='battle'] .bg-pattern {
+  display: none;
+}
+.battle-hit {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+.btn-battle-exit {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  width: 72px;
+  height: 60px;
+}
+.btn-battle-exit .ico {
+  width: 34px;
+  height: 34px;
+}
+.battle-label {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 26px;
+  pointer-events: none;
+}
+
