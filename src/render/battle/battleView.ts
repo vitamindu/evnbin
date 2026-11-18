@@ -264,7 +264,9 @@ export class BattleView {
 
   /** 발밑 팀 색 원(모델 크기에 맞춰 함께 커진다) */
   private teamRing(u: Unit): THREE.Mesh {
-    const color = u.id === this.followId ? TEAM_RING.me : u.team === 0 ? TEAM_RING.ally : TEAM_RING.enemy;
+    // 보는 사람 기준: 나 / 같은 팀 / 상대 팀
+    const myTeam = this.units.get(this.followId)?.unit.team ?? (u.id === this.followId ? u.team : 0);
+    const color = u.id === this.followId ? TEAM_RING.me : u.team === myTeam ? TEAM_RING.ally : TEAM_RING.enemy;
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.55, 0.7, 40),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false }),
