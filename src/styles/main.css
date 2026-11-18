@@ -617,6 +617,16 @@ img {
   gap: 12px;
   background: linear-gradient(#22327f, #172263);
 }
+.mode-card[data-mode='teamfight'] {
+  background: linear-gradient(100deg, #2a47b0 0%, #1b2669 55%, #5c1f52 100%);
+}
+.mode-ico-wrap {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  flex: none;
+}
 .mode-ico {
   width: 66px;
   height: 66px;
@@ -625,13 +635,24 @@ img {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
 }
 .mode-name {
   font-size: 30px;
+  line-height: 1.05;
 }
 .mode-map {
   font-size: 18px;
   color: #6ff0d4;
+  white-space: nowrap;
+}
+.mode-card[data-mode='training'] .mode-tag {
+  background: #5a6390;
+}
+.mode-more {
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
 }
 .mode-tag {
   position: absolute;

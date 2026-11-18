@@ -19,6 +19,8 @@ import { createBattleScreen } from './ui/screens/battle';
 import { createFighterDetailScreen } from './ui/screens/fighterDetail';
 import { createFightersScreen } from './ui/screens/fighters';
 import { createLobbyScreen } from './ui/screens/lobby';
+import { createOnlineScreen } from './ui/screens/online';
+import { createResultsScreen } from './ui/screens/results';
 import { createTitleScreen } from './ui/screens/title';
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
@@ -93,13 +95,24 @@ async function boot() {
         detail.setFighter(id);
         screens.show(detail);
       },
-      battle: () => screens.show(battle),
+      battle: (match) => {
+        battle.configure(match ?? null);
+        if (screens.active === battle) battle.restart();
+        else screens.show(battle);
+      },
+      online: () => screens.show(online),
+      results: (result) => {
+        results.setResult(result);
+        screens.show(results);
+      },
     },
   };
   const lobby = createLobbyScreen(ctx);
   const fighters = createFightersScreen(ctx);
   const detail = createFighterDetailScreen(ctx);
   const battle = createBattleScreen(ctx);
+  const online = createOnlineScreen(ctx);
+  const results = createResultsScreen(ctx);
   lobbyScreen = lobby;
 
   title.setProgress(1);

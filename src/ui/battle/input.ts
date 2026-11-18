@@ -1,4 +1,4 @@
-import type { BattleSession } from '../../battle/session';
+import type { BattleLike } from '../../battle/types';
 import { getFighter } from '../../data/fighters';
 import type { Vec2 } from '../../game/types';
 import type { UiMetrics } from './metrics';
@@ -71,7 +71,7 @@ export class BattleInput {
   readonly attackStick = new AimStickView('attack');
   readonly superStick = new AimStickView('super');
 
-  private session: BattleSession | null = null;
+  private session: BattleLike | null = null;
   private root: HTMLElement | null = null;
   private readonly metrics: UiMetrics;
   private readonly feedback: InputFeedback;
@@ -94,7 +94,7 @@ export class BattleInput {
     if (!this.move) this.moveStick.place(MOVE_IDLE_FROM_EDGE.left, this.metrics.height - MOVE_IDLE_FROM_EDGE.bottom);
   }
 
-  bind(session: BattleSession, root: HTMLElement) {
+  bind(session: BattleLike, root: HTMLElement) {
     this.unbind();
     this.session = session;
     this.root = root;

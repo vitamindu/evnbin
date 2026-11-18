@@ -105,6 +105,64 @@ export const ICONS = {
     `<path d="M24 3l5 9 9.8-2.8L36 19l9 5-9 5 2.8 9.8L29 36l-5 9-5-9-9.8 2.8L12 29l-9-5 9-5-2.8-9.8L19 12z" fill="#ffd34d" ${S}/>` +
       `<path d="M27.5 11L17 26h6.5l-3 11L31.5 21H25z" fill="#ffffff" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>`,
   ),
+  // 모드
+  /** TRAINING: 받침대 위 과녁판 */
+  modeTraining: svg(
+    `<path d="M17 36l-5 9M31 36l5 9M24 38v7" fill="none" ${S}/>` +
+      `<circle cx="24" cy="21" r="17" fill="#ffffff" ${S}/>` +
+      `<circle cx="24" cy="21" r="11" fill="#ff5d5d" ${S}/>` +
+      `<circle cx="24" cy="21" r="5.5" fill="#ffffff" ${S}/>` +
+      `<circle cx="24" cy="21" r="1.8" fill="#ff5d5d"/>`,
+  ),
+  /** TEAM FIGHT: 마주 기운 파랑·빨강 방패 + 위의 별 불꽃 */
+  modeTeamfight: svg(
+    `<g transform="rotate(-14 15 27)"><path d="M15 11l10 4v8c0 8-4.5 12.5-10 15.5C9.5 35.5 5 31 5 23v-8z" fill="#4f8bff" ${S}/></g>` +
+      `<g transform="rotate(14 33 27)"><path d="M33 11l10 4v8c0 8-4.5 12.5-10 15.5C27.5 35.5 23 31 23 23v-8z" fill="#ff5d5d" ${S}/></g>` +
+      `<path d="M24 1.5l2.6 5.2 5.7.8-4.2 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.2-4 5.7-.8z" fill="#ffd34d" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/>`,
+  ),
+  // 온라인 방
+  copy: svg(
+    `<rect x="17" y="5" width="24" height="29" rx="5" fill="#c9d3ff" ${S}/>` +
+      `<rect x="7" y="14" width="24" height="29" rx="5" fill="#ffffff" ${S}/>` +
+      `<path d="M13 23h12M13 30h12M13 37h7" stroke="#8b97cf" stroke-width="3" stroke-linecap="round"/>`,
+  ),
+  swap: svg(
+    `<path d="M9 15h27M29 8l7 7-7 7M39 33H12M19 26l-7 7 7 7" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="M9 15h27M29 8l7 7-7 7" fill="none" stroke="#7fb2ff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="M39 33H12M19 26l-7 7 7 7" fill="none" stroke="#ff8a8a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
+  /** 봇: 안테나 달린 네모 머리 */
+  bot: svg(
+    `<path d="M24 6v6" ${S}/><circle cx="24" cy="5.5" r="3.2" fill="#ffd34d" stroke="var(--ink)" stroke-width="2.5"/>` +
+      `<path d="M5 22v9M43 22v9" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>` +
+      `<rect x="8" y="12" width="32" height="29" rx="9" fill="#c9d3ff" ${S}/>` +
+      `<rect x="13" y="19" width="22" height="13" rx="6.5" fill="#2a2f5a" stroke="var(--ink)" stroke-width="2.5"/>` +
+      `<circle cx="19" cy="25.5" r="2.8" fill="#63dcff"/><circle cx="29" cy="25.5" r="2.8" fill="#63dcff"/>`,
+  ),
+  /** 방장 */
+  crown: svg(
+    `<path d="M6 17l9.5 8L24 11l8.5 14 9.5-8-4 21H10z" fill="#ffd34d" ${S}/>` +
+      `<path d="M11.5 32h25" stroke="#c98a10" stroke-width="3" stroke-linecap="round"/>` +
+      `<circle cx="24" cy="10" r="3.2" fill="#ff8ad1" stroke="var(--ink)" stroke-width="2.5"/>`,
+  ),
+  /** 최고 활약 */
+  star: svg(
+    `<path d="M24 4l6.2 12.6 13.8 2-10 9.8 2.4 13.8L24 35.7l-12.4 6.5L14 28.4 4 18.6l13.8-2z" fill="#ffd34d" ${S}/>` +
+      `<path d="M24 11l3.6 7.4" stroke="#fff6c2" stroke-width="3" stroke-linecap="round"/>`,
+  ),
+  /** 이름 고치기 */
+  pencil: svg(
+    `<path d="M9 39l2.5-10L31 9.5l7.5 7.5L19 36.5z" fill="#ffd34d" ${S}/>` +
+      `<path d="M9 39l2.5-10 7.5 7.5z" fill="#ffe0b0" ${S}/>` +
+      `<path d="M27 13.5l7.5 7.5" stroke="var(--ink)" stroke-width="3"/>`,
+  ),
+  /** 나가기: 문 + 화살표 */
+  door: svg(
+    `<path d="M8 6h20v36H8z" fill="#b07a52" ${S}/><path d="M12 10h12v28H12z" fill="#8a5a3c" stroke="var(--ink)" stroke-width="2"/>` +
+      `<circle cx="22" cy="25" r="2" fill="#ffd34d" stroke="var(--ink)" stroke-width="1.5"/>` +
+      `<path d="M27 24h15M36 18l6 6-6 6" fill="none" stroke="var(--ink)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="M27 24h15M36 18l6 6-6 6" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
   rotate: svg(
     `<rect x="14" y="6" width="20" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/>` +
       `<path d="M6 30a18 18 0 0 0 14 13M42 18A18 18 0 0 0 28 5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>` +

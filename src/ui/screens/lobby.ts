@@ -3,7 +3,9 @@ import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { getProfile, onProfileChange, totalTrophies } from '../../state/profile';
+import { getSettings, onSettingsChange } from '../../state/settings';
 import type { AppContext } from '../context';
+import { MODES, openModePicker } from '../overlays/modePicker';
 import { openSettings } from '../overlays/settings';
 import { comingSoon } from '../overlays/toast';
 import { attachDrag, button, currencyBar, iconEl, roleChip, txt } from '../widgets';
@@ -74,16 +76,32 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     [iconEl('pass', 'ico pass-ico'), el('span', 'pass-text', [txt('SEASON PASS', 'pass-title'), txt('SEASON 1', 'pass-sub')])],
     comingSoon,
   );
+  // 모드 카드: 지금 고른 모드(설정에 저장). 탭하면 모드 선택 팝업, PLAY는 그 모드로 시작
+  const modeIco = el('span', 'mode-ico-wrap');
+  const modeName = txt('', 'mode-name');
+  const modeMap = txt('', 'mode-map');
+  const modeTag = txt('MODE', 'mode-tag');
   const modeCard = button(
     'mode-card',
-    [
-      iconEl('modeCrystal', 'ico mode-ico'),
-      el('span', 'mode-text', [txt('TRAINING', 'mode-name'), txt('TRAINING YARD', 'mode-map')]),
-      txt('MODE', 'mode-tag'),
-    ],
-    comingSoon,
+    [modeIco, el('span', 'mode-text', [modeName, modeMap]), modeTag, iconEl('next', 'ico mode-more')],
+    () => openModePicker(ctx),
   );
-  const playBtn = button('btn-play', [txt('PLAY')], () => ctx.go.battle(), 'select');
+  const renderMode = () => {
+    const m = MODES[getSettings().playMode];
+    modeCard.dataset.mode = m.id;
+    modeIco.replaceChildren(iconEl(m.icon, 'ico mode-ico'));
+    modeName.textContent = m.name;
+    modeMap.textContent = m.map;
+    modeTag.textContent = `MODE · ${m.online ? 'ONLINE' : 'OFFLINE'}`;
+  };
+  renderMode();
+  onSettingsChange(renderMode);
+  const playBtn = button(
+    'btn-play',
+    [txt('PLAY')],
+    () => (getSettings().playMode === 'teamfight' ? ctx.go.online() : ctx.go.battle()),
+    'select',
+  );
 
   const root = el('div', 'lobby', [
     hit,

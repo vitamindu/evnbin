@@ -1,4 +1,4 @@
-import type { BattleSession } from '../../battle/session';
+import type { BattleLike } from '../../battle/types';
 import { el } from '../../core/dom';
 import { TICK_RATE, type EntityId, type SimEvent, type Unit, type Vec2 } from '../../game/types';
 import { txt } from '../widgets';
@@ -63,7 +63,7 @@ export class BattleHud {
   private readonly respawnNum: HTMLElement;
   private readonly bars = new Map<EntityId, UnitBar>();
   private readonly pops: Pop[] = [];
-  private session: BattleSession | null = null;
+  private session: BattleLike | null = null;
   private frameNo = 0;
   private last = 0;
   private dead: boolean | null = null;
@@ -90,7 +90,7 @@ export class BattleHud {
     this.el = el('div', 'hud', [this.barLayer, this.popLayer, this.veil, this.respawn]);
   }
 
-  bind(session: BattleSession) {
+  bind(session: BattleLike) {
     this.unbind();
     this.session = session;
     this.last = performance.now();
@@ -131,7 +131,7 @@ export class BattleHud {
       p.age = Math.min(p.age, 0.06);
     } else {
       p = this.pops.find((q) => !q.active) ?? this.pops.reduce((a, b) => (b.age > a.age ? b : a));
-      const u = this.session?.sim.getUnit(targetId);
+      const u = this.session?.state.getUnit(targetId);
       p.active = true;
       p.targetId = targetId;
       p.pos = { ...pos };
@@ -170,7 +170,7 @@ export class BattleHud {
     this.frameNo++;
 
     const me = s.player;
-    for (const u of s.sim.units) this.updateBar(s, u, u.team === me.team);
+    for (const u of s.state.units) this.updateBar(s, u, u.team === me.team);
     for (const [id, b] of this.bars) {
       if (b.seen !== this.frameNo) {
         b.root.remove();
@@ -206,7 +206,7 @@ export class BattleHud {
     return { id: u.id, root, fill, lag, num, ammo, hp: -1, maxHp: -1, x: NaN, y: NaN, shown: false, seen: 0 };
   }
 
-  private updateBar(s: BattleSession, u: Unit, ally: boolean) {
+  private updateBar(s: BattleLike, u: Unit, ally: boolean) {
     let b = this.bars.get(u.id);
     if (!b) {
       b = this.makeBar(u, u.id === s.playerId, ally);
@@ -260,7 +260,7 @@ export class BattleHud {
     }
   }
 
-  private updatePops(s: BattleSession, dt: number) {
+  private updatePops(s: BattleLike, dt: number) {
     for (const p of this.pops) {
       if (!p.active) continue;
       p.age += dt;
@@ -288,7 +288,7 @@ export class BattleHud {
     }
   }
 
-  private updateRespawn(s: BattleSession) {
+  private updateRespawn(s: BattleLike) {
     const me = s.player;
     const dead = !me.alive;
     if (dead !== this.dead) {
@@ -299,7 +299,7 @@ export class BattleHud {
       this.onDead(dead);
     }
     if (!dead) return;
-    const secs = Math.max(1, Math.ceil((me.respawnTick - s.sim.tick) / TICK_RATE));
+    const secs = Math.max(1, Math.ceil((me.respawnTick - s.state.tick) / TICK_RATE));
     if (secs !== this.countdown) {
       this.countdown = secs;
       this.respawnNum.textContent = String(secs);

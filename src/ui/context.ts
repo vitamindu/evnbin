@@ -1,6 +1,16 @@
+import type { BattleLike } from '../battle/types';
 import type { FighterId } from '../data/fighters';
 import type { ScreenManager } from '../core/screens';
+import type { OnlineClient } from '../net/api';
+import type { MatchResult, MatchStartInfo } from '../net/protocol';
 import type { Stage } from '../render/stage';
+
+/** 온라인 경기 하나를 전투 화면에 넘길 때 쓰는 묶음(OnlineEvents.matchStart + 클라이언트) */
+export interface OnlineMatch {
+  session: BattleLike;
+  info: MatchStartInfo;
+  client: OnlineClient;
+}
 
 /** 화면들이 공유하는 앱 상태와 이동 함수 */
 export interface AppContext {
@@ -13,6 +23,11 @@ export interface AppContext {
     lobby(): void;
     fighters(): void;
     fighterDetail(id: FighterId): void;
-    battle(): void;
+    /** 인자 없으면 오프라인 연습장, 있으면 그 온라인 경기. 이미 전투 화면이면 새 세션으로 다시 붙는다 */
+    battle(match?: OnlineMatch): void;
+    /** 온라인 TEAM FIGHT: 연결 → 방 만들기 / 코드로 들어가기 → 방(이미 방에 있으면 바로 방) */
+    online(): void;
+    /** 온라인 경기 결과 */
+    results(result: MatchResult): void;
   };
 }

@@ -1,25 +1,47 @@
 import '../../styles/battle.css';
+import '../../styles/online.css';
 import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { BattleSession } from '../../battle/session';
+import type { BattleLike } from '../../battle/types';
 import { TRAINING_YARD } from '../../data/maps/training';
+import type { MatchResult } from '../../net/protocol';
+import { getServerUrl } from '../../net/config';
 import { getProfile } from '../../state/profile';
-import type { AppContext } from '../context';
+import type { AppContext, OnlineMatch } from '../context';
 import { BattleFeedback } from '../battle/feedback';
 import { BattleHud } from '../battle/hud';
 import { BattleInput } from '../battle/input';
 import { UiMetrics } from '../battle/metrics';
+import { KoFeed, MatchBanner, Scoreboard, fighterNameOf, type NameOf } from '../battle/scoreboard';
+import { pingMeter } from '../online/widgets';
 import { button, iconEl, txt } from '../widgets';
 
+/** 경기 끝 배너를 결과 화면 전에 보여 주는 시간(ms) */
+const BANNER_MS = 2600;
+
 /**
- * 전투 화면(연습장). UI 담당.
- * 조작은 `ui/battle/input.ts`, 머리 위 체력·피해 숫자·부활 카운트다운은 `ui/battle/hud.ts`.
- * 시뮬레이션과 3D는 BattleSession(Lead)이 맡고, 이 화면은 session.onFrame / onEvents로만 갱신한다.
+ * 전투 화면. UI 담당. 세션은 BattleLike(오프라인 연습장 BattleSession 또는 온라인 세션)만 쓴다.
+ * 조작은 `ui/battle/input.ts`, 머리 위 체력·피해 숫자·부활 카운트다운은 `ui/battle/hud.ts`,
+ * teamfight 점수판·KO 알림·끝 배너는 `ui/battle/scoreboard.ts`.
+ * 이 화면은 session.onFrame / onEvents로만 갱신한다.
+ *
+ * 온라인: 오른쪽 위 핑, 나가기는 확인 후 방에서 나감, 연결이 끊기면 다시 연결/나가기 막,
+ * OnlineEvents.matchEnd → 끝 배너 → 결과 화면.
  *
  * QA: 주소에 `?qa`가 있으면 `window.__fgBattle`로 현재 세션을 연다(E2E에서 상태 확인용).
  */
-export function createBattleScreen(ctx: AppContext): Screen {
-  let session: BattleSession | null = null;
+export function createBattleScreen(ctx: AppContext) {
+  let session: BattleLike | null = null;
+  let online: OnlineMatch | null = null;
+  let pending: OnlineMatch | null = null;
+  let nameOf: NameOf = () => '';
+  let ended = false;
+  let endAt = 0;
+  let resultTimer = 0;
+  let lostOnce = false;
+  let confirmEl: HTMLElement | null = null;
+  const unsubs: (() => void)[] = [];
   const qa = new URLSearchParams(location.search).has('qa');
 
   const feedback = new BattleFeedback();
@@ -33,44 +55,201 @@ export function createBattleScreen(ctx: AppContext): Screen {
     },
     denied: () => feedback.denied(),
   });
+  const scoreboard = new Scoreboard();
+  const feed = new KoFeed();
+  const banner = new MatchBanner();
+  const ping = pingMeter('battle-ping');
 
-  const exitBtn = button('btn-battle-exit', [iconEl('back')], () => ctx.go.lobby(), 'back');
+  // 연결이 끊겼을 때 막
+  const nvTitle = txt('', 'nv-title');
+  const nvDots = el('div', 'mm-dots', [el('i'), el('i'), el('i')]);
+  const nvButtons = el('div', 'cp-buttons');
+  const netVeil = el('div', 'net-veil', [el('div', 'nv-box panel', [nvTitle, nvDots, nvButtons])]);
+  netVeil.hidden = true;
+
+  const exitBtn = button('btn-battle-exit', [iconEl('back')], () => exit(), 'back');
   const label = txt('TRAINING YARD', 'battle-label');
   const controls = el('div', 'battle-controls', [input.moveStick.el, input.superStick.el, input.attackStick.el]);
-  const root = el('div', 'battle', [hud.el, controls, label, exitBtn]);
+  const root = el('div', 'battle', [hud.el, controls, label, scoreboard.el, ping.el, feed.el, banner.el, exitBtn, netVeil]);
   if (navigator.maxTouchPoints > 0) root.classList.add('has-touch');
 
-  return {
+  function exit() {
+    if (!online) {
+      ctx.go.lobby();
+      return;
+    }
+    if (ended) return;
+    confirmLeave();
+  }
+
+  function leaveMatch() {
+    const m = online;
+    closeConfirm();
+    if (m && m.client.room) m.client.leaveRoom();
+    ctx.go.online();
+  }
+
+  function confirmLeave() {
+    closeConfirm();
+    const ov = el('div', 'overlay', [
+      el('div', 'confirm-panel panel', [
+        txt('LEAVE MATCH?', 'cf-title'),
+        el('p', 'cf-note', ['YOUR TEAM WILL KEEP PLAYING WITHOUT YOU.']),
+        el('div', 'cp-buttons', [
+          button('cp-btn is-back', [txt('STAY')], () => closeConfirm(), 'back'),
+          button('cp-btn is-danger', [txt('LEAVE')], () => leaveMatch()),
+        ]),
+      ]),
+    ]);
+    ov.addEventListener('click', (e) => {
+      if (e.target === ov) closeConfirm();
+    });
+    confirmEl = ov;
+    ctx.overlayLayer.append(ov);
+  }
+
+  function closeConfirm() {
+    confirmEl?.remove();
+    confirmEl = null;
+  }
+
+  function showNet(state: 'ok' | 'connecting' | 'lost') {
+    netVeil.hidden = state === 'ok';
+    if (state === 'ok') return;
+    nvDots.hidden = state !== 'connecting';
+    nvTitle.textContent = state === 'connecting' ? 'RECONNECTING' : 'CONNECTION LOST';
+    const leave = button('cp-btn is-back', [txt('LEAVE')], () => leaveMatch(), 'back');
+    if (state === 'connecting') {
+      nvButtons.replaceChildren(leave);
+      return;
+    }
+    const retry = button('cp-btn is-go', [txt('RECONNECT')], () => {
+      const c = online?.client;
+      if (!c) return;
+      const p = getProfile();
+      c.connect(getServerUrl(), p.name, p.selected).catch(() => showNet('lost'));
+    });
+    nvButtons.replaceChildren(leave, retry);
+  }
+
+  /** 경기가 끝났다(점수판의 winner 또는 matchEnd). 배너는 한 번만 */
+  function markEnded(winner: 0 | 1 | -1, score: [number, number]) {
+    if (ended || !session) return;
+    ended = true;
+    endAt = performance.now();
+    closeConfirm();
+    root.classList.add('is-over');
+    banner.show(winner, session.player.team, score);
+  }
+
+  function onMatchEnd(result: MatchResult) {
+    markEnded(result.winner, result.score);
+    window.clearTimeout(resultTimer);
+    const wait = Math.max(600, BANNER_MS - (performance.now() - endAt));
+    resultTimer = window.setTimeout(() => ctx.go.results(result), wait);
+  }
+
+  function setup() {
+    const m = pending;
+    const s: BattleLike = m ? m.session : new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD });
+    session = s;
+    online = m;
+    ended = false;
+    lostOnce = false;
+    const teamfight = s.match.mode === 'teamfight';
+    root.classList.toggle('is-online', !!m);
+    root.classList.toggle('is-teamfight', teamfight);
+    label.hidden = teamfight;
+    scoreboard.el.hidden = !teamfight;
+    feed.el.hidden = !teamfight;
+    ping.el.hidden = !m;
+    scoreboard.reset();
+    feed.clear();
+    banner.hide();
+    showNet('ok');
+    if (m) {
+      const names = new Map(m.info.roster.map((r) => [r.entityId, r.name]));
+      const fallback = fighterNameOf(s.state);
+      nameOf = (id) => names.get(id) ?? fallback(id);
+    } else {
+      nameOf = fighterNameOf(s.state);
+    }
+
+    metrics.attach();
+    hud.bind(s);
+    input.bind(s, root);
+    feedback.reset(s.player.superCharge);
+    s.onEvents = (events) => {
+      hud.onEvents(events);
+      feedback.onEvents(events, s.playerId);
+      if (teamfight) feed.onEvents(events, s.state, s.playerId, nameOf);
+    };
+    s.onFrame = () => {
+      input.frame();
+      hud.frame();
+      feedback.superCharge(s.player.superCharge);
+      if (teamfight) {
+        scoreboard.update(s.match, s.player.team);
+        feed.frame();
+        const w = s.match.winner;
+        if (w !== null && !ended) markEnded(w, s.match.score);
+      }
+    };
+    ctx.stage.setView(s);
+
+    if (m) {
+      const c = m.client;
+      ping.set(c.pingMs);
+      unsubs.push(
+        c.on('ping', (ms) => ping.set(ms)),
+        c.on('matchEnd', onMatchEnd),
+        c.on('status', (st) => {
+          if (st === 'connected') {
+            showNet('ok');
+          } else if (!ended) {
+            lostOnce = true;
+            showNet(st === 'connecting' ? 'connecting' : 'lost');
+          }
+        }),
+        c.on('room', (r) => {
+          // 다시 연결했더니 경기가 이미 끝나 방이 대기 중이면 방으로
+          if (lostOnce && !ended && (!r || r.phase === 'lobby')) ctx.go.online();
+        }),
+      );
+      if (c.status !== 'connected') showNet(c.status === 'connecting' ? 'connecting' : 'lost');
+    }
+    if (qa) (window as unknown as { __fgBattle?: BattleLike }).__fgBattle = s;
+  }
+
+  function teardown() {
+    for (const u of unsubs.splice(0)) u();
+    window.clearTimeout(resultTimer);
+    closeConfirm();
+    input.unbind();
+    hud.unbind();
+    metrics.detach();
+    root.classList.remove('is-dead', 'is-over');
+    ctx.stage.setView(null);
+    session?.dispose();
+    session = null;
+    online = null;
+    if (qa) delete (window as unknown as { __fgBattle?: BattleLike }).__fgBattle;
+  }
+
+  const screen: Screen & { configure(m: OnlineMatch | null): void; restart(): void } = {
     el: root,
     bg: 'battle',
-    onShow() {
-      const s = new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD });
-      session = s;
-      metrics.attach();
-      hud.bind(s);
-      input.bind(s, root);
-      feedback.reset(s.player.superCharge);
-      s.onEvents = (events) => {
-        hud.onEvents(events);
-        feedback.onEvents(events, s.playerId);
-      };
-      s.onFrame = () => {
-        input.frame();
-        hud.frame();
-        feedback.superCharge(s.player.superCharge);
-      };
-      ctx.stage.setView(s);
-      if (qa) (window as unknown as { __fgBattle?: BattleSession }).__fgBattle = s;
+    onShow: setup,
+    onHide: teardown,
+    /** 다음 onShow(또는 restart)에 쓸 경기. null이면 오프라인 연습장 */
+    configure(m) {
+      pending = m;
     },
-    onHide() {
-      input.unbind();
-      hud.unbind();
-      metrics.detach();
-      root.classList.remove('is-dead');
-      ctx.stage.setView(null);
-      session?.dispose();
-      session = null;
-      if (qa) delete (window as unknown as { __fgBattle?: BattleSession }).__fgBattle;
+    /** 이미 전투 화면일 때 새 세션으로 다시 붙는다(다시 연결 후 새 경기 등) */
+    restart() {
+      teardown();
+      setup();
     },
   };
+  return screen;
 }
