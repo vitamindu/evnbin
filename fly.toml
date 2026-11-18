@@ -1,0 +1,33 @@
+# Fly.io 게임 서버 설정. 배포는 .github/workflows/deploy-server.yml 이 한다.
+# 방 정보가 서버 메모리에 있으므로 서버는 항상 1대(--ha=false)로 돌린다.
+app = "fightguys-evnbin"
+primary_region = "nrt" # 도쿄: 한국과 가장 가까운 지역
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8787"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # 접속이 없으면 멈추고, 누가 접속하면 자동으로 다시 켠다(요금 절약, 켜지는 데 몇 초)
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 150
+    hard_limit = 200
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

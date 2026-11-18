@@ -1,6 +1,6 @@
 import type { FighterId } from '../../../src/data/fighters';
 import { Sim } from '../../../src/game/sim';
-import type { Aim, Dummy, EntityId, Fighter, FighterInput, SimEvent, Team, Vec2 } from '../../../src/game/types';
+import { TICK_RATE, type Aim, type Dummy, type EntityId, type Fighter, type FighterInput, type SimEvent, type Team, type Vec2 } from '../../../src/game/types';
 import type { MapDef } from '../../../src/game/world';
 
 /**
@@ -58,3 +58,16 @@ export function ofType<T extends SimEvent['type']>(events: readonly SimEvent[], 
 }
 
 export const center = (x: number, y: number): Vec2 => ({ x: x + 0.5, y: y + 0.5 });
+
+/**
+ * distance를 speed(타일/초)로 가는 데 필요한 틱 + 여유 2틱.
+ * 테스트는 수치를 직접 쓰지 않고 데이터·규칙 값에서 시간을 계산한다(밸런스 조정에 깨지지 않게).
+ */
+export const ticksFor = (distance: number, speed: number): number => Math.ceil((distance / speed) * TICK_RATE) + 2;
+
+/** 조건이 참이 될 때까지(최대 maxTicks) 진행하고 모은 사건을 돌려준다 */
+export function runUntil(sim: Sim, cond: () => boolean, maxTicks = 600, inputs: Record<EntityId, FighterInput> = {}): SimEvent[] {
+  const all: SimEvent[] = [];
+  for (let i = 0; i < maxTicks && !cond(); i++) all.push(...tick(sim, inputs));
+  return all;
+}

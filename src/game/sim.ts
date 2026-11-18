@@ -26,6 +26,8 @@ import {
   REGEN_PER_SEC,
   REVEAL_TICKS,
   SUPER_PROJECTILE_RADIUS,
+  TEAMFIGHT_TARGET_SCORE,
+  TEAMFIGHT_TICKS,
   TURRET_DAMAGE,
   TURRET_INTERVAL_TICKS,
   TURRET_RANGE,
@@ -203,6 +205,9 @@ export class Sim implements SimView {
   constructor(opts: SimOptions) {
     this.grid = new Grid(opts.map);
     this.rng = new Rng(opts.seed);
+    if ((opts.mode ?? 'training') === 'teamfight') {
+      this.match = { mode: 'teamfight', score: [0, 0], targetScore: TEAMFIGHT_TARGET_SCORE, ticksLeft: TEAMFIGHT_TICKS, winner: null };
+    }
     for (const spec of opts.fighters) {
       const spawns = this.grid.teamSpawns[spec.team];
       const spawn = spawns[spec.spawnIndex % Math.max(1, spawns.length)] ?? { x: 2, y: 2 };
@@ -271,15 +276,51 @@ export class Sim implements SimView {
     this.events = [];
     this.broken = [];
     this.knockAcc.clear();
-    for (const u of this.units) if (!u.alive && this.tick >= u.respawnTick) this.respawn(u);
+    // 경기가 끝난 뒤: 입력·부활·회복·더미 행동은 멈추고, 이미 시작된 행동(연사·돌진·점프)과
+    // 날아가는 탄은 끝까지 진행하되 피해·넉백·충전은 없다(over 확인)
+    const over = this.over;
+    if (!over) for (const u of this.units) if (!u.alive && this.tick >= u.respawnTick) this.respawn(u);
     for (const u of this.units) if (u.alive) this.stepKnockback(u);
-    for (const u of this.units) if (u.alive && u.type === 'fighter') this.stepFighter(u, inputs.get(u.id));
-    for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
+    for (const u of this.units) if (u.alive && u.type === 'fighter') this.stepFighter(u, over ? undefined : inputs.get(u.id));
+    if (!over) for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
     this.stepProjectiles();
     this.stepLobs();
-    for (const u of this.units) if (u.alive) this.regen(u);
+    if (!over) for (const u of this.units) if (u.alive) this.regen(u);
     if (this.broken.length) this.events.push({ type: 'wallsBroken', tiles: dedupeTiles(this.broken) });
+    if (!this.over) this.stepMatchClock();
     return this.events;
+  }
+
+  /** 경기가 끝났는가(training은 끝나지 않는다) */
+  get over(): boolean {
+    return this.match.winner !== null;
+  }
+
+  // ───────────── 경기(teamfight) ─────────────
+
+  /** 남은 시간을 한 틱 줄이고, 0이 되면 점수로 승패를 정한다 */
+  private stepMatchClock() {
+    const m = this.match;
+    if (m.ticksLeft <= 0) return; // -1: 무제한
+    m.ticksLeft--;
+    if (m.ticksLeft === 0) this.endMatch(m.score[0] > m.score[1] ? 0 : m.score[1] > m.score[0] ? 1 : -1);
+  }
+
+  /** 파이터 u가 sourceId에게 쓰러졌다: teamfight면 상대 팀 득점, 목표 점수에 닿으면 경기 끝 */
+  private scoreKo(u: Unit, sourceId: EntityId) {
+    const m = this.match;
+    if (m.mode !== 'teamfight' || this.over || u.type !== 'fighter') return;
+    const killer = this.getUnit(sourceId);
+    if (!killer || killer.team === u.team) return;
+    m.score[killer.team]++;
+    this.events.push({ type: 'score', team: killer.team, score: [m.score[0], m.score[1]], killerId: killer.id, victimId: u.id });
+    if (m.targetScore > 0 && m.score[killer.team] >= m.targetScore) this.endMatch(killer.team);
+  }
+
+  private endMatch(winner: Team | -1) {
+    if (this.over) return;
+    this.match.winner = winner;
+    this.events.push({ type: 'matchEnd', winner, score: [this.match.score[0], this.match.score[1]] });
   }
 
   // ───────────── 파이터 ─────────────
@@ -752,6 +793,7 @@ export class Sim implements SimView {
 
   /** traveled: 발사 지점부터 맞은 지점까지 날아간 거리(거리 비례 피해용) */
   private projectileHit(p: Projectile, u: Unit, traveled: number) {
+    if (this.over) return; // 경기가 끝난 뒤의 탄은 아무 효과 없음
     this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper);
     if (u.alive && p.knockback > 0) this.applyKnockback(u, p.vel.x, p.vel.y, p.knockback, angleOf(p.vel));
     if (!p.isSuper) {
@@ -785,7 +827,7 @@ export class Sim implements SimView {
 
   /** 기본 공격 적중 1회분 궁극기 충전. 1이 되는 순간 superReady */
   private chargeFromHit(f: Fighter) {
-    if (f.superCharge >= 1) return;
+    if (f.superCharge >= 1 || this.over) return;
     f.superCharge = Math.min(1, f.superCharge + getFighter(f.fighterId).attack.superChargePerHit);
     if (f.superCharge >= 1 - EPS) {
       f.superCharge = 1;
@@ -794,15 +836,15 @@ export class Sim implements SimView {
   }
 
   private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean) {
-    if (!isHittable(u) || amount <= 0) return;
+    if (!isHittable(u) || amount <= 0 || this.over) return;
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;
     const killed = u.hp <= 0;
     this.events.push({ type: 'hit', targetId: u.id, sourceId, damage: amount, pos: { ...u.pos }, isSuper, killed });
-    if (killed) this.kill(u);
+    if (killed) this.kill(u, sourceId);
   }
 
-  private kill(u: Unit) {
+  private kill(u: Unit, sourceId: EntityId) {
     u.alive = false;
     u.respawnTick = this.tick + (u.type === 'fighter' ? FIGHTER_RESPAWN_TICKS : DUMMY_RESPAWN_TICKS);
     if (u.type === 'fighter') {
@@ -812,6 +854,7 @@ export class Sim implements SimView {
       (u as SimDummy).knock = null;
     }
     this.events.push({ type: 'death', unitId: u.id, pos: { ...u.pos } });
+    this.scoreKo(u, sourceId);
   }
 
   /**
@@ -820,7 +863,7 @@ export class Sim implements SimView {
    * 돌진 중인 파이터는 밀리지 않는다. 방향 벡터가 0이면 fallbackDir(라디안) 방향.
    */
   private applyKnockback(u: Unit, dirX: number, dirY: number, distance: number, fallbackDir: number) {
-    if (!isHittable(u) || distance <= 0) return;
+    if (!isHittable(u) || distance <= 0 || this.over) return;
     if (u.type === 'fighter' && u.action?.kind === 'dash') return;
     let l = Math.hypot(dirX, dirY);
     if (l < 1e-6) {

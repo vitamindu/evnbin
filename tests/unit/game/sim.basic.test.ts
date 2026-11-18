@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TRAINING_YARD } from '../../../src/data/maps/training';
 import { getFighter } from '../../../src/data/fighters';
 import { Sim } from '../../../src/game/sim';
-import { fighterRadius } from '../../../src/game/rules';
+import { FIGHTER_RADIUS, FIGHTER_RADIUS_BY_ID, fighterRadius } from '../../../src/game/rules';
 import type { FighterInput } from '../../../src/game/types';
 import { fighters, makeSim, testMap } from './helpers';
 
@@ -28,15 +28,16 @@ describe('Sim 기본', () => {
     expect(p.facing).toBe(0);
   });
 
-  it('파이터 반지름: 기본 0.4, BOULDER 0.5', () => {
+  it('파이터 반지름: 기본 FIGHTER_RADIUS, BOULDER는 예외 값', () => {
     const sim = makeSim(testMap(10, 7, [[2, 2, 'A'], [2, 4, 'A']]), [
       { id: 'rivet', spawnIndex: 0 },
       { id: 'boulder', spawnIndex: 1 },
     ]);
     const [r, b] = fighters(sim);
     expect(r!.radius).toBe(fighterRadius('rivet'));
-    expect(r!.radius).toBe(0.4);
-    expect(b!.radius).toBe(0.5);
+    expect(r!.radius).toBe(FIGHTER_RADIUS);
+    expect(b!.radius).toBe(FIGHTER_RADIUS_BY_ID.boulder);
+    expect(b!.radius).toBeGreaterThan(r!.radius);
   });
 
   it('연습장에서 모든 파이터가 공격·궁극기를 계속 써도 상태 값이 유효하다', () => {
