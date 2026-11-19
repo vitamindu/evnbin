@@ -208,6 +208,10 @@ export class Sim implements SimView {
   private broken: Vec2[] = [];
   private readonly byId = new Map<EntityId, Unit>();
   /** 이번 틱에 받은 넉백 방향의 합(같은 틱 여러 발을 하나로 합친다) */
+  /** 공격 묶음 번호(넉백 한 번 규칙) */
+  private nextGroup = 1;
+  /** 대상별로 이미 넉백을 준 탄 묶음 */
+  private readonly knockedBy = new Map<EntityId, Set<number>>();
   private readonly knockAcc = new Map<EntityId, { sx: number; sy: number; distance: number; fx: number; fy: number }>();
 
   constructor(opts: SimOptions) {
@@ -422,16 +426,18 @@ export class Sim implements SimView {
   }
 
   private fireSpread(f: Fighter, spec: ShotSpec, dir: number) {
+    const group = this.nextGroup++;
     const spread = (spec.spreadDeg * Math.PI) / 180;
     for (let i = 0; i < spec.count; i++) {
       const k = spec.count > 1 ? i / (spec.count - 1) - 0.5 : 0;
       const mul = spec.speedJitter > 0 ? 1 + spec.speedJitter * (this.rng.next() * 2 - 1) : 1;
-      this.spawnShot(f, spec, dir + k * spread, 0, mul);
+      this.spawnShot(f, spec, dir + k * spread, 0, mul, group);
     }
   }
 
   private fireRadial(f: Fighter, spec: ShotSpec, dir: number) {
-    for (let i = 0; i < spec.count; i++) this.spawnShot(f, spec, dir + (i * Math.PI * 2) / spec.count, 0);
+    const group = this.nextGroup++;
+    for (let i = 0; i < spec.count; i++) this.spawnShot(f, spec, dir + (i * Math.PI * 2) / spec.count, 0, 1, group);
   }
 
   /** 연사: 이번 틱까지 나가야 할 탄을 쏜다. 다 쏘면 행동 끝 */
@@ -455,7 +461,7 @@ export class Sim implements SimView {
    * 직선 투사체 하나. 몸 중심에서 출발한다(벽에 붙어 있어도 벽 안에서 시작하지 않게).
    * lateral: 진행 방향 기준 옆으로 띄우는 거리(+ = 진행 방향의 오른쪽, 화면 기준).
    */
-  private spawnShot(owner: Unit, spec: ShotSpec, dir: number, lateral: number, speedMul = 1) {
+  private spawnShot(owner: Unit, spec: ShotSpec, dir: number, lateral: number, speedMul = 1, groupId?: number) {
     const radius = spec.isSuper ? SUPER_PROJECTILE_RADIUS : PROJECTILE_RADIUS;
     const maxLat = Math.max(0, owner.radius - radius);
     const lat = Math.sign(lateral) * Math.min(Math.abs(lateral), maxLat);
@@ -476,6 +482,7 @@ export class Sim implements SimView {
       knockback: spec.knockback,
       ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
       pierce: spec.pierce,
+      ...(groupId !== undefined ? { groupId } : {}),
       hitIds: [],
     });
   }
@@ -804,7 +811,21 @@ export class Sim implements SimView {
   private projectileHit(p: Projectile, u: Unit, traveled: number) {
     if (this.over) return; // 경기가 끝난 뒤의 탄은 아무 효과 없음
     this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper);
-    if (u.alive && p.knockback > 0) this.applyKnockback(u, p.vel.x, p.vel.y, p.knockback, angleOf(p.vel));
+    if (u.alive && p.knockback > 0) {
+      // 같은 공격 묶음의 탄은 한 대상을 한 번만 밀어낸다(피해는 탄마다)
+      let done = this.knockedBy.get(u.id);
+      if (p.groupId === undefined || !done?.has(p.groupId)) {
+        if (p.groupId !== undefined) {
+          if (!done) this.knockedBy.set(u.id, (done = new Set()));
+          done.add(p.groupId);
+          if (done.size > 32) done.delete(done.values().next().value as number);
+        }
+        // 묶음 넉백은 쏜 사람에서 대상으로 향하는 방향(가장 먼저 맞은 산탄의 비스듬한 방향이 아니라)
+        const owner = p.groupId !== undefined ? this.getUnit(p.ownerId) : undefined;
+        if (owner) this.applyKnockback(u, u.pos.x - owner.pos.x, u.pos.y - owner.pos.y, p.knockback, angleOf(p.vel));
+        else this.applyKnockback(u, p.vel.x, p.vel.y, p.knockback, angleOf(p.vel));
+      }
+    }
     if (!p.isSuper) {
       const owner = this.getUnit(p.ownerId);
       if (owner?.type === 'fighter') this.chargeFromHit(owner);

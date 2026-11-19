@@ -102,6 +102,8 @@ export interface Projectile {
   breaksWalls: boolean;
   /** 넉백 거리(타일), 0이면 없음 */
   knockback: number;
+  /** 같은 한 번의 공격(산탄 한 번, 연사 한 번)에서 나간 탄들의 묶음 번호. 넉백은 묶음마다 한 번만 */
+  groupId?: number;
   /** 거리 비례 피해: 사거리 끝까지 날아갔을 때의 피해량. 없으면 damage 고정 */
   damageFar?: number;
   /** 전체 사거리(거리 비례 피해 계산용) */
