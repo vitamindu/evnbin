@@ -3,7 +3,7 @@ import { getFighter } from '../../../src/data/fighters';
 import { DUMMY_RADIUS, KNOCKBACK_TICKS, PROJECTILE_RADIUS, SUPER_PROJECTILE_RADIUS } from '../../../src/game/rules';
 import { TICK_DT, TICK_RATE } from '../../../src/game/types';
 import { Tile } from '../../../src/game/world';
-import { attack, center, dummies, fighters, makeSim, ofType, run, superIn, testMap, tick, ticksFor } from './helpers';
+import { attack, center, dummies, fighters, makeSim, ofType, run, superIn, testMap, tick, ticksFor, withoutJitter } from './helpers';
 
 const RIVET = getFighter('rivet');
 const VOLLEY = getFighter('volley');
@@ -268,7 +268,8 @@ describe('궁극기: spread (RIVET Scrap Cannon)', () => {
     const first = tick(sim, { [p.id]: superIn({ x: 1, y: 0 }) });
     expect(sim.projectiles).toHaveLength(s.count);
     expect(sim.projectiles.every((q) => q.isSuper && q.breaksWalls && q.knockback === s.knockback && q.damage === s.damage)).toBe(true);
-    const events = [...first, ...run(sim, flightTicks(s.range, s.projectileSpeed))];
+    // 탄속 흔들림이 있으면 가장 느린 탄 기준으로 기다린다
+    const events = [...first, ...run(sim, flightTicks(s.range, s.projectileSpeed * (1 - (s.speedJitter ?? 0))))];
     const broken = ofType(events, 'wallsBroken').flatMap((e) => e.tiles);
     expect(broken).toContainEqual({ x: breakX, y: 4 });
     for (const t of broken) {
@@ -285,7 +286,8 @@ describe('궁극기: spread (RIVET Scrap Cannon)', () => {
     for (let y = 1; y <= 7; y++) expect(sim.grid.get(hardX, y)).toBe(Tile.HardWall);
   });
 
-  it('맞은 대상을 넉백 거리만큼 맞은 방향으로 밀어낸다', () => {
+  it('맞은 대상을 넉백 거리만큼 맞은 방향으로 밀어낸다(탄속 흔들림 없이)', () =>
+    withoutJitter(() => {
     const sim = makeSim(testMap(Math.ceil(8 + s.knockback * 2), 9, [[2, 4, 'A'], [4, 4, 'd']]), [{ id: 'rivet' }]);
     const p = fighters(sim)[0]!;
     const d = dummies(sim)[0]!;
@@ -295,7 +297,7 @@ describe('궁극기: spread (RIVET Scrap Cannon)', () => {
     run(sim, flightTicks(2, s.projectileSpeed) + KNOCKBACK_TICKS + 2);
     expect(d.pos.x - x0).toBeCloseTo(s.knockback, 2);
     expect(d.pos.y).toBeCloseTo(center(4, 4).y, 3);
-  });
+    }));
 });
 
 describe('궁극기: burst (VOLLEY Overdrive)', () => {

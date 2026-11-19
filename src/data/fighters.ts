@@ -42,6 +42,8 @@ export interface AttackDef {
   reload: number;
   /** 적중 1회당 궁극기 충전량(0~1). count발 모두 맞으면 count배 */
   superChargePerHit: number;
+  /** spread: 탄마다 속도를 ±이 비율만큼 다르게 해서 흩어져 날아가게 한다(0이면 모두 같은 속도) */
+  speedJitter?: number;
   /** true면 탄이 모든 대상을 관통한다 */
   pierce?: boolean;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
@@ -73,6 +75,8 @@ export interface SuperDef {
   aoeRadius?: number;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일) */
   lateralOffset?: number;
+  /** spread: 탄마다 속도를 ±이 비율만큼 다르게 해서 흩어져 날아가게 한다(0이면 모두 같은 속도) */
+  speedJitter?: number;
   /** true면 탄이 모든 대상을 관통한다(맞힌 대상마다 한 번씩 피해) */
   pierce?: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
@@ -135,13 +139,14 @@ export const FIGHTERS: readonly FighterDef[] = [
       description: '더 넓고 멀리 무거운 리벳 9발을 쏜다. 벽을 부수고 적을 밀쳐 낸다.',
       kind: 'spread',
       damage: 320,
-      count: 9,
+      count: 7,
       spreadDeg: 46,
       burstInterval: 0,
-      projectileSpeed: 9,
+      projectileSpeed: 6.5,
       range: 5.95,
       breaksWalls: true,
       knockback: 2.5,
+      speedJitter: 0.25,
     },
   },
   {
@@ -251,7 +256,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       name: 'Petal Leap',
       description: '벽 너머 원하는 곳으로 멀리 뛰어오르며, 뛴 자리에 벚꽃 폭탄 4개를 남긴다.',
       kind: 'leap',
-      damage: 700,
+      damage: 1000,
       count: 4,
       spreadDeg: 0,
       burstInterval: 0,
@@ -260,7 +265,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       breaksWalls: false,
       knockback: 0,
       aoeRadius: 1.3,
-      leapTime: 1.5,
+      leapTime: 0.5,
       fuse: 2,
     },
   },

@@ -113,6 +113,8 @@ export interface ShotSpec {
   damageFar?: number;
   /** 모든 대상 관통 */
   pierce: boolean;
+  /** spread: 탄마다 속도 ±비율 */
+  speedJitter: number;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime: number;
   /** leap: 폭탄이 터지기까지(초) */
@@ -135,6 +137,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       knockback: s.knockback,
       lateralOffset: s.lateralOffset ?? 0,
       pierce: s.pierce ?? false,
+      speedJitter: s.speedJitter ?? 0,
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
       leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
       fuse: s.fuse ?? DEFAULT_FUSE,
@@ -154,6 +157,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     knockback: 0,
     lateralOffset: a.lateralOffset ?? 0,
     pierce: a.pierce ?? false,
+    speedJitter: a.speedJitter ?? 0,
     aoeRadius: a.aoeRadius ?? DEFAULT_LOB_AOE,
     damageFar: a.damageFar,
     leapTime: DEFAULT_LEAP_TIME,
@@ -421,7 +425,8 @@ export class Sim implements SimView {
     const spread = (spec.spreadDeg * Math.PI) / 180;
     for (let i = 0; i < spec.count; i++) {
       const k = spec.count > 1 ? i / (spec.count - 1) - 0.5 : 0;
-      this.spawnShot(f, spec, dir + k * spread, 0);
+      const mul = spec.speedJitter > 0 ? 1 + spec.speedJitter * (this.rng.next() * 2 - 1) : 1;
+      this.spawnShot(f, spec, dir + k * spread, 0, mul);
     }
   }
 
@@ -450,7 +455,7 @@ export class Sim implements SimView {
    * 직선 투사체 하나. 몸 중심에서 출발한다(벽에 붙어 있어도 벽 안에서 시작하지 않게).
    * lateral: 진행 방향 기준 옆으로 띄우는 거리(+ = 진행 방향의 오른쪽, 화면 기준).
    */
-  private spawnShot(owner: Unit, spec: ShotSpec, dir: number, lateral: number) {
+  private spawnShot(owner: Unit, spec: ShotSpec, dir: number, lateral: number, speedMul = 1) {
     const radius = spec.isSuper ? SUPER_PROJECTILE_RADIUS : PROJECTILE_RADIUS;
     const maxLat = Math.max(0, owner.radius - radius);
     const lat = Math.sign(lateral) * Math.min(Math.abs(lateral), maxLat);
@@ -462,7 +467,7 @@ export class Sim implements SimView {
       ownerId: owner.id,
       team: owner.team,
       pos: { x: owner.pos.x - s * lat, y: owner.pos.y + c * lat },
-      vel: fromAngle(dir, spec.projectileSpeed),
+      vel: fromAngle(dir, spec.projectileSpeed * speedMul),
       radius,
       damage: spec.damage,
       remaining: spec.range,

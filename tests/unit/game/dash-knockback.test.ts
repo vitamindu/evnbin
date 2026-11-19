@@ -3,7 +3,7 @@ import { getFighter } from '../../../src/data/fighters';
 import { KNOCKBACK_TICKS } from '../../../src/game/rules';
 import { TICK_DT, TICK_RATE, type Fighter } from '../../../src/game/types';
 import { Tile } from '../../../src/game/world';
-import { attack, center, dummies, fighters, makeSim, ofType, run, runUntil, superIn, testMap, tick, ticksFor } from './helpers';
+import { attack, center, dummies, fighters, makeSim, ofType, run, runUntil, superIn, testMap, tick, ticksFor, withoutJitter } from './helpers';
 
 const S = getFighter('boulder').super;
 const RIVET_S = getFighter('rivet').super;
@@ -129,7 +129,8 @@ describe('넉백', () => {
     return { sim, me: me!, foe: foe! };
   }
 
-  it(`${KNOCKBACK_TICKS}틱 동안 밀려나고, 그동안 이동·공격 불가`, () => {
+  it(`${KNOCKBACK_TICKS}틱 동안 밀려나고, 그동안 이동·공격 불가(탄속 흔들림 없이)`, () =>
+    withoutJitter(() => {
     const { sim, me, foe } = duel();
     foe.superCharge = 1;
     const x0 = me.pos.x;
@@ -146,7 +147,7 @@ describe('넉백', () => {
     const after = tick(sim, { [me.id]: attack({ x: 1, y: 0 }, { x: 1, y: 0 }) });
     expect(me.action).toBeNull();
     expect(ofType(after, 'attack').filter((e) => e.unitId === me.id)).toHaveLength(1);
-  });
+  }));
 
   it('넉백은 연사를 끊는다', () => {
     const sim = makeSim(testMap(24, 9, [[8, 4, 'A'], [10, 4, 'Z']]), [

@@ -1,4 +1,4 @@
-import type { FighterId } from '../../../src/data/fighters';
+import { FIGHTERS, type FighterId } from '../../../src/data/fighters';
 import { Sim } from '../../../src/game/sim';
 import { TICK_RATE, type Aim, type Dummy, type EntityId, type Fighter, type FighterInput, type SimEvent, type Team, type Vec2 } from '../../../src/game/types';
 import type { MapDef } from '../../../src/game/world';
@@ -70,4 +70,24 @@ export function runUntil(sim: Sim, cond: () => boolean, maxTicks = 600, inputs: 
   const all: SimEvent[] = [];
   for (let i = 0; i < maxTicks && !cond(); i++) all.push(...tick(sim, inputs));
   return all;
+}
+
+/**
+ * 모든 파이터의 탄속 흔들림(speedJitter)을 잠시 0으로 두고 fn을 실행한다.
+ * 정확한 거리·시간을 확인하는 테스트용(흔들림이 있으면 산탄이 서로 다른 틱에 도착한다).
+ */
+export function withoutJitter(fn: () => void) {
+  const saved = FIGHTERS.map((f) => [f.attack.speedJitter, f.super.speedJitter] as const);
+  for (const f of FIGHTERS) {
+    if (f.attack.speedJitter !== undefined) f.attack.speedJitter = 0;
+    if (f.super.speedJitter !== undefined) f.super.speedJitter = 0;
+  }
+  try {
+    fn();
+  } finally {
+    FIGHTERS.forEach((f, i) => {
+      f.attack.speedJitter = saved[i]![0];
+      f.super.speedJitter = saved[i]![1];
+    });
+  }
 }

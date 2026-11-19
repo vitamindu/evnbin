@@ -219,7 +219,8 @@ describe('account HTTP API', () => {
     bad.ws.send(JSON.stringify({ t: 'join', code }));
     const full = await wait(a.msgs, (m) => m.t === 'room' && m.room.players.length === 3);
     const names = full.t === 'room' ? full.room.players.map((p) => p.name) : [];
-    expect(names).toEqual(['Hero', 'Hero 2', 'Faker']);
+    // 입장 순서는 소켓 연결 순서에 따라 달라질 수 있다
+    expect([...names].sort()).toEqual(['Faker', 'Hero', 'Hero 2']);
     a.ws.send(JSON.stringify({ t: 'start' }));
     const end = await wait(a.msgs, (m) => m.t === 'end');
     expect(end.t === 'end' && end.result.winner).toBe(-1); // 20틱 안전 상한 → 0:0 무승부

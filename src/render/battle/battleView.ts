@@ -44,7 +44,9 @@ const SHOT_COLOR: Record<string, string> = {
   boulder: '#4d5270',
   hinako: '#ec2a7c',
   dummy: '#cf1d2c',
-  /** 상대 팀 탄환은 캐릭터와 상관없이 빨간색 */
+  /** 우리 팀 탄환(캐릭터와 상관없이) */
+  ally: '#1e63f0',
+  /** 상대 팀 탄환(캐릭터와 상관없이) */
   enemy: '#e01b2b',
 };
 
@@ -280,10 +282,10 @@ export class BattleView {
   }
 
   private shotColor(owner: Unit | undefined): string {
-    if (!owner) return SHOT_COLOR.dummy!;
-    const myTeam = this.units.get(this.followId)?.unit.team;
-    if (myTeam !== undefined && owner.team !== myTeam) return SHOT_COLOR.enemy!;
-    return (owner.type === 'fighter' ? SHOT_COLOR[owner.fighterId] : SHOT_COLOR.dummy) ?? '#ff7a00';
+    if (!owner) return SHOT_COLOR.enemy!;
+    // 규칙: 우리 팀 탄환은 무조건 파란색, 상대 팀은 무조건 빨간색(CLAUDE.md)
+    const myTeam = this.units.get(this.followId)?.unit.team ?? 0;
+    return owner.team === myTeam ? SHOT_COLOR.ally! : SHOT_COLOR.enemy!;
   }
 
   /** 몸통 재질(카툰 명암) */

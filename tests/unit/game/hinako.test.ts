@@ -279,7 +279,8 @@ describe('HINAKO 궁극기: leap', () => {
   });
 
   it('점프 중에는 피해를 받지 않고, 투사체는 소모되지 않고 지나간다', () => {
-    // HINAKO가 오른쪽으로 점프하자마자 마주 선 적 RIVET이 산탄을 쏜다. 산탄은 HINAKO를 지나 사거리 끝까지 간다
+    // 적 RIVET이 HINAKO에게 산탄을 쏘고, 산탄이 닿기 직전에 HINAKO가 적 쪽으로 점프한다.
+    // 산탄과 공중의 HINAKO가 엇갈리고(맞지 않음), 산탄은 뛴 자리 뒤쪽 사거리 끝까지 간다
     const R = getFighter('rivet').attack;
     const gap = Math.max(2, Math.floor(R.range * 0.6));
     const hx = Math.ceil(R.range) + 2;
@@ -289,12 +290,31 @@ describe('HINAKO 궁극기: leap', () => {
     ]);
     const [me, foe] = fighters(sim);
     me!.superCharge = 1;
-    tick(sim, { [me!.id]: superIn({ x: 1, y: 0 }) });
     tick(sim, { [foe!.id]: attack({ x: -1, y: 0 }) });
     const ids = new Set(sim.projectiles.filter((q) => q.ownerId === foe!.id).map((q) => q.id));
     expect(ids.size).toBe(R.count);
-    const events = runUntil(sim, () => !sim.projectiles.some((q) => ids.has(q.id)), ticksFor(R.range, R.projectileSpeed));
-    expect(isAirborne(me!)).toBe(true); // 산탄이 다 사라질 때까지 공중
+    // 가장 앞선 탄이 HINAKO에게 한 틱 거리 안으로 들어오면 점프
+    const step = (R.projectileSpeed * (1 + (R.speedJitter ?? 0))) / 30;
+    const lead = () => Math.min(...sim.projectiles.filter((q) => ids.has(q.id)).map((q) => q.pos.x));
+    const reach = me!.pos.x + me!.radius + PROJECTILE_RADIUS;
+    const events = runUntil(sim, () => lead() - reach <= 2 * step, ticksFor(gap, R.projectileSpeed * (1 - (R.speedJitter ?? 0))));
+    expect(ofType(events, 'hit')).toHaveLength(0);
+    events.push(...tick(sim, { [me!.id]: superIn({ x: 1, y: 0 }) }));
+    expect(isAirborne(me!)).toBe(true);
+    // 공중에 있는 동안 어떤 탄이 HINAKO의 현재 위치를 지나쳤는가(엇갈림)
+    let crossedInAir = false;
+    events.push(
+      ...runUntil(
+        sim,
+        () => {
+          const live = sim.projectiles.filter((q) => ids.has(q.id));
+          if (isAirborne(me!) && live.some((q) => q.pos.x < me!.pos.x)) crossedInAir = true;
+          return live.length === 0;
+        },
+        ticksFor(R.range, R.projectileSpeed * (1 - (R.speedJitter ?? 0))),
+      ),
+    );
+    expect(crossedInAir).toBe(true);
     expect(ofType(events, 'hit').filter((h) => h.targetId === me!.id)).toHaveLength(0);
     expect(me!.hp).toBe(me!.maxHp);
     const ends = ofType(events, 'projectileEnd').filter((e) => ids.has(e.id));
@@ -305,7 +325,7 @@ describe('HINAKO 궁극기: leap', () => {
     // 착지 뒤에는 다시 맞는다
     runUntil(sim, () => me!.action === null, LEAP_TICKS + 1);
     foe!.ammo = foe!.maxAmmo;
-    const after = [...tick(sim, { [foe!.id]: attack(null) }), ...run(sim, ticksFor(R.range, R.projectileSpeed))];
+    const after = [...tick(sim, { [foe!.id]: attack(null) }), ...run(sim, ticksFor(R.range, R.projectileSpeed * (1 - (R.speedJitter ?? 0))))];
     expect(ofType(after, 'hit').some((h) => h.targetId === me!.id)).toBe(true);
   });
 
