@@ -69,7 +69,7 @@ const ERROR_TEXT: Record<ErrorCode, string> = {
 /** 연결 하나 */
 class Conn {
   id: string | null = null;
-  name = 'PLAYER';
+  name = '플레이어';
   /** 로그인한 계정 키(hello의 토큰으로 확인). 게스트는 null */
   account: string | null = null;
   fighterId: FighterId = 'rivet';

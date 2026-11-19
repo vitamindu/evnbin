@@ -49,13 +49,13 @@ export interface RosterSeed {
   account?: string | null;
 }
 
-/** 이름 다듬기: 제어 문자 제거, 공백 정리, 최대 16글자. 비면 PLAYER */
+/** 이름 다듬기: 제어 문자 제거, 공백 정리, 최대 16글자. 비면 '플레이어' */
 export function sanitizeName(raw: string): string {
   const s = Array.from(raw.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim())
     .slice(0, NAME_MAX)
     .join('')
     .trim();
-  return s || 'PLAYER';
+  return s || '플레이어';
 }
 
 export function normalizeCode(code: string): string {
@@ -212,7 +212,7 @@ export class Room {
       for (let slot = free; slot < TEAM_SIZE; slot++) {
         const pick = FIGHTERS.find((f) => !used.has(f.id)) ?? FIGHTERS[(slot + team) % FIGHTERS.length]!;
         used.add(pick.id);
-        out.push({ playerId: `bot-${team}-${slot}`, name: `BOT ${n++}`, team, fighterId: pick.id, bot: true });
+        out.push({ playerId: `bot-${team}-${slot}`, name: `봇 ${n++}`, team, fighterId: pick.id, bot: true });
       }
     }
     return out;

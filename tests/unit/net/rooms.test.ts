@@ -136,7 +136,7 @@ describe('room rules', () => {
   });
 
   it('sanitizes names', () => {
-    expect(sanitizeName('  ')).toBe('PLAYER');
+    expect(sanitizeName('  ')).toBe('플레이어');
     expect(sanitizeName('a\u0000b\n  c')).toBe('ab c');
     expect(Array.from(sanitizeName('가'.repeat(40)))).toHaveLength(16);
   });
