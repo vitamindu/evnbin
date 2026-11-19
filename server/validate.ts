@@ -29,7 +29,8 @@ export function parseClientMsg(raw: string): ClientMsg | null {
   switch (m.t) {
     case 'hello':
       if (!isNum(m.v) || typeof m.name !== 'string' || m.name.length > 64 || !isFighter(m.fighterId)) return null;
-      return { t: 'hello', v: m.v, name: m.name, fighterId: m.fighterId };
+      if (m.token !== undefined && (typeof m.token !== 'string' || m.token.length > 200)) return null;
+      return { t: 'hello', v: m.v, name: m.name, fighterId: m.fighterId, ...(typeof m.token === 'string' ? { token: m.token } : {}) };
     case 'create':
       return { t: 'create' };
     case 'join':

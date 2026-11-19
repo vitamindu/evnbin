@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { startServer, type RunningServer, type ServerOptions } from '../../../server/app';
@@ -13,8 +16,11 @@ let server: RunningServer | null = null;
 const sockets: WebSocket[] = [];
 const clients: OnlineClientImpl[] = [];
 
+let dataDir: string | null = null;
+
 async function boot(opts: ServerOptions = {}) {
-  server = await startServer({ port: 0, host: '127.0.0.1', startDelayMs: 50, log: () => {}, ...opts });
+  dataDir = mkdtempSync(join(tmpdir(), 'fg-net-'));
+  server = await startServer({ port: 0, host: '127.0.0.1', startDelayMs: 50, log: () => {}, dataDir, ...opts });
   return `ws://127.0.0.1:${server.port}`;
 }
 
@@ -23,6 +29,8 @@ afterEach(async () => {
   for (const s of sockets.splice(0)) s.terminate();
   await server?.close();
   server = null;
+  if (dataDir) rmSync(dataDir, { recursive: true, force: true });
+  dataDir = null;
 });
 
 /** 원시 웹소켓 가짜 클라이언트 */
@@ -71,7 +79,7 @@ class FakeClient {
 async function fake(url: string, name: string): Promise<FakeClient> {
   const c = new FakeClient(url);
   await c.opened();
-  c.send({ t: 'hello', v: 1, name, fighterId: 'volley' });
+  c.send({ t: 'hello', v: 2, name, fighterId: 'volley' });
   await c.next('welcome');
   return c;
 }
@@ -100,7 +108,7 @@ describe('game server', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean; protocol: number };
     expect(body.ok).toBe(true);
-    expect(body.protocol).toBe(1);
+    expect(body.protocol).toBe(2);
   });
 
   it('rejects a wrong protocol version and unknown rooms', async () => {
@@ -109,13 +117,13 @@ describe('game server', () => {
     await c.opened();
     c.send({ t: 'join', code: 'ABCD' });
     expect((await c.next('error')).code).toBe('bad_message'); // hello 전
-    c.send({ t: 'hello', v: 1, name: 'A', fighterId: 'rivet' });
+    c.send({ t: 'hello', v: 2, name: 'A', fighterId: 'rivet' });
     await c.next('welcome');
     c.send({ t: 'join', code: 'ZZZZ' });
     expect((await c.next('error', (m) => m.code !== 'bad_message')).code).toBe('room_not_found');
     const d = new FakeClient(url);
     await d.opened();
-    d.send({ t: 'hello', v: 99, name: 'B', fighterId: 'rivet' });
+    d.send({ t: 'hello', v: 1, name: 'B', fighterId: 'rivet' });
     expect((await d.next('error')).code).toBe('bad_version');
   });
 
@@ -184,6 +192,7 @@ describe('game server', () => {
         sessionOptions: { createView: () => fakeView() },
         reconnectDelaysMs: [50, 100, 200, 400],
         pingIntervalMs: 200,
+        getToken: () => null,
       });
       clients.push(c);
       return c;

@@ -50,6 +50,8 @@ export class Match {
   /** 사람 플레이어(봇 제외) */
   readonly humans: readonly MatchRosterEntry[];
   result: MatchResult | null = null;
+  /** playerId → 계정 키(로그인한 사람만). 경기 결과를 계정에 반영할 때 쓴다 */
+  readonly accounts = new Map<string, string>();
   /** 측정용: 마지막 snap 공통 본문 크기(바이트), 보낸 snap 수 */
   lastSnapBytes = 0;
   snapsSent = 0;
@@ -80,6 +82,7 @@ export class Match {
       bot: r.bot,
     }));
     this.humans = this.roster.filter((r) => !r.bot);
+    for (const r of cfg.roster) if (!r.bot && r.account) this.accounts.set(r.playerId, r.account);
     for (const h of this.humans) this.queues.set(h.playerId, new InputQueue(cfg.inputQueue));
     for (const r of this.roster) {
       this.stats.set(r.entityId, { playerId: r.playerId, name: r.name, fighterId: r.fighterId, team: r.team, kills: 0, deaths: 0, damage: 0 });

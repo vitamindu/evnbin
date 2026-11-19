@@ -1,5 +1,6 @@
 import type { FighterId } from '../data/fighters';
 import type { Team } from '../game/types';
+import { getToken } from './account';
 import type { OnlineClient, OnlineEvents, OnlineStatus } from './api';
 import { OnlineSession, type OnlineSessionOptions, type SessionTransport } from './onlineSession';
 import { PROTOCOL_VERSION, type ClientMsg, type MatchStartInfo, type RoomState, type ServerMsg } from './protocol';
@@ -7,7 +8,7 @@ import { PROTOCOL_VERSION, type ClientMsg, type MatchStartInfo, type RoomState, 
 /**
  * 온라인 클라이언트(OnlineClient 구현). Network 담당. UI는 createOnlineClient()만 쓴다.
  *
- * - connect: 웹소켓 연결 → hello → welcome을 받으면 끝(실패하면 reject, 자동 재시도 안 함).
+ * - connect: 웹소켓 연결 → hello(로그인했으면 토큰 포함, 서버가 계정 이름을 쓴다) → welcome을 받으면 끝(실패하면 reject, 자동 재시도 안 함).
  * - 연결된 뒤 끊기면 자동 재연결(0.5초~5초 간격, 약 30초). 방에 있었으면 같은 이름으로 그 방에 다시 들어가
  *   같은 자리(playerId)를 이어받고, 경기 중이면 같은 세션으로 다시 맞춘다(resync).
  * - createRoom / joinRoom은 다음 room(성공) 또는 error(실패, OnlineError.code = 서버 오류 코드)로 끝난다.
@@ -39,6 +40,8 @@ export interface OnlineClientOptions {
   staleMs?: number;
   /** 재연결 간격(ms). 다 쓰면 포기 */
   reconnectDelaysMs?: number[];
+  /** 로그인 토큰(hello에 싣는다). 기본: account.ts의 저장된 토큰. 없으면 게스트 */
+  getToken?: () => string | null;
 }
 
 type Listeners = { [K in keyof OnlineEvents]?: Set<(v: OnlineEvents[K]) => void> };
@@ -85,12 +88,14 @@ export class OnlineClientImpl implements OnlineClient {
   private readonly opts: Required<Omit<OnlineClientOptions, 'WebSocketImpl' | 'createSession' | 'sessionOptions'>> &
     Pick<OnlineClientOptions, 'WebSocketImpl' | 'createSession' | 'sessionOptions'>;
 
+
   constructor(opts: OnlineClientOptions = {}) {
     this.opts = {
       pingIntervalMs: 2000,
       requestTimeoutMs: 8000,
       staleMs: 6000,
       reconnectDelaysMs: DEFAULT_RECONNECT,
+      getToken,
       ...opts,
     };
   }
@@ -154,7 +159,14 @@ export class OnlineClientImpl implements OnlineClient {
     ws.onopen = () => {
       if (gen !== this.generation) return;
       this.lastMessageAt = now();
-      this.sendNow({ t: 'hello', v: PROTOCOL_VERSION, name: this.roomName ?? this.name, fighterId: this.fighterId });
+      const token = this.opts.getToken();
+      this.sendNow({
+        t: 'hello',
+        v: PROTOCOL_VERSION,
+        name: this.roomName ?? this.name,
+        fighterId: this.fighterId,
+        ...(token ? { token } : {}),
+      });
     };
     ws.onmessage = (ev: MessageEvent) => {
       if (gen !== this.generation) return;

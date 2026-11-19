@@ -18,7 +18,7 @@ COPY package.json package-lock.json ./
 # 번들은 외부 패키지(ws)만 node_modules에서 읽는다
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist-server ./dist-server
-USER node
+# 계정 파일은 /data(Fly 볼륨, root 소유로 붙는다)에 쓰므로 root로 실행한다. 볼륨이 없으면 ./.data
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

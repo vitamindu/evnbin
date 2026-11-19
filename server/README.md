@@ -22,6 +22,7 @@ curl localhost:8787/health
 | `HOST` | 0.0.0.0 | 바인드 주소 |
 | `ALLOWED_ORIGINS` | (모두 허용) | 쉼표 구분 페이지 주소. 예: `https://<user>.github.io` |
 | `START_DELAY_MS` | 1500 | START 후 첫 틱까지(모두가 전투 화면을 준비할 시간) |
+| `DATA_DIR` | `/data`(있으면) → `./.data` | 계정 파일 `accounts.json` 위치 |
 
 클라이언트 빌드 시 `VITE_SERVER_URL=wss://game.example.com npm run build`로 기본 서버 주소를 넣는다
 (`src/net/config.ts`). 사용자가 설정에서 바꾼 주소는 기기(localStorage `fg.server.v1`)에 저장된다.
@@ -43,6 +44,22 @@ docker run --init -p 8787:8787 -e ALLOWED_ORIGINS=https://<user>.github.io fight
 - **상태 확인**: `GET /health` → `{"ok":true,"protocol":1,"rooms":0,"playing":0,"connections":0,"uptimeSec":12}`.
 - 비밀값은 필요 없다. 토큰 등을 이미지나 저장소에 넣지 않는다.
 
+## 계정(4단계)
+
+- API(같은 주소, JSON): `POST /api/signup`, `POST /api/login` → `{token, profile}`, `GET /api/me`,
+  `PUT /api/profile {selected}`(선택 캐릭터만), `POST /api/logout`. 인증은 `Authorization: Bearer <token>`.
+  오류는 `{error}`: `bad_credentials` 401, `unauthorized` 401, `username_taken` 409,
+  `invalid_username`·`weak_password`·`bad_request` 400, `rate_limited` 429.
+  형식: `src/net/accountApi.ts`, 클라이언트: `src/net/account.ts`.
+- CORS: `https://vitamindu.github.io`, `http://localhost:*`, `http://127.0.0.1:*`.
+- 저장: `DATA_DIR/accounts.json` 하나(임시 파일 → rename). 비밀번호는 scrypt + 사용자별 salt,
+  토큰은 SHA-256 해시만 저장(30일 만료, 계정당 10개). 백업은 이 파일 하나를 복사하면 된다.
+- 로그인 실패: 같은 IP(Fly-Client-IP)에서 10분에 5번 틀리면 10분 동안 `rate_limited`. 가입은 IP당 10분에 10번.
+- 웹소켓 `hello`(프로토콜 v2)에 `token`이 있으면 계정 이름으로 방에 들어가고, 경기가 끝나면 그 계정에
+  캐릭터별 트로피(승 +8, 무 0, 패 −4, 0 미만 없음)와 코인(승 +20, 그 외 +10)을 반영한다.
+  중간에 나간 사람도 반영(패배 회피 방지). 토큰이 없거나 틀리면 게스트(반영 없음).
+- 계정 자리의 재접속은 같은 계정만 이어받는다(이름만 같은 게스트는 불가).
+
 ## 구조
 
 | 파일 | 내용 |
@@ -55,6 +72,8 @@ docker run --init -p 8787:8787 -e ALLOWED_ORIGINS=https://<user>.github.io fight
 | `loop.ts` | 드리프트 보정 고정 주기 루프 |
 | `bots.ts` | `src/game/bot.ts`의 `botInput` 어댑터(예외 시 가만히) |
 | `validate.ts` | 클라이언트 메시지 검사 |
+| `accounts.ts` | 계정 저장소(JSON 파일, scrypt, 토큰), 경기 결과 반영, 로그인 실패 제한 |
+| `api.ts` | `/api/*` HTTP 처리와 CORS |
 
 ## 동작 요약
 

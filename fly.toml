@@ -8,6 +8,12 @@ primary_region = "nrt" # 도쿄: 한국과 가장 가까운 지역
 
 [env]
   PORT = "8787"
+  DATA_DIR = "/data"
+
+# 계정 파일(accounts.json)을 두는 볼륨. Lead가 만든 1GB 볼륨 fg_data(nrt)
+[mounts]
+  source = "fg_data"
+  destination = "/data"
 
 [http_service]
   internal_port = 8787

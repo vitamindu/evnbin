@@ -8,6 +8,8 @@ import type { AddressInfo } from 'node:net';
 import { WebSocket, WebSocketServer } from 'ws';
 import { PROTOCOL_VERSION, type ClientMsg, type MatchResult, type ServerMsg } from '../src/net/protocol';
 import type { FighterId } from '../src/data/fighters';
+import { AccountStore, RateLimiter, defaultDataDir, type AccountResult } from './accounts';
+import { DEFAULT_API_ORIGINS, handleApi } from './api';
 import { Match, type MatchConfig } from './match';
 import { Room, RoomManager, sanitizeName, type RoomError } from './rooms';
 import { parseClientMsg } from './validate';
@@ -26,6 +28,14 @@ export interface ServerOptions {
   emptyRoomGraceMs?: number;
   /** 이 시간(ms) 동안 아무것도 못 받으면 연결을 끊는다(반쯤 열린 연결 정리) */
   silentMs?: number;
+  /** 계정 파일 폴더(기본: DATA_DIR → /data → ./.data) */
+  dataDir?: string;
+  /** 계정 저장소를 직접 넘길 때(테스트) */
+  accounts?: AccountStore;
+  /** 계정 API CORS 허용 주소(localhost는 항상 허용). 기본 https://vitamindu.github.io */
+  apiOrigins?: string[];
+  /** 로그인 실패 제한(테스트용으로 줄일 수 있다) */
+  rateLimiter?: RateLimiter;
   /** 웹소켓 압축(permessage-deflate) */
   compress?: boolean;
   /** 경기 설정 덮어쓰기(테스트용: maxTicks 등) */
@@ -36,6 +46,7 @@ export interface ServerOptions {
 export interface RunningServer {
   readonly port: number;
   readonly rooms: RoomManager;
+  readonly accounts: AccountStore;
   /** 상태 요약(/health와 같은 값) */
   health(): Record<string, unknown>;
   /** 연결별 보낸 바이트(측정용) */
@@ -58,6 +69,8 @@ const ERROR_TEXT: Record<ErrorCode, string> = {
 class Conn {
   id: string | null = null;
   name = 'PLAYER';
+  /** 로그인한 계정 키(hello의 토큰으로 확인). 게스트는 null */
+  account: string | null = null;
   fighterId: FighterId = 'rivet';
   room: Room | null = null;
   /** 마지막으로 무언가 받은 시각(ms) */
@@ -112,6 +125,10 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   const emptyRoomGraceMs = opts.emptyRoomGraceMs ?? 30_000;
   const silentMs = opts.silentMs ?? 10_000;
   const allowed = (opts.allowedOrigins ?? []).filter(Boolean);
+  const accounts = opts.accounts ?? new AccountStore(opts.dataDir ?? defaultDataDir(), Date.now, log);
+  const limiter = opts.rateLimiter ?? new RateLimiter();
+  const apiDeps = { store: accounts, limiter, allowedOrigins: opts.apiOrigins ?? DEFAULT_API_ORIGINS, log };
+  log(`accounts: ${accounts.size} in ${accounts.dir}`);
 
   const health = () => {
     let playing = 0;
@@ -122,11 +139,13 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       rooms: rooms.rooms.size,
       playing,
       connections: conns.size,
+      accounts: accounts.size,
       uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     };
   };
 
   const http = createServer((req: IncomingMessage, res: ServerResponse) => {
+    if (handleApi(req, res, apiDeps)) return;
     const path = (req.url ?? '/').split('?')[0];
     if (req.method === 'GET' && (path === '/health' || path === '/')) {
       res.writeHead(200, {
@@ -171,11 +190,29 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     return true;
   };
 
+  /** 로그인한 사람의 트로피·코인 반영(중간에 나간 사람 포함, 게스트·봇 제외) */
+  const applyResults = (match: Match | null, result: MatchResult) => {
+    if (!match) return;
+    const list: AccountResult[] = [];
+    for (const h of match.humans) {
+      const account = match.accounts.get(h.playerId);
+      if (!account) continue;
+      const outcome = result.winner === -1 ? 'draw' : result.winner === h.team ? 'win' : 'loss';
+      list.push({ account, fighterId: h.fighterId, outcome });
+    }
+    try {
+      accounts.applyMatchResults(list);
+    } catch (err) {
+      log(`apply results failed: ${(err as Error)?.stack ?? String(err)}`);
+    }
+  };
+
   const endMatch = (room: Room, result: MatchResult) => {
     const match = room.match;
     room.match = null;
     const end = JSON.stringify({ t: 'end', result } satisfies ServerMsg);
     for (const m of room.members) if (m.connected) byPlayer.get(m.id)?.sendRaw(end);
+    applyResults(match, result);
     room.phase = 'lobby';
     for (const m of room.members) m.ready = false;
     // 경기 중 끊긴 채 돌아오지 않은 사람은 정리
@@ -257,8 +294,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         return;
       }
       if (!c.room) {
-        c.name = sanitizeName(msg.name);
         c.fighterId = msg.fighterId;
+        // 토큰이 맞으면 계정 이름, 아니면(없음·만료) 게스트
+        const key = msg.token ? accounts.verify(msg.token) : null;
+        c.account = key;
+        c.name = key ? (accounts.username(key) ?? sanitizeName(msg.name)) : sanitizeName(msg.name);
       }
       if (!c.id) {
         c.id = newPlayerId();
@@ -287,7 +327,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     if (msg.t === 'create') {
       if (c.room) leaveRoom(c);
       const room = rooms.create();
-      const m = room.add(c.id, c.name, c.fighterId);
+      const m = room.add(c.id, c.name, c.fighterId, Date.now(), c.account);
       if (typeof m === 'string') {
         rooms.delete(room.code);
         c.error(m);
@@ -309,13 +349,13 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         c.send({ t: 'room', room: room.toState() });
         return;
       }
-      const again = room.findReconnect(c.name);
+      const again = room.findReconnect(c.name, c.account);
       if (again) {
         if (c.room) leaveRoom(c);
         takeOver(c, room, again.id);
         return;
       }
-      const m = room.add(c.id, c.name, c.fighterId);
+      const m = room.add(c.id, c.name, c.fighterId, Date.now(), c.account);
       if (typeof m === 'string') {
         c.error(m);
         return;
@@ -410,6 +450,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   }, 4_000);
   const sweeper = setInterval(() => {
     const now = Date.now();
+    limiter.sweep();
     for (const room of [...rooms.rooms.values()]) {
       const gone = room.sweepDisconnected(now, lobbyGraceMs);
       if (room.members.length === 0) {
@@ -433,6 +474,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   return {
     port,
     rooms,
+    accounts,
     health,
     traffic: () => [...conns].map((c) => ({ playerId: c.id, bytesOut: c.bytesOut, messagesOut: c.messagesOut })),
     close: () =>

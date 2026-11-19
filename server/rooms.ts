@@ -34,6 +34,8 @@ export interface Member {
   order: number;
   /** 연결이 끊긴 시각(ms). 연결 중이면 null */
   disconnectedAt: number | null;
+  /** 로그인한 계정 키(게스트는 null). 재접속은 같은 계정만 이어받는다 */
+  account: string | null;
 }
 
 /** 경기 명단 재료(서버 Match가 받는다) */
@@ -43,6 +45,8 @@ export interface RosterSeed {
   team: Team;
   fighterId: FighterId;
   bot: boolean;
+  /** 경기 결과를 반영할 계정(게스트·봇은 없음) */
+  account?: string | null;
 }
 
 /** 이름 다듬기: 제어 문자 제거, 공백 정리, 최대 16글자. 비면 PLAYER */
@@ -93,7 +97,7 @@ export class Room {
   }
 
   /** 새 플레이어 입장. 팀은 자동 배정, 이름이 겹치면 뒤에 숫자를 붙인다 */
-  add(id: string, name: string, fighterId: FighterId, now = Date.now()): Member | RoomError {
+  add(id: string, name: string, fighterId: FighterId, now = Date.now(), account: string | null = null): Member | RoomError {
     if (this.phase !== 'lobby') return 'in_progress';
     if (this.members.length >= MAX_PLAYERS) return 'room_full';
     const c0 = this.teamCount(0);
@@ -108,6 +112,7 @@ export class Room {
       connected: true,
       order: this.order++,
       disconnectedAt: null,
+      account,
     };
     this.members.push(m);
     this.touch(now);
@@ -115,10 +120,15 @@ export class Room {
     return m;
   }
 
-  /** 같은 이름의 자리(재접속 대상). 로비: 끊긴 자리만, 경기 중: 연결 여부와 상관없이 */
-  findReconnect(name: string): Member | undefined {
+  /**
+   * 재접속 대상 자리. 로비: 끊긴 자리만, 경기 중: 연결 여부와 상관없이.
+   * 계정 자리는 같은 계정만, 연결 여부와 상관없이(토큰으로 확인했으므로 다른 탭·반쯤 열린 연결을 대신한다).
+   * 게스트 자리는 같은 이름의 게스트만(이름만 같은 게스트가 계정 자리를 가로챌 수 없다).
+   */
+  findReconnect(name: string, account: string | null = null): Member | undefined {
+    if (account) return this.members.find((m) => m.account === account);
     const n = sanitizeName(name);
-    return this.members.find((m) => sameName(m.name, n) && (!m.connected || this.phase !== 'lobby'));
+    return this.members.find((m) => m.account === null && sameName(m.name, n) && (!m.connected || this.phase !== 'lobby'));
   }
 
   remove(id: string, now = Date.now()): boolean {
@@ -214,7 +224,9 @@ export class Room {
     const bots = this.bots();
     const out: RosterSeed[] = [];
     for (const team of [0, 1] as const) {
-      for (const m of humans) if (m.team === team) out.push({ playerId: m.id, name: m.name, team, fighterId: m.fighterId, bot: false });
+      for (const m of humans) {
+        if (m.team === team) out.push({ playerId: m.id, name: m.name, team, fighterId: m.fighterId, bot: false, account: m.account });
+      }
       for (const b of bots) if (b.team === team) out.push(b);
     }
     return out;

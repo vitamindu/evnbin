@@ -8,7 +8,7 @@
 import type { FighterId } from '../data/fighters';
 import type { Lob, MatchMode, MatchState, Projectile, SimEvent, Team, Unit, Vec2 } from '../game/types';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** 조준: [x, y](길이 0~1) 또는 null(자동 조준) */
 export type WireAim = [number, number] | null;
@@ -87,7 +87,8 @@ export interface MatchResult {
 
 // ───────────── 클라이언트 → 서버 ─────────────
 export type ClientMsg =
-  | { t: 'hello'; v: number; name: string; fighterId: FighterId }
+  /** v2: token(로그인 토큰)이 있으면 계정 이름을 쓰고 경기 결과를 그 계정에 반영. 없으면 게스트 */
+  | { t: 'hello'; v: number; name: string; fighterId: FighterId; token?: string }
   | { t: 'create' }
   | { t: 'join'; code: string }
   | { t: 'leave' }
