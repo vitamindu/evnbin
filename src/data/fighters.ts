@@ -115,7 +115,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: '고물상 정비공. 모든 문제를 리벳 대포로 해결한다.',
     palette: { primary: '#ff8a2a', secondary: '#1aa39a', accent: '#ffd23f', skin: '#f2b48a', dark: '#6b2f0e' },
     hp: 3800,
-    moveSpeed: 2.35,
+    moveSpeed: 2.28,
     attack: {
       name: 'Rivet Spray',
       description: '리벳 5발을 부채꼴로 쏜다. 가까울수록 많이 맞는다.',
