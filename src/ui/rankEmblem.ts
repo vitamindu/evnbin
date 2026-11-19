@@ -49,60 +49,88 @@ export function rankEmblemSvg(tierId: TierId, uid = Math.random().toString(36).s
   const tier = TIERS.find((t) => t.id === tierId) ?? TIERS[0]!;
   const level = TIERS.indexOf(tier);
   const { light, dark, gem } = tier.colors;
-  const g = `g${uid}`;
-  const parts: string[] = [];
-  const stroke = `stroke="${INK}" stroke-width="3" stroke-linejoin="round"`;
+  const id = (n: string) => `${n}${uid}`;
+  const s = `stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"`;
+  const back: string[] = [];
+  const front: string[] = [];
+  const mirror = (d: string, fill: string, extra = '') =>
+    `<path d="${d}" fill="${fill}" ${s} ${extra}/><path d="${d}" transform="translate(100 0) scale(-1 1)" fill="${fill}" ${s} ${extra}/>`;
 
-  // 뒤 장식(메달 뒤에 그린다)
+  // ── 뒤 장식 ──
   if (level >= 7) {
-    // 챌린저: 빛살
-    for (let i = 0; i < 12; i++) {
-      const a = (Math.PI / 6) * i;
-      parts.push(`<path d="M50 52 L${(50 + 46 * Math.cos(a - 0.08)).toFixed(1)} ${(52 + 46 * Math.sin(a - 0.08)).toFixed(1)} L${(50 + 46 * Math.cos(a + 0.08)).toFixed(1)} ${(52 + 46 * Math.sin(a + 0.08)).toFixed(1)}Z" fill="${gem}" opacity="0.55"/>`);
+    // 챌린저: 빛살 + 바깥 빛 고리
+    for (let i = 0; i < 16; i++) {
+      const a = (Math.PI / 8) * i;
+      const r = i % 2 ? 40 : 48;
+      back.push(`<path d="M50 54 L${(50 + r * Math.cos(a - 0.06)).toFixed(1)} ${(54 + r * Math.sin(a - 0.06)).toFixed(1)} L${(50 + r * Math.cos(a + 0.06)).toFixed(1)} ${(54 + r * Math.sin(a + 0.06)).toFixed(1)}Z" fill="${gem}" opacity="0.5"/>`);
+    }
+    back.push(`<circle cx="50" cy="54" r="38" fill="url(#${id('glow')})"/>`);
+  }
+  if (level >= 6) {
+    // 그랜드마스터 이상: 큰 불꽃 날개(깃 5개)
+    for (let k = 0; k < 5; k++) {
+      const y = 30 + k * 7;
+      const x = 4 + k * 2.5;
+      back.push(mirror(`M30 ${y + 8} C${x + 10} ${y + 6} ${x} ${y} ${x - 1} ${y - 8} C${x + 8} ${y - 2} ${x + 16} ${y - 1} 30 ${y + 1} Z`, `url(#${id('wing')})`));
+    }
+  } else if (level >= 5) {
+    // 마스터: 깃 3개 날개
+    for (let k = 0; k < 3; k++) {
+      const y = 38 + k * 8;
+      const x = 10 + k * 3;
+      back.push(mirror(`M30 ${y + 7} C${x + 8} ${y + 6} ${x} ${y + 1} ${x - 1} ${y - 6} C${x + 7} ${y - 1} ${x + 14} ${y} 30 ${y + 1} Z`, `url(#${id('wing')})`));
     }
   }
-  if (level >= 5) {
-    // 마스터 이상: 날개(그랜드마스터부터 크고 불꽃 모양)
-    const big = level >= 6;
-    const wing = big
-      ? 'M30 50 C12 44 4 30 6 16 C14 26 18 26 22 22 C20 32 24 38 30 40 Z'
-      : 'M30 52 C18 48 12 40 12 30 C18 36 22 36 26 34 C25 42 27 46 30 46 Z';
-    parts.push(`<path d="${wing}" fill="url(#${g})" ${stroke}/>`);
-    parts.push(`<path d="${wing}" transform="translate(100 0) scale(-1 1)" fill="url(#${g})" ${stroke}/>`);
-  }
   if (level >= 3) {
-    // 플래티넘 이상: 옆 지느러미
-    parts.push(`<path d="M22 56 L8 64 L24 70 Z" fill="${dark}" ${stroke}/>`);
-    parts.push(`<path d="M78 56 L92 64 L76 70 Z" fill="${dark}" ${stroke}/>`);
+    // 플래티넘 이상: 옆 지느러미(다이아부터 더 크게)
+    const big = level >= 4;
+    back.push(mirror(big ? 'M22 50 L2 58 L10 64 L4 72 L24 70 Z' : 'M22 54 L8 62 L24 68 Z', `url(#${id('rim')})`));
   }
   if (level >= 2) {
-    // 골드 이상: 위 뿔
-    parts.push(`<path d="M42 22 L50 6 L58 22 Z" fill="url(#${g})" ${stroke}/>`);
+    // 골드 이상: 위 뿔(다이아부터 세 갈래)
+    back.push(`<path d="M41 26 L50 ${level >= 4 ? 2 : 8} L59 26 Z" fill="url(#${id('rim')})" ${s}/>`);
+    if (level >= 4) back.push(mirror('M38 28 L32 12 L44 24 Z', `url(#${id('rim')})`));
+    // 아래 잎사귀 장식
+    back.push(mirror('M50 88 C40 92 30 88 26 80 C34 84 42 84 50 82 Z', `url(#${id('rim')})`));
   }
 
-  // 메달 본체
-  parts.push(`<polygon points="${hex(50, 54, 32)}" fill="url(#${g})" ${stroke}/>`);
-  parts.push(`<polygon points="${hex(50, 54, 22)}" fill="${dark}" stroke="${INK}" stroke-width="2" opacity="0.9"/>`);
-  if (level >= 1) {
-    // 실버 이상: 옆 홈
-    parts.push(`<path d="M20 48 h8 M72 48 h8 M20 60 h8 M72 60 h8" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`);
+  // ── 메달 본체 ──
+  front.push(`<polygon points="${hex(50, 54, 33)}" fill="url(#${id('rim')})" ${s}/>`);
+  front.push(`<polygon points="${hex(50, 54, 26)}" fill="url(#${id('face')})" stroke="${INK}" stroke-width="1.8"/>`);
+  // 광택: 테두리 위쪽 하이라이트
+  front.push(`<path d="M24 41 L50 25 L76 41" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="2.2" stroke-linecap="round"/>`);
+  if (level === 0) {
+    // 브론즈: 리벳 4개
+    for (const [x, y] of [[30, 44], [70, 44], [30, 64], [70, 64]]) front.push(`<circle cx="${x}" cy="${y}" r="2.2" fill="${light}" stroke="${INK}" stroke-width="1.2"/>`);
   }
-  // 가운데 보석: 다이아 이상은 큰 마름모 보석, 아래는 별
+  if (level >= 1) {
+    // 실버 이상: 옆 홈 + 위 탭
+    front.push(`<path d="M19 48 h7 M74 48 h7 M19 60 h7 M74 60 h7" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>`);
+    front.push(`<rect x="45" y="20" width="10" height="5" rx="2" fill="${light}" ${s}/>`);
+  }
+  // ── 가운데 보석 ──
   if (level >= 4) {
-    parts.push(`<path d="M50 34 L64 52 L50 74 L36 52 Z" fill="${gem}" ${stroke}/>`);
-    parts.push(`<path d="M36 52 H64 M50 34 L44 52 L50 74 L56 52 Z" fill="none" stroke="${dark}" stroke-width="1.5"/>`);
+    front.push(`<circle cx="50" cy="54" r="16" fill="url(#${id('glow')})"/>`);
+    front.push(`<path d="M50 36 L63 52 L50 72 L37 52 Z" fill="url(#${id('gem')})" ${s}/>`);
+    front.push(`<path d="M37 52 H63 M50 36 L45 52 L50 72 L55 52 Z" fill="none" stroke="${dark}" stroke-width="1.3" opacity="0.8"/>`);
+    front.push(`<path d="M44 44 L48 40" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.9"/>`);
   } else {
-    parts.push(`<polygon points="${star(50, 54, 15)}" fill="${gem}" ${stroke}/>`);
+    front.push(`<polygon points="${star(50, 54, 15)}" fill="url(#${id('gem')})" ${s}/>`);
+    front.push(`<circle cx="46" cy="49" r="2" fill="#ffffff" opacity="0.85"/>`);
   }
   if (level >= 7) {
     // 챌린저: 왕관
-    parts.push(`<path d="M34 24 L38 10 L44 18 L50 6 L56 18 L62 10 L66 24 Z" fill="#ffd34d" ${stroke}/>`);
+    front.push(`<path d="M33 24 L37 8 L44 17 L50 2 L56 17 L63 8 L67 24 Z" fill="url(#${id('crown')})" ${s}/>`);
+    for (const x of [37, 50, 63]) front.push(`<circle cx="${x}" cy="${x === 50 ? 4 : 10}" r="2.4" fill="${gem}" stroke="${INK}" stroke-width="1.2"/>`);
   }
 
-  return (
-    `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">` +
-    `<defs><linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient></defs>` +
-    parts.join('') +
-    `</svg>`
-  );
+  const defs =
+    `<linearGradient id="${id('rim')}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${light}"/><stop offset="0.45" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient>` +
+    `<radialGradient id="${id('face')}" cx="0.4" cy="0.3" r="0.8"><stop offset="0" stop-color="${light}" stop-opacity="0.85"/><stop offset="0.55" stop-color="${dark}"/><stop offset="1" stop-color="${INK}" stop-opacity="0.9"/></radialGradient>` +
+    `<radialGradient id="${id('gem')}" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="${gem}"/><stop offset="1" stop-color="${light}"/></radialGradient>` +
+    `<radialGradient id="${id('glow')}"><stop offset="0" stop-color="${gem}" stop-opacity="0.9"/><stop offset="1" stop-color="${gem}" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="${id('wing')}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/></linearGradient>` +
+    `<linearGradient id="${id('crown')}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2a8"/><stop offset="1" stop-color="#d9930f"/></linearGradient>`;
+
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${back.join('')}${front.join('')}</svg>`;
 }

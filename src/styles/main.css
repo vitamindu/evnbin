@@ -450,8 +450,8 @@ img {
   background: var(--panel);
 }
 .tc-ico {
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
 }
 .tc-body {
   flex: 1;
@@ -1215,8 +1215,8 @@ img {
   gap: 16px;
 }
 .rk-emblem-big {
-  width: 96px;
-  height: 96px;
+  width: 120px;
+  height: 120px;
 }
 .rk-mine-name {
   display: block;
@@ -1247,8 +1247,8 @@ img {
   background: rgba(255, 211, 77, 0.12);
 }
 .rk-emblem {
-  width: 64px;
-  height: 64px;
+  width: 84px;
+  height: 84px;
 }
 .rk-name {
   font-size: 16px;
