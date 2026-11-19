@@ -44,7 +44,8 @@ function scenario(seed: number) {
       const a = i * 0.07 + k * 1.3;
       const input: FighterInput = { move: { x: (f.team === 0 ? 0.7 : -0.7) * (i < 150 ? 1 : Math.cos(a)), y: Math.sin(a * 1.7) } };
       if ((i + k * 7) % 11 === 0) input.attack = { aim: k % 2 === 0 ? null : { x: f.team === 0 ? 1 : -1, y: Math.sin(a * 2) * 0.3 } };
-      if (i === 91 + k * 5) input.super = { aim: k === 2 ? { x: 1, y: 0 } : null };
+      // 궁극기가 찼으면 20틱마다 다시 시도(밸런스·속도가 바뀌어도 모든 궁극기가 한 번은 나가도록)
+      if (i >= 91 + k * 5 && (i - 91 - k * 5) % 20 === 0 && f.alive && f.superCharge >= 1) input.super = { aim: k === 2 ? { x: 1, y: 0 } : null };
       inputs[f.id] = input;
     });
     log.push(tick(sim, inputs));
@@ -65,7 +66,7 @@ describe('결정성', () => {
     expect(snapshot(b.sim, b.log)).toBe(snapshot(a.sim, a.log));
     // 시나리오가 실제로 여러 규칙을 거쳤는지
     const types = new Set(a.log.flat().map((e) => e.type));
-    for (const t of ['attack', 'hit', 'projectileEnd', 'wallsBroken', 'explode'] as const) expect(types.has(t)).toBe(true);
+    for (const t of ['attack', 'hit', 'projectileEnd', 'wallsBroken', 'explode'] as const) expect(types.has(t), `event ${t}`).toBe(true);
   });
 });
 
