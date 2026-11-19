@@ -61,6 +61,9 @@ export interface AccountResult {
   account: string;
   fighterId: FighterId;
   outcome: MatchOutcome;
+  /** 팀 안 피해량 순위(0 = 1등)와 팀 인원(봇 포함) */
+  place?: number;
+  teamSize?: number;
 }
 
 export const validUsername = isValidUsername;
@@ -246,7 +249,7 @@ export class AccountStore {
       fp.trophies = Math.max(0, fp.trophies + delta);
       u.profile.coins += r.outcome === 'win' ? COINS_WIN : COINS_OTHER;
       const before = u.profile.rankPoints ?? 0;
-      u.profile.rankPoints = Math.max(0, before + (ranked ? rankDelta(r.outcome) : 0));
+      u.profile.rankPoints = Math.max(0, before + (ranked ? rankDelta(r.outcome, r.place ?? 0, r.teamSize ?? 1) : 0));
       out.set(r.account, { rankPoints: u.profile.rankPoints, rankDelta: u.profile.rankPoints - before });
       changed = true;
     }

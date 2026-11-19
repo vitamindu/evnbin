@@ -29,10 +29,9 @@ export const TIERS: readonly TierDef[] = [
 export const DIVISION_POINTS = 100;
 export const DIVISION_NAMES = ['IV', 'III', 'II', 'I'] as const;
 
-/** 경기 결과에 따른 점수 변화 */
-export const RANK_WIN = 20;
-export const RANK_LOSS = -15;
-export const RANK_DRAW = 0;
+/** 경기 결과에 따른 점수 변화 폭: 이기면 +MIN~+MAX, 지면 −MIN~−MAX, 비기면 0 */
+export const RANK_STEP_MIN = 19;
+export const RANK_STEP_MAX = 23;
 
 export interface RankInfo {
   tier: TierDef;
@@ -68,6 +67,29 @@ export function isRankedMatch(humansPerTeam: readonly [number, number]): boolean
   return humansPerTeam[0] === humansPerTeam[1] && humansPerTeam[0] >= RANKED_MIN_PER_TEAM;
 }
 
-export function rankDelta(outcome: 'win' | 'loss' | 'draw'): number {
-  return outcome === 'win' ? RANK_WIN : outcome === 'loss' ? RANK_LOSS : RANK_DRAW;
+/**
+ * 점수 변화. place: 팀 안 피해량 순위(0 = 1등), teamSize: 팀 인원(봇 포함), rand: 0 이상 1 미만 난수.
+ * 피해량 1등일수록 이기면 +23, 지면 −19 쪽이 나올 확률이 높고, 꼴등일수록 반대(+19 / −23)다.
+ */
+export function rankDelta(outcome: 'win' | 'loss' | 'draw', place = 0, teamSize = 1, rand: number = Math.random()): number {
+  if (outcome === 'draw') return 0;
+  const steps = RANK_STEP_MAX - RANK_STEP_MIN; // 4
+  // 팀 안에서의 위치 0(꼴등)~1(1등). 혼자면 가운데
+  const s = teamSize > 1 ? 1 - Math.min(place, teamSize - 1) / (teamSize - 1) : 0.5;
+  // 이기면 높은 순위가 큰 폭, 지면 높은 순위가 작은 폭
+  const goodness = outcome === 'win' ? s : 1 - s;
+  const target = RANK_STEP_MIN + steps * goodness;
+  const weights: number[] = [];
+  for (let k = 0; k <= steps; k++) weights.push(Math.exp(-((RANK_STEP_MIN + k - target) ** 2) / 1.2));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = rand * total;
+  let mag = RANK_STEP_MAX;
+  for (let k = 0; k <= steps; k++) {
+    r -= weights[k]!;
+    if (r < 0) {
+      mag = RANK_STEP_MIN + k;
+      break;
+    }
+  }
+  return outcome === 'win' ? mag : -mag;
 }

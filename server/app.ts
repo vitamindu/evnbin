@@ -200,7 +200,11 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       const account = match.accounts.get(h.playerId);
       if (!account) continue;
       const outcome = result.winner === -1 ? 'draw' : result.winner === h.team ? 'win' : 'loss';
-      list.push({ account, fighterId: h.fighterId, outcome });
+      const mates = result.stats
+        .filter((s) => s.team === h.team)
+        .sort((a, b) => b.damage - a.damage || b.kills - a.kills);
+      const place = Math.max(0, mates.findIndex((s) => s.playerId === h.playerId));
+      list.push({ account, fighterId: h.fighterId, outcome, place, teamSize: mates.length });
       accountOf.set(h.playerId, account);
     }
     try {
