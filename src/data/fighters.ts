@@ -255,7 +255,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       breaksWalls: false,
       knockback: 0,
       aoeRadius: 1.3,
-      leapTime: 2.5,
+      leapTime: 1.5,
       fuse: 2,
     },
   },
