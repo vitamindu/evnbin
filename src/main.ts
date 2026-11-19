@@ -1,3 +1,4 @@
+import { loadRankImages } from './ui/rankEmblem';
 import '@fontsource/lilita-one/400.css';
 import '@fontsource/black-han-sans/400.css';
 import './styles/main.css';
@@ -77,7 +78,7 @@ async function boot() {
   );
   title.setProgress(0.4);
   // glb 캐릭터 모델(초상화를 그리기 전에 받아 둔다)
-  await withTimeout(preloadGlbFighters(), 15000);
+  await withTimeout(Promise.all([preloadGlbFighters(), loadRankImages()]), 15000);
   title.setProgress(0.6);
   await nextFrame();
 

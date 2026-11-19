@@ -26,7 +26,26 @@ function star(cx: number, cy: number, r: number, inner = 0.45): string {
   return pts.join(' ');
 }
 
+/** public/ranks/<티어>.png 가 있으면 그 이미지를 쓴다(부팅 때 loadRankImages로 확인) */
+const images = new Map<TierId, string>();
+
+export async function loadRankImages(): Promise<void> {
+  await Promise.all(
+    TIERS.map(async (t) => {
+      const url = `${import.meta.env.BASE_URL}ranks/${t.id}.png`;
+      try {
+        const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+        if (res.ok && (res.headers.get('content-type') ?? '').startsWith('image/')) images.set(t.id, url);
+      } catch {
+        /* 없으면 기본 문양 */
+      }
+    }),
+  );
+}
+
 export function rankEmblemSvg(tierId: TierId, uid = Math.random().toString(36).slice(2, 8)): string {
+  const img = images.get(tierId);
+  if (img) return `<img src="${img}" alt="${tierId}" draggable="false" style="width:100%;height:100%;object-fit:contain">`;
   const tier = TIERS.find((t) => t.id === tierId) ?? TIERS[0]!;
   const level = TIERS.indexOf(tier);
   const { light, dark, gem } = tier.colors;
