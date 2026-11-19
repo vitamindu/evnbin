@@ -18,7 +18,9 @@ import { initToast } from './ui/overlays/toast';
 import { createBattleScreen } from './ui/screens/battle';
 import { createFighterDetailScreen } from './ui/screens/fighterDetail';
 import { createFightersScreen } from './ui/screens/fighters';
+import { initAccountSync } from './ui/account/session';
 import { createLobbyScreen } from './ui/screens/lobby';
+import { createLoginScreen } from './ui/screens/login';
 import { createOnlineScreen } from './ui/screens/online';
 import { createResultsScreen } from './ui/screens/results';
 import { createTitleScreen } from './ui/screens/title';
@@ -57,12 +59,12 @@ async function boot() {
   ui.append(overlayLayer);
   initToast(overlayLayer);
 
-  let lobbyScreen: ReturnType<typeof createLobbyScreen> | null = null;
+  let loginScreen: ReturnType<typeof createLoginScreen> | null = null;
   const title = createTitleScreen(stage, () => {
     unlockAudio();
     sfx('start');
     void enterFullscreen();
-    if (lobbyScreen) screens.show(lobbyScreen);
+    if (loginScreen) screens.show(loginScreen);
   });
   screens.show(title);
   stage.start();
@@ -89,6 +91,7 @@ async function boot() {
     overlayLayer,
     portraits,
     go: {
+      login: () => screens.show(login),
       lobby: () => screens.show(lobby),
       fighters: () => screens.show(fighters),
       fighterDetail: (id) => {
@@ -113,7 +116,9 @@ async function boot() {
   const battle = createBattleScreen(ctx);
   const online = createOnlineScreen(ctx);
   const results = createResultsScreen(ctx);
-  lobbyScreen = lobby;
+  const login = createLoginScreen(ctx);
+  initAccountSync();
+  loginScreen = login;
 
   title.setProgress(1);
   await nextFrame();

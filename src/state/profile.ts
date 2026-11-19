@@ -42,8 +42,11 @@ function load(): Profile {
 }
 
 let profile = load();
+/** 로그인 중이면 서버 프로필을 쓰고, 기기에는 저장하지 않는다(기기 저장분은 오프라인용으로 남겨 둔다) */
+let fromServer = false;
 
 function save() {
+  if (fromServer) return;
   try {
     localStorage.setItem(KEY, JSON.stringify(profile));
   } catch {
@@ -61,6 +64,27 @@ export function updateProfile(fn: (p: Profile) => void) {
   for (const l of listeners) l(profile);
 }
 
+/**
+ * 로그인하면 서버 프로필로 바꾸고(null이면 기기에 저장된 오프라인 프로필로 돌아간다) 화면을 갱신한다.
+ * 서버 프로필은 Profile과 같은 모양이며, 빠진 캐릭터 항목은 기본값으로 채운다.
+ */
+export function useServerProfile(p: Profile | null) {
+  if (p) {
+    const def = makeDefault();
+    profile = { ...def, ...p, fighters: { ...def.fighters, ...(p.fighters ?? {}) } };
+    if (!FIGHTERS.some((f) => f.id === profile.selected)) profile.selected = def.selected;
+    fromServer = true;
+  } else {
+    fromServer = false;
+    profile = load();
+  }
+  for (const l of listeners) l(profile);
+}
+
+export function isServerProfile(): boolean {
+  return fromServer;
+}
+
 export function onProfileChange(l: Listener): () => void {
   listeners.add(l);
   return () => listeners.delete(l);
@@ -71,6 +95,7 @@ export function totalTrophies(p: Readonly<Profile> = profile): number {
 }
 
 export function resetProfile() {
+  if (fromServer) return;
   profile = makeDefault();
   save();
   for (const l of listeners) l(profile);

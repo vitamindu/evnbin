@@ -5,6 +5,8 @@ import { getServerUrl, setServerUrl } from '../../net/config';
 import { resetProfile } from '../../state/profile';
 import { getSettings, updateSettings } from '../../state/settings';
 import type { AppContext } from '../context';
+import { getAccount, logout } from '../account/accountApi';
+import { getOnlineClient } from '../online/clientFactory';
 import { toast } from './toast';
 import { button, iconEl, txt } from '../widgets';
 
@@ -94,6 +96,23 @@ export function openSettings(ctx: AppContext) {
     toast('SERVER SAVED');
   });
 
+  // 계정: 이름 + 로그아웃(로그인 안 했으면 OFFLINE + 로그인)
+  const acct = getAccount();
+  const accountCtl = el('div', 'set-account', [
+    txt(acct ? acct.username : 'OFFLINE', `set-acct-name${acct ? '' : ' is-off'}`),
+    button(`btn-toggle ${acct ? 'btn-danger btn-logout' : 'btn-login'}`, [txt(acct ? 'LOG OUT' : 'LOG IN')], async () => {
+      overlay.remove();
+      if (acct) {
+        const c = getOnlineClient();
+        if (c.room) c.leaveRoom();
+        if (c.status !== 'disconnected') c.disconnect();
+        await logout();
+        toast('LOGGED OUT · 로그아웃했어요');
+      }
+      ctx.go.login();
+    }),
+  ]);
+
   const dpr = window.devicePixelRatio || 1;
   const info = el('p', 'set-info', [
     `${GAME_TITLE} v${GAME_VERSION} · screen ${window.innerWidth}×${window.innerHeight} @${dpr}x` +
@@ -103,10 +122,11 @@ export function openSettings(ctx: AppContext) {
   const overlay = el('div', 'overlay', [
     el('div', 'set-panel panel', [
       el('div', 'set-head', [txt('SETTINGS', 'set-title'), button('btn-close', [iconEl('close')], () => overlay.remove(), 'back')]),
+      row('ACCOUNT', accountCtl),
       row('FULLSCREEN', fullscreen),
       row('GRAPHICS', quality),
       row('SHOW FPS', fps),
-      row('RESET PROGRESS', reset),
+      acct ? null : row('RESET PROGRESS', reset),
       row('SERVER', server),
       info,
     ]),

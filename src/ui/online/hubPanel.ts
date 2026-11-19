@@ -3,6 +3,7 @@ import { getFighter } from '../../data/fighters';
 import { getServerUrl } from '../../net/config';
 import { getProfile, updateProfile } from '../../state/profile';
 import type { AppContext } from '../context';
+import { getAccount } from '../account/accountApi';
 import { openFighterPicker } from '../overlays/fighterPicker';
 import { openSettings } from '../overlays/settings';
 import { button, iconEl, roleChip, txt } from '../widgets';
@@ -28,6 +29,8 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   nameInput.enterKeyHint = 'done';
   nameInput.setAttribute('aria-label', 'Your name');
   const commitName = () => {
+    const acct = getAccount();
+    if (acct) return acct.username;
     const v = cleanName(nameInput.value) || 'PLAYER';
     nameInput.value = v;
     if (v !== getProfile().name) {
@@ -53,10 +56,11 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
       refresh();
     }),
   );
-  const playerCard = el('div', 'hub-player panel', [
-    el('label', 'hub-namebox', [txt('YOUR NAME', 'hub-label'), el('span', 'name-field', [nameInput, iconEl('pencil', 'ico name-pencil')])]),
-    fighterBtn,
-  ]);
+  // 로그인 중이면 이름은 계정 이름(고칠 수 없음)이라 입력칸 대신 이름표만
+  const nameBox = el('label', 'hub-namebox', [txt('YOUR NAME', 'hub-label'), el('span', 'name-field', [nameInput, iconEl('pencil', 'ico name-pencil')])]);
+  const acctName = txt('', 'hub-acct-name');
+  const acctBox = el('div', 'hub-namebox hub-acct', [txt('PLAYING AS', 'hub-label'), el('span', 'hub-acct-row', [acctName, txt('ACCOUNT', 'slot-tag tag-you')])]);
+  const playerCard = el('div', 'hub-player panel', [nameBox, acctBox, fighterBtn]);
 
   // ── 방 만들기
   const createLabel = txt('CREATE');
@@ -141,6 +145,10 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
 
   function refresh() {
     const p = getProfile();
+    const acct = getAccount();
+    nameBox.hidden = !!acct;
+    acctBox.hidden = !acct;
+    acctName.textContent = acct?.username ?? '';
     if (document.activeElement !== nameInput) nameInput.value = p.name;
     const f = getFighter(p.selected);
     pfBox.replaceChildren(portrait(ctx, f.id, 'portrait hub-portrait'));
