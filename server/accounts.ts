@@ -1,3 +1,4 @@
+import { rankDelta } from '../src/data/ranks';
 /**
  * 계정 저장소(아이디+비밀번호). Network 담당.
  *
@@ -78,7 +79,7 @@ export function defaultProfile(username: string): Profile {
   const fighters = {} as Profile['fighters'];
   for (const f of FIGHTERS) fighters[f.id] = { trophies: 0, power: 1 };
   const tag = Array.from({ length: 8 }, () => TAG_ALPHABET[randomInt(TAG_ALPHABET.length)]).join('');
-  return { name: username, tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters };
+  return { name: username, tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters, rankPoints: 0 };
 }
 
 /** 데이터 폴더: DATA_DIR → /data(있으면) → ./.data */
@@ -233,7 +234,9 @@ export class AccountStore {
   }
 
   /** 경기 결과: 캐릭터별 트로피(승 +8, 무 0, 패 −4, 0 아래로 안 내려감), 코인(승 +20, 그 외 +10) */
-  applyMatchResults(results: readonly AccountResult[]) {
+  /** ranked=false면 랭크 점수는 그대로(트로피·코인만) */
+  applyMatchResults(results: readonly AccountResult[], ranked = false): Map<string, { rankPoints: number; rankDelta: number }> {
+    const out = new Map<string, { rankPoints: number; rankDelta: number }>();
     let changed = false;
     for (const r of results) {
       const u = this.data.users[r.account];
@@ -242,9 +245,13 @@ export class AccountStore {
       const delta = r.outcome === 'win' ? TROPHY_WIN : r.outcome === 'loss' ? TROPHY_LOSS : 0;
       fp.trophies = Math.max(0, fp.trophies + delta);
       u.profile.coins += r.outcome === 'win' ? COINS_WIN : COINS_OTHER;
+      const before = u.profile.rankPoints ?? 0;
+      u.profile.rankPoints = Math.max(0, before + (ranked ? rankDelta(r.outcome) : 0));
+      out.set(r.account, { rankPoints: u.profile.rankPoints, rankDelta: u.profile.rankPoints - before });
       changed = true;
     }
     if (changed) this.save();
+    return out;
   }
 
   private issueToken(key: string, user: StoredUser): string {

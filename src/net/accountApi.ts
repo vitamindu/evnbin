@@ -25,6 +25,7 @@ export interface AccountProfile {
   crystals: number;
   selected: FighterId;
   fighters: Record<FighterId, AccountFighterProgress>;
+  rankPoints: number;
 }
 
 export type AccountApiError =

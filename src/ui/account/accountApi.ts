@@ -75,6 +75,7 @@ function fakeModule(): AccountModule {
       level: 1,
       coins: 40,
       crystals: 0,
+      rankPoints: 0,
       selected: 'rivet',
       fighters: {
         rivet: { trophies: 16, power: 1 },

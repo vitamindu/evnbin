@@ -1,3 +1,6 @@
+import { rankLabel, rankOf } from '../../data/ranks';
+import { openRanks } from '../overlays/ranks';
+import { rankEmblemSvg } from '../rankEmblem';
 import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
@@ -41,13 +44,14 @@ export function createLobbyScreen(ctx: AppContext): Screen {
   const pTag = el('span', 'pc-sub', ['']);
   const avatar = el('span', 'avatar t-outline', ['']);
   const profileCard = button('profile-card', [avatar, el('span', 'pc-text', [pName, pTag])], comingSoon);
+  const rankIco = el('span', 'ico tc-ico');
   const trophyNum = txt('0', 'tc-num');
   const trophyFill = el('i');
   const trophyNext = el('span', 'tc-next', ['']);
   const trophyCard = button(
     'trophy-card',
-    [iconEl('trophy', 'ico tc-ico'), el('span', 'tc-body', [el('span', 'tc-row', [trophyNum, trophyNext]), el('span', 'bar', [trophyFill])])],
-    comingSoon,
+    [rankIco, el('span', 'tc-body', [el('span', 'tc-row', [trophyNum, trophyNext]), el('span', 'bar', [trophyFill])])],
+    () => openRanks(ctx),
   );
 
   // ── 가운데: 이름표 + 캐릭터 드래그 영역 + 파티 슬롯
@@ -142,10 +146,12 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     avatar.textContent = p.name.charAt(0);
     avatar.style.setProperty('--c', f.palette.primary);
     const total = totalTrophies(p);
-    const m = trophyMilestone(total);
-    trophyNum.textContent = String(total);
-    trophyNext.textContent = `/ ${m.next}`;
-    trophyFill.style.width = `${((total - m.prev) / (m.next - m.prev)) * 100}%`;
+    void trophyMilestone(total);
+    const rk = rankOf(p.rankPoints ?? 0);
+    rankIco.innerHTML = rankEmblemSvg(rk.tier.id, 'lobby');
+    trophyNum.textContent = rankLabel(rk);
+    trophyNext.textContent = `${rk.points} RP`;
+    trophyFill.style.width = rk.to === null ? '100%' : `${((rk.points - rk.from) / (rk.to - rk.from)) * 100}%`;
     plateRole.replaceChildren(roleChip(f.id));
     plateName.textContent = f.name;
     plateTrophy.textContent = String(p.fighters[f.id].trophies);

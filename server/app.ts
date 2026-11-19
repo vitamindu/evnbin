@@ -1,3 +1,4 @@
+import { isRankedMatch } from '../src/data/ranks';
 /**
  * 게임 서버: HTTP(GET /health) + 같은 포트의 웹소켓. Network 담당.
  * 메시지 형식은 src/net/protocol.ts(계약). 방 규칙은 rooms.ts, 경기는 match.ts.
@@ -193,15 +194,25 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   /** 로그인한 사람의 트로피·코인 반영(중간에 나간 사람 포함, 게스트·봇 제외) */
   const applyResults = (match: Match | null, result: MatchResult) => {
     if (!match) return;
+    const accountOf = new Map<string, string>();
     const list: AccountResult[] = [];
     for (const h of match.humans) {
       const account = match.accounts.get(h.playerId);
       if (!account) continue;
       const outcome = result.winner === -1 ? 'draw' : result.winner === h.team ? 'win' : 'loss';
       list.push({ account, fighterId: h.fighterId, outcome });
+      accountOf.set(h.playerId, account);
     }
     try {
-      accounts.applyMatchResults(list);
+      const per: [number, number] = [0, 0];
+      for (const h of match.humans) per[h.team]++;
+      result.ranked = isRankedMatch(per);
+      const ranks = accounts.applyMatchResults(list, result.ranked);
+      for (const s of result.stats) {
+        const acc = accountOf.get(s.playerId);
+        const rk = acc ? ranks.get(acc) : undefined;
+        if (rk) Object.assign(s, rk);
+      }
     } catch (err) {
       log(`apply results failed: ${(err as Error)?.stack ?? String(err)}`);
     }
@@ -210,9 +221,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   const endMatch = (room: Room, result: MatchResult) => {
     const match = room.match;
     room.match = null;
+    applyResults(match, result); // 랭크 점수를 결과에 담은 뒤 보낸다
     const end = JSON.stringify({ t: 'end', result } satisfies ServerMsg);
     for (const m of room.members) if (m.connected) byPlayer.get(m.id)?.sendRaw(end);
-    applyResults(match, result);
     room.phase = 'lobby';
     for (const m of room.members) m.ready = false;
     // 경기 중 끊긴 채 돌아오지 않은 사람은 정리

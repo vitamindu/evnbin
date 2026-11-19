@@ -1,3 +1,4 @@
+import { RANKED_MIN_PER_TEAM, isRankedMatch } from '../../data/ranks';
 import { el } from '../../core/dom';
 import { getFighter } from '../../data/fighters';
 import { getMap } from '../../data/maps';
@@ -152,7 +153,8 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     'select',
   );
   const actions = el('div', 'room-actions', [hint, el('div', 'room-go', [readyBtn, startBtn])]);
-  const root = el('div', 'room', [codeCard, colA, center, colB, el('div', 'room-tools', [switchBtn, botsBtn]), actions]);
+  const rankedTag = txt('', 'room-ranked');
+  const root = el('div', 'room', [codeCard, colA, center, colB, el('div', 'room-tools', [switchBtn, botsBtn]), actions, rankedTag]);
 
   function myPlayer(c: OnlineClient): RoomPlayer | null {
     return c.room?.players.find((p) => p.id === c.playerId) ?? null;
@@ -256,6 +258,11 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     const canStart = host && lobby && waiting === 0 && enough && performance.now() - starting > 3000;
     startBtn.classList.toggle('is-disabled', !canStart);
 
+    const humans: [number, number] = [0, 0];
+    for (const pl of room.players) if (!pl.bot) humans[pl.team]++;
+    const ranked = isRankedMatch(humans);
+    rankedTag.textContent = ranked ? 'RANKED' : `UNRANKED · ${RANKED_MIN_PER_TEAM}+ VS ${RANKED_MIN_PER_TEAM}+ PLAYERS`;
+    rankedTag.classList.toggle('is-ranked', ranked);
     let h: string;
     if (room.phase === 'playing') h = 'MATCH STARTING…';
     else if (room.phase === 'results') h = 'MATCH FINISHED';

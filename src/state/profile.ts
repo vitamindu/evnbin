@@ -14,6 +14,8 @@ export interface Profile {
   crystals: number;
   selected: FighterId;
   fighters: Record<FighterId, FighterProgress>;
+  /** 랭크 점수(TEAM FIGHT 온라인 경기로만 바뀐다, src/data/ranks.ts) */
+  rankPoints: number;
 }
 
 const KEY = 'fg.profile.v1';
@@ -24,7 +26,7 @@ function makeDefault(): Profile {
   const fighters = {} as Record<FighterId, FighterProgress>;
   for (const f of FIGHTERS) fighters[f.id] = { trophies: 0, power: 1 };
   const tag = Array.from({ length: 8 }, () => '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 34)]).join('');
-  return { name: 'PLAYER', tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters };
+  return { name: 'PLAYER', tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters, rankPoints: 0 };
 }
 
 function load(): Profile {

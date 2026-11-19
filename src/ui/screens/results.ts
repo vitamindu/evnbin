@@ -1,3 +1,4 @@
+import { rankLabel, rankOf } from '../../data/ranks';
 import '../../styles/online.css';
 import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
@@ -28,6 +29,7 @@ export function createResultsScreen(ctx: AppContext) {
   });
 
   const title = txt('', 'rs-title');
+  const rankLine = txt('', 'rs-rank');
   const scoreMine = txt('0', 'rs-num');
   const scoreTheirs = txt('0', 'rs-num');
   const scoreLine = el('div', 'rs-score', [el('span', 'rs-box is-blue', [txt('YOUR TEAM', 'rs-cap'), scoreMine]), txt('-', 'rs-dash'), el('span', 'rs-box is-red', [txt('ENEMY', 'rs-cap'), scoreTheirs])]);
@@ -39,7 +41,7 @@ export function createResultsScreen(ctx: AppContext) {
     c.disconnect();
     ctx.go.lobby();
   }, 'back');
-  const root = el('div', 'results', [el('div', 'rs-head', [title, scoreLine]), tables, el('div', 'rs-buttons', [lobbyBtn, roomBtn])]);
+  const root = el('div', 'results', [el('div', 'rs-head', [title, scoreLine, rankLine]), tables, el('div', 'rs-buttons', [lobbyBtn, roomBtn])]);
 
   let result: MatchResult | null = null;
   let celebrate = false;
@@ -76,6 +78,11 @@ export function createResultsScreen(ctx: AppContext) {
     root.dataset.outcome = outcome;
     screen.bg = `results-${outcome}`;
     title.textContent = outcome === 'win' ? 'VICTORY!' : outcome === 'lose' ? 'DEFEAT' : 'DRAW';
+    if (!r.ranked) rankLine.textContent = 'UNRANKED · 3+ VS 3+ PLAYERS NEEDED';
+    else if (me?.rankPoints !== undefined) {
+      const d = me.rankDelta ?? 0;
+      rankLine.textContent = `${rankLabel(rankOf(me.rankPoints))}  ${d >= 0 ? '+' : ''}${d} RP`;
+    } else rankLine.textContent = 'RANKED · LOG IN TO EARN RP';
     scoreMine.textContent = String(r.score[myTeam]);
     scoreTheirs.textContent = String(r.score[other]);
     // 최고 활약: KO가 가장 많은 사람(같으면 피해량) — 아무도 KO가 없으면 없음

@@ -77,9 +77,14 @@ export interface PlayerStats {
   kills: number;
   deaths: number;
   damage: number;
+  /** 로그인한 플레이어: 경기 후 랭크 점수와 변화량(게스트·봇은 없음) */
+  rankPoints?: number;
+  rankDelta?: number;
 }
 
 export interface MatchResult {
+  /** 랭크 점수가 반영된 경기인가(양 팀 사람 3명 이상·동수) */
+  ranked?: boolean;
   winner: Team | -1;
   score: [number, number];
   stats: PlayerStats[];
