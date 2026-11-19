@@ -12,12 +12,13 @@ describe('랭크', () => {
     expect(rankLabel(rankOf(9999))).toBe('CHALLENGER');
     expect(rankOf(-50).points).toBe(0);
   });
-  it('랭크 경기: 양 팀 사람 3명 이상·동수만', () => {
+  it('랭크 경기: 양 팀 사람 수가 같을 때만(봇 제외)', () => {
     expect(isRankedMatch([3, 3])).toBe(true);
-    expect(isRankedMatch([4, 4])).toBe(true);
-    expect(isRankedMatch([1, 1])).toBe(false);
+    expect(isRankedMatch([1, 1])).toBe(true);
+    expect(isRankedMatch([2, 2])).toBe(true);
     expect(isRankedMatch([3, 2])).toBe(false);
-    expect(isRankedMatch([2, 2])).toBe(false);
+    expect(isRankedMatch([1, 0])).toBe(false);
+    expect(isRankedMatch([0, 0])).toBe(false);
   });
 });
 

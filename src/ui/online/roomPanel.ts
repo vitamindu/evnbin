@@ -1,4 +1,4 @@
-import { RANKED_MIN_PER_TEAM, isRankedMatch } from '../../data/ranks';
+import { isRankedMatch } from '../../data/ranks';
 import { el } from '../../core/dom';
 import { getFighter } from '../../data/fighters';
 import { getMap } from '../../data/maps';
@@ -261,7 +261,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     const humans: [number, number] = [0, 0];
     for (const pl of room.players) if (!pl.bot) humans[pl.team]++;
     const ranked = isRankedMatch(humans);
-    rankedTag.textContent = ranked ? 'RANKED' : `UNRANKED · ${RANKED_MIN_PER_TEAM}+ VS ${RANKED_MIN_PER_TEAM}+ PLAYERS`;
+    rankedTag.textContent = ranked ? 'RANKED' : 'UNRANKED · TEAMS NEED THE SAME NUMBER OF PLAYERS';
     rankedTag.classList.toggle('is-ranked', ranked);
     let h: string;
     if (room.phase === 'playing') h = 'MATCH STARTING…';

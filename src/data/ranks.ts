@@ -61,8 +61,8 @@ export function rankLabel(r: RankInfo): string {
   return r.division ? `${r.tier.name} ${r.division}` : r.tier.name;
 }
 
-/** 랭크 점수가 바뀌는 경기인가: 양 팀 모두 사람(봇 제외) 3명 이상이고 인원이 같아야 한다 */
-export const RANKED_MIN_PER_TEAM = 3;
+/** 랭크 점수가 바뀌는 경기인가: 양 팀의 사람(봇 제외) 수가 같아야 한다(각 팀 1명 이상) */
+export const RANKED_MIN_PER_TEAM = 1;
 export function isRankedMatch(humansPerTeam: readonly [number, number]): boolean {
   return humansPerTeam[0] === humansPerTeam[1] && humansPerTeam[0] >= RANKED_MIN_PER_TEAM;
 }

@@ -78,7 +78,7 @@ export function createResultsScreen(ctx: AppContext) {
     root.dataset.outcome = outcome;
     screen.bg = `results-${outcome}`;
     title.textContent = outcome === 'win' ? 'VICTORY!' : outcome === 'lose' ? 'DEFEAT' : 'DRAW';
-    if (!r.ranked) rankLine.textContent = 'UNRANKED · 3+ VS 3+ PLAYERS NEEDED';
+    if (!r.ranked) rankLine.textContent = 'UNRANKED · UNEVEN TEAMS';
     else if (me?.rankPoints !== undefined) {
       const d = me.rankDelta ?? 0;
       rankLine.textContent = `${rankLabel(rankOf(me.rankPoints))}  ${d >= 0 ? '+' : ''}${d} RP`;
