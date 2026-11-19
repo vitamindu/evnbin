@@ -156,7 +156,20 @@ function fakeModule(): AccountModule {
 
 const fake = new URLSearchParams(location.search).has('fakeonline');
 const real = Object.values(realModules)[0];
-const api: AccountModule = !fake && real ? real : fakeModule();
+/** 진짜 모듈은 로그아웃 상태도 { profile: null, username: null } 객체로 준다 → UI 계약(null)에 맞춘다 */
+function adapt(m: AccountModule): AccountModule {
+  type Raw = { profile: Profile | null; username: string | null } | null;
+  const norm = (a: unknown): Account | null => {
+    const r = a as Raw;
+    return r && r.profile && r.username ? { username: r.username, profile: r.profile } : null;
+  };
+  return {
+    ...m,
+    getAccount: () => norm(m.getAccount()),
+    onAccountChange: (cb) => m.onAccountChange((a) => cb(norm(a))),
+  };
+}
+const api: AccountModule = !fake && real ? adapt(real) : fakeModule();
 
 export const signup = (username: string, password: string) => api.signup(username, password);
 export const login = (username: string, password: string) => api.login(username, password);
