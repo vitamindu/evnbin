@@ -45,7 +45,7 @@ export function createOnlineScreen(ctx: AppContext): Screen {
 
   // ── 머리줄
   const chip = netChip();
-  const hdr = header('TEAM FIGHT', () => back(), chip.el);
+  const hdr = header('팀 대결', () => back(), chip.el);
 
   // ── 연결 상태 패널
   const cpTitle = txt('', 'cp-title');
@@ -76,21 +76,21 @@ export function createOnlineScreen(ctx: AppContext): Screen {
     cpDots.hidden = v !== 'connecting';
     const btn = (label: string, cls: string, fn: () => void) => button(`cp-btn ${cls}`, [txt(label)], fn, cls === 'is-back' ? 'back' : 'tap');
     if (v === 'connecting') {
-      cpTitle.textContent = 'CONNECTING';
-      cpNote.textContent = 'FINDING THE GAME SERVER';
-      cpButtons.replaceChildren(btn('CANCEL', 'is-back', () => leaveToLobby()));
+      cpTitle.textContent = '연결 중';
+      cpNote.textContent = '게임 서버를 찾고 있어요';
+      cpButtons.replaceChildren(btn('취소', 'is-back', () => leaveToLobby()));
     } else if (v === 'failed') {
-      cpTitle.textContent = "CAN'T REACH THE SERVER";
-      cpNote.textContent = 'IS THE SERVER RUNNING? CHECK THE ADDRESS IN SETTINGS.';
+      cpTitle.textContent = '서버에 연결할 수 없어요';
+      cpNote.textContent = '서버가 켜져 있는지, 설정의 서버 주소가 맞는지 확인해 주세요.';
       cpButtons.replaceChildren(
-        btn('LOBBY', 'is-back', () => leaveToLobby()),
-        btn('SETTINGS', 'is-blue', () => openSettings(ctx)),
-        btn('RETRY', 'is-go', () => void connect()),
+        btn('로비', 'is-back', () => leaveToLobby()),
+        btn('설정', 'is-blue', () => openSettings(ctx)),
+        btn('다시 시도', 'is-go', () => void connect()),
       );
     } else {
-      cpTitle.textContent = 'CONNECTION LOST';
-      cpNote.textContent = 'RECONNECT TO GET BACK TO YOUR ROOM.';
-      cpButtons.replaceChildren(btn('LOBBY', 'is-back', () => leaveToLobby()), btn('RECONNECT', 'is-go', () => void connect()));
+      cpTitle.textContent = '연결이 끊겼어요';
+      cpNote.textContent = '다시 연결하면 방으로 돌아가요.';
+      cpButtons.replaceChildren(btn('로비', 'is-back', () => leaveToLobby()), btn('다시 연결', 'is-go', () => void connect()));
     }
   }
 
@@ -142,7 +142,7 @@ export function createOnlineScreen(ctx: AppContext): Screen {
       await getClient().createRoom();
       if (shown) setView('room');
     } catch (e) {
-      toast(errorFrom(e, "COULDN'T CREATE A ROOM"));
+      toast(errorFrom(e, '방을 만들지 못했어요'));
     } finally {
       busy = null;
       hub.setBusy(null);
@@ -158,7 +158,7 @@ export function createOnlineScreen(ctx: AppContext): Screen {
       await getClient().joinRoom(code);
       if (shown) setView('room');
     } catch (e) {
-      hub.setJoinError(errorFrom(e, 'ROOM NOT FOUND'));
+      hub.setJoinError(errorFrom(e, '방을 찾을 수 없어요'));
     } finally {
       busy = null;
       hub.setBusy(null);

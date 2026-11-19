@@ -31,7 +31,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   const commitName = () => {
     const acct = getAccount();
     if (acct) return acct.username;
-    const v = cleanName(nameInput.value) || 'PLAYER';
+    const v = cleanName(nameInput.value) || '플레이어';
     nameInput.value = v;
     if (v !== getProfile().name) {
       updateProfile((p) => {
@@ -48,7 +48,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   const pfBox = el('span', 'hub-pf');
   const fighterName = txt('', 'hub-fname');
   const fighterRole = el('span', 'hub-frole');
-  const fighterBtn = button('hub-fighter', [pfBox, el('span', 'hub-fcol', [txt('FIGHTER', 'hub-label'), fighterName, fighterRole]), txt('CHANGE', 'hub-change')], () =>
+  const fighterBtn = button('hub-fighter', [pfBox, el('span', 'hub-fcol', [txt('캐릭터', 'hub-label'), fighterName, fighterRole]), txt('바꾸기', 'hub-change')], () =>
     openFighterPicker(ctx, getProfile().selected, (id) => {
       updateProfile((p) => {
         p.selected = id;
@@ -57,18 +57,18 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
     }),
   );
   // 로그인 중이면 이름은 계정 이름(고칠 수 없음)이라 입력칸 대신 이름표만
-  const nameBox = el('label', 'hub-namebox', [txt('YOUR NAME', 'hub-label'), el('span', 'name-field', [nameInput, iconEl('pencil', 'ico name-pencil')])]);
+  const nameBox = el('label', 'hub-namebox', [txt('내 이름', 'hub-label'), el('span', 'name-field', [nameInput, iconEl('pencil', 'ico name-pencil')])]);
   const acctName = txt('', 'hub-acct-name');
-  const acctBox = el('div', 'hub-namebox hub-acct', [txt('PLAYING AS', 'hub-label'), el('span', 'hub-acct-row', [acctName, txt('ACCOUNT', 'slot-tag tag-you')])]);
+  const acctBox = el('div', 'hub-namebox hub-acct', [txt('플레이어', 'hub-label'), el('span', 'hub-acct-row', [acctName, txt('계정', 'slot-tag tag-you')])]);
   const playerCard = el('div', 'hub-player panel', [nameBox, acctBox, fighterBtn]);
 
   // ── 방 만들기
-  const createLabel = txt('CREATE');
+  const createLabel = txt('만들기');
   const createBtn = button('hc-btn hc-create-btn', [createLabel], () => void actions.create(), 'select');
   const createCard = el('div', 'hub-card hub-create panel', [
     el('span', 'hc-art', [el('span', 'hc-glow'), iconEl('crown', 'ico hc-ico')]),
-    txt('CREATE ROOM', 'hc-title'),
-    el('p', 'hc-desc', ['GET A ROOM CODE AND SHARE IT WITH YOUR FRIENDS']),
+    txt('방 만들기', 'hc-title'),
+    el('p', 'hc-desc', ['방 코드를 받아서 친구들에게 알려 주세요']),
     createBtn,
   ]);
 
@@ -85,11 +85,11 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   const boxes = [0, 1, 2, 3].map(() => el('span', 'code-box t-outline'));
   const codeField = el('label', 'code-field', [...boxes, codeInput]);
   const joinError = txt('', 'join-error');
-  const joinLabel = txt('JOIN');
+  const joinLabel = txt('들어가기');
   const joinBtn = button('hc-btn hc-join-btn', [joinLabel], () => void submitJoin(), 'select');
   const joinCard = el('div', 'hub-card hub-join panel', [
-    txt('JOIN ROOM', 'hc-title'),
-    el('p', 'hc-desc', ["ENTER YOUR FRIEND'S 4-LETTER CODE"]),
+    txt('방 들어가기', 'hc-title'),
+    el('p', 'hc-desc', ['친구가 알려 준 코드 4자리를 넣어 주세요']),
     codeField,
     joinError,
     joinBtn,
@@ -129,7 +129,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   async function submitJoin() {
     const code = cleanCode(codeInput.value);
     if (code.length !== 4) {
-      setJoinError('ENTER ALL 4 LETTERS');
+      setJoinError('코드 4자리를 모두 넣어 주세요');
       codeInput.focus();
       return;
     }
@@ -139,7 +139,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
 
   // ── 서버 주소(바꾸려면 설정)
   const serverText = el('span', 'hub-server-url');
-  const serverRow = el('div', 'hub-server', [txt('SERVER', 'hub-label'), serverText, button('hub-server-btn', [iconEl('gear')], () => openSettings(ctx))]);
+  const serverRow = el('div', 'hub-server', [txt('서버', 'hub-label'), serverText, button('hub-server-btn', [iconEl('gear')], () => openSettings(ctx))]);
 
   const root = el('div', 'hub', [playerCard, el('div', 'hub-cards', [createCard, joinCard]), serverRow]);
 
@@ -166,8 +166,8 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
     /** 진행 중인 요청 표시(버튼 글자·눌림 막기) */
     setBusy(kind: 'create' | 'join' | null) {
       root.classList.toggle('is-busy', kind !== null);
-      createLabel.textContent = kind === 'create' ? 'CREATING…' : 'CREATE';
-      joinLabel.textContent = kind === 'join' ? 'JOINING…' : 'JOIN';
+      createLabel.textContent = kind === 'create' ? '만드는 중…' : '만들기';
+      joinLabel.textContent = kind === 'join' ? '들어가는 중…' : '들어가기';
     },
     blurInputs() {
       nameInput.blur();

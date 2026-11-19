@@ -186,22 +186,22 @@ export function accountErrorCode(e: unknown): AccountErrorCode {
   return typeof code === 'string' ? (code as AccountErrorCode) : 'network';
 }
 
-/** 오류 문구: 영어 + 한국어 짧게 */
-export function accountErrorText(code: AccountErrorCode): [string, string] {
+/** 오류 문구(한국어, 짧게) */
+export function accountErrorText(code: AccountErrorCode): string {
   switch (code) {
     case 'bad_credentials':
-      return ['WRONG ID OR PASSWORD', '아이디 또는 비밀번호가 틀렸어요'];
+      return '아이디 또는 비밀번호가 틀렸어요';
     case 'username_taken':
-      return ['THAT ID IS TAKEN', '이미 있는 아이디예요'];
+      return '이미 있는 아이디예요';
     case 'invalid_username':
-      return ['ID: 3-12 LETTERS, NUMBERS, _', '아이디는 3~12자 영문·숫자·한글·_'];
+      return '아이디는 3~12자 영문·숫자·한글·_';
     case 'weak_password':
-      return ['PASSWORD: 6+ CHARACTERS', '비밀번호는 6자 이상'];
+      return '비밀번호는 6자 이상';
     case 'unauthorized':
-      return ['PLEASE LOG IN AGAIN', '다시 로그인해 주세요'];
+      return '다시 로그인해 주세요';
     case 'rate_limited':
-      return ['TOO MANY TRIES. WAIT A MOMENT', '잠시 뒤 다시 시도해 주세요'];
+      return '잠시 뒤 다시 시도해 주세요';
     default:
-      return ["CAN'T REACH THE SERVER", '서버에 연결할 수 없어요'];
+      return '서버에 연결할 수 없어요';
   }
 }

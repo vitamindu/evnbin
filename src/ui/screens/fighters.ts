@@ -22,9 +22,9 @@ export function createFightersScreen(ctx: AppContext): Screen {
       [
         el('span', 'fcard-portrait', [
           img,
-          el('span', 'fcard-power', [txt('POWER'), txt(String(prog.power), 'fcard-power-num')]),
+          el('span', 'fcard-power', [txt('파워'), txt(String(prog.power), 'fcard-power-num')]),
           el('span', 'fcard-trophy', [iconEl('trophy'), txt(String(prog.trophies))]),
-          p.selected === f.id ? txt('SELECTED', 'fcard-selected') : null,
+          p.selected === f.id ? txt('선택됨', 'fcard-selected') : null,
         ].filter(Boolean) as Node[]),
         el('span', 'fcard-info', [txt(f.name, 'fcard-name'), roleChip(f.id)]),
       ],
@@ -38,7 +38,7 @@ export function createFightersScreen(ctx: AppContext): Screen {
 
   const soonCard = button(
     'fcard fcard-soon',
-    [el('span', 'fcard-portrait', [txt('?', 'fcard-q')]), el('span', 'fcard-info', [txt('MORE SOON', 'fcard-name')])],
+    [el('span', 'fcard-portrait', [txt('?', 'fcard-q')]), el('span', 'fcard-info', [txt('곧 추가', 'fcard-name')])],
     comingSoon,
   );
 
@@ -47,8 +47,8 @@ export function createFightersScreen(ctx: AppContext): Screen {
   onProfileChange(render);
 
   const root = el('div', 'fighters', [
-    header('FIGHTERS', () => ctx.go.lobby(), currencyBar(comingSoon)),
-    el('div', 'fighters-count', [txt(`${FIGHTERS.length} / ${FIGHTERS.length} UNLOCKED`)]),
+    header('캐릭터', () => ctx.go.lobby(), currencyBar(comingSoon)),
+    el('div', 'fighters-count', [txt(`${FIGHTERS.length} / ${FIGHTERS.length} 보유`)]),
     grid,
   ]);
 

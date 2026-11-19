@@ -37,7 +37,7 @@ async function boot() {
   blockBrowserGestures();
 
   // 세로 화면 안내 + FPS 표시(설계 좌표 밖, 실제 화면 기준)
-  const rotate = el('div', 'rotate-overlay', [el('div', 'rotate-box', [el('span', 'rotate-ico'), el('p', '', ['ROTATE YOUR DEVICE'])])]);
+  const rotate = el('div', 'rotate-overlay', [el('div', 'rotate-box', [el('span', 'rotate-ico'), el('p', '', ['화면을 가로로 돌려 주세요'])])]);
   rotate.querySelector('.rotate-ico')!.innerHTML = ICONS.rotate;
   const fpsEl = el('div', 'fps');
   app.append(rotate, fpsEl);

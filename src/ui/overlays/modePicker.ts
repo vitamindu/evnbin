@@ -20,21 +20,21 @@ export interface ModeInfo {
 export const MODES: Record<MatchMode, ModeInfo> = {
   training: {
     id: 'training',
-    name: 'TRAINING',
+    name: '연습장',
     map: 'TRAINING YARD',
     icon: 'modeTraining',
     online: false,
-    blurb: 'PRACTICE YOUR MOVES ON TARGET DUMMIES',
-    facts: ['SOLO', 'NO TIMER'],
+    blurb: '허수아비를 상대로 마음껏 연습해요',
+    facts: ['혼자', '시간 제한 없음'],
   },
   teamfight: {
     id: 'teamfight',
-    name: 'TEAM FIGHT',
+    name: '팀 대결',
     map: 'BLOSSOM ARENA',
     icon: 'modeTeamfight',
     online: true,
-    blurb: 'TEAM UP WITH FRIENDS USING A ROOM CODE',
-    facts: ['3 VS 3', 'FIRST TO 10', '2:30'],
+    blurb: '방 코드로 친구들과 한판 붙어요',
+    facts: ['3 대 3', '10 KO 선승', '2:30'],
   },
 };
 
@@ -42,7 +42,7 @@ export const MODES: Record<MatchMode, ModeInfo> = {
 export function openModePicker(ctx: AppContext, onPicked?: (m: MatchMode) => void) {
   const current = getSettings().playMode;
   const card = (m: ModeInfo) => {
-    const art = el('span', 'mp-art', [el('span', 'mp-burst'), iconEl(m.icon, 'ico mp-ico'), txt(m.online ? 'ONLINE' : 'OFFLINE', 'mp-net')]);
+    const art = el('span', 'mp-art', [el('span', 'mp-burst'), iconEl(m.icon, 'ico mp-ico'), txt(m.online ? '온라인' : '오프라인', 'mp-net')]);
     const c = button(
       `mp-card mp-${m.id}${m.id === current ? ' is-selected' : ''}`,
       [
@@ -53,7 +53,7 @@ export function openModePicker(ctx: AppContext, onPicked?: (m: MatchMode) => voi
           el('span', 'mp-blurb', [m.blurb]),
           el('span', 'mp-facts', m.facts.map((f) => txt(f, 'mp-fact'))),
         ]),
-        m.id === current ? txt('SELECTED', 'mp-selected') : null,
+        m.id === current ? txt('선택됨', 'mp-selected') : null,
       ].filter(Boolean) as Node[],
       () => {
         updateSettings({ playMode: m.id });
@@ -68,7 +68,7 @@ export function openModePicker(ctx: AppContext, onPicked?: (m: MatchMode) => voi
 
   const overlay = el('div', 'overlay', [
     el('div', 'mp-panel', [
-      el('div', 'mp-head', [txt('SELECT MODE', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
+      el('div', 'mp-head', [txt('모드 선택', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
       el('div', 'mp-cards', [card(MODES.training), card(MODES.teamfight)]),
     ]),
   ]);

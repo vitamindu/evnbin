@@ -2,19 +2,19 @@
 export function errorText(code: string, fallback?: string): string {
   switch (code) {
     case 'room_not_found':
-      return 'ROOM NOT FOUND';
+      return '방을 찾을 수 없어요';
     case 'room_full':
-      return 'THAT ROOM IS FULL';
+      return '방이 꽉 찼어요';
     case 'in_progress':
-      return 'MATCH ALREADY STARTED';
+      return '이미 경기가 시작됐어요';
     case 'not_host':
-      return 'ONLY THE HOST CAN START';
+      return '방장만 시작할 수 있어요';
     case 'bad_version':
-      return 'UPDATE THE GAME TO PLAY ONLINE';
+      return '게임을 새로 고친 뒤 다시 들어와 주세요';
     case 'bad_message':
-      return 'SOMETHING WENT WRONG';
+      return '문제가 생겼어요';
     default:
-      return fallback ? fallback.toUpperCase() : 'SOMETHING WENT WRONG';
+      return fallback || '문제가 생겼어요';
   }
 }
 

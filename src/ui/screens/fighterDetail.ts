@@ -9,15 +9,15 @@ import { toast } from '../overlays/toast';
 import { attachDrag, button, header, iconEl, roleChip, txt } from '../widgets';
 
 function rangeLabel(r: number) {
-  if (r < 3.5) return 'VERY SHORT';
-  if (r < 5.6) return 'SHORT';
-  if (r < 6.65) return 'NORMAL';
-  return 'LONG';
+  if (r < 3.5) return '아주 짧음';
+  if (r < 5.6) return '짧음';
+  if (r < 6.65) return '보통';
+  return '김';
 }
 function speedLabel(s: number) {
-  if (s < 2.27) return 'SLOW';
-  if (s < 2.46) return 'NORMAL';
-  return 'FAST';
+  if (s < 2.27) return '느림';
+  if (s < 2.46) return '보통';
+  return '빠름';
 }
 
 /** 캐릭터 상세 화면: 왼쪽 정보, 오른쪽 3D 모델, 오른쪽 아래 선택 버튼 */
@@ -46,7 +46,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
   const abilityCard = (kind: string, name: string, desc: string, cls: string) =>
     el('div', `ability panel ${cls}`, [txt(kind, 'ability-kind'), txt(name, 'ability-name'), el('p', 'ability-desc', [desc])]);
 
-  const selectLabel = txt('SELECT');
+  const selectLabel = txt('선택');
   const selectBtn = button('btn-select', [selectLabel], () => {
     if (getProfile().selected === current) return;
     updateProfile((p) => {
@@ -54,7 +54,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
     });
     view.celebrate();
     sfx('select');
-    toast(`${getFighter(current).name} SELECTED`);
+    toast(`${getFighter(current).name} 선택!`);
   }, false);
 
   const step = (dir: number) => {
@@ -83,7 +83,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
   const renderSelect = () => {
     const sel = getProfile().selected === current;
     selectBtn.classList.toggle('is-selected', sel);
-    selectLabel.textContent = sel ? 'SELECTED' : 'SELECT';
+    selectLabel.textContent = sel ? '선택됨' : '선택';
   };
 
   const render = (f: FighterDef) => {
@@ -94,19 +94,19 @@ export function createFighterDetailScreen(ctx: AppContext) {
     tagline.textContent = f.tagline;
     const a = f.attack;
     stats.replaceChildren(
-      statRow('HEALTH', f.hp, STAT_MAX.hp, String(f.hp)),
+      statRow('체력', f.hp, STAT_MAX.hp, String(f.hp)),
       statRow(
-        'DAMAGE',
+        '피해량',
         (a.damageFar ?? a.damage) * a.count,
         STAT_MAX.damage,
         a.damageFar ? `${a.damage}–${a.damageFar}` : a.count > 1 ? `${a.damage} × ${a.count}` : String(a.damage),
       ),
-      statRow('RANGE', a.range, STAT_MAX.range, rangeLabel(a.range)),
-      statRow('SPEED', f.moveSpeed, STAT_MAX.speed, speedLabel(f.moveSpeed)),
+      statRow('사거리', a.range, STAT_MAX.range, rangeLabel(a.range)),
+      statRow('이동 속도', f.moveSpeed, STAT_MAX.speed, speedLabel(f.moveSpeed)),
     );
     abilities.replaceChildren(
-      abilityCard('ATTACK', a.name, a.description, 'ab-attack'),
-      abilityCard('SUPER', f.super.name, f.super.description, 'ab-super'),
+      abilityCard('기본 공격', a.name, a.description, 'ab-attack'),
+      abilityCard('궁극기', f.super.name, f.super.description, 'ab-super'),
     );
     renderSelect();
   };

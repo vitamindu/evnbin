@@ -21,7 +21,7 @@ export function initAccountSync() {
   onProfileChange((p) => {
     const a = getAccount();
     if (!a || p.selected === a.profile.selected) return;
-    updateSelected(p.selected).catch((e) => toast(accountErrorText(accountErrorCode(e))[0]));
+    updateSelected(p.selected).catch((e) => toast(accountErrorText(accountErrorCode(e))));
   });
   const a = getAccount();
   if (a) useServerProfile(a.profile);

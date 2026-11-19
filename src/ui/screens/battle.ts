@@ -93,11 +93,11 @@ export function createBattleScreen(ctx: AppContext) {
     closeConfirm();
     const ov = el('div', 'overlay', [
       el('div', 'confirm-panel panel', [
-        txt('LEAVE MATCH?', 'cf-title'),
-        el('p', 'cf-note', ['YOUR TEAM WILL KEEP PLAYING WITHOUT YOU.']),
+        txt('경기에서 나갈까요?', 'cf-title'),
+        el('p', 'cf-note', ['나가도 남은 팀원은 계속 싸워요.']),
         el('div', 'cp-buttons', [
-          button('cp-btn is-back', [txt('STAY')], () => closeConfirm(), 'back'),
-          button('cp-btn is-danger', [txt('LEAVE')], () => leaveMatch()),
+          button('cp-btn is-back', [txt('계속하기')], () => closeConfirm(), 'back'),
+          button('cp-btn is-danger', [txt('나가기')], () => leaveMatch()),
         ]),
       ]),
     ]);
@@ -117,13 +117,13 @@ export function createBattleScreen(ctx: AppContext) {
     netVeil.hidden = state === 'ok';
     if (state === 'ok') return;
     nvDots.hidden = state !== 'connecting';
-    nvTitle.textContent = state === 'connecting' ? 'RECONNECTING' : 'CONNECTION LOST';
-    const leave = button('cp-btn is-back', [txt('LEAVE')], () => leaveMatch(), 'back');
+    nvTitle.textContent = state === 'connecting' ? '다시 연결 중' : '연결이 끊겼어요';
+    const leave = button('cp-btn is-back', [txt('나가기')], () => leaveMatch(), 'back');
     if (state === 'connecting') {
       nvButtons.replaceChildren(leave);
       return;
     }
-    const retry = button('cp-btn is-go', [txt('RECONNECT')], () => {
+    const retry = button('cp-btn is-go', [txt('다시 연결')], () => {
       const c = online?.client;
       if (!c) return;
       const p = getProfile();

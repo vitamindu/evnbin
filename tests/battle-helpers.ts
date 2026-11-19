@@ -79,13 +79,13 @@ export async function seedSelectedFighter(page: Page, id: FighterId) {
 
 /** From the lobby: FIGHTERS → card → SELECT → back → back, i.e. the real UI path (ends on the lobby). */
 export async function selectFighterViaUi(page: Page, id: FighterId) {
-  await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
+  await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await page.locator(`.fcard[data-fighter="${id}"]`).tap();
   await expect(page.locator('.detail-name')).toHaveText(NAMES[id]);
   const select = page.locator('.btn-select');
-  if ((await select.innerText()).trim() !== 'SELECTED') await select.tap();
-  await expect(select).toHaveText('SELECTED');
+  if ((await select.innerText()).trim() !== '선택됨') await select.tap();
+  await expect(select).toHaveText('선택됨');
   await page.locator('.detail .btn-back').tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await page.locator('.fighters .btn-back').tap();

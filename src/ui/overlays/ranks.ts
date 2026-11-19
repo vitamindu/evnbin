@@ -22,13 +22,10 @@ export function openRanks(ctx: AppContext) {
   );
   const overlay = el('div', 'overlay', [
     el('div', 'rk-panel panel', [
-      el('div', 'set-head', [txt('RANKS', 'set-title'), button('btn-close', [iconEl('close')], () => overlay.remove(), 'back')]),
+      el('div', 'set-head', [txt('티어', 'set-title'), button('btn-close', [iconEl('close')], () => overlay.remove(), 'back')]),
       el('div', 'rk-mine', [icon(rankEmblemSvg(r.tier.id), 'ico rk-emblem-big'), el('div', '', [txt(rankLabel(r), 'rk-mine-name'), txt(`${r.points} RP`, 'rk-mine-pts')])]),
       list,
-      el('p', 'rk-rule', [
-        `Win +${RANK_STEP_MIN}~${RANK_STEP_MAX} · Lose −${RANK_STEP_MIN}~${RANK_STEP_MAX} (more damage in your team = better odds) · ${DIVISION_POINTS} RP per division. RP only changes in TEAM FIGHT when both teams have the same number of players (bots don't count).`,
-      ]),
-      el('p', 'rk-rule rk-ko', [`승리 +${RANK_STEP_MIN}~${RANK_STEP_MAX}, 패배 −${RANK_STEP_MIN}~${RANK_STEP_MAX}. 팀 내 피해량 순위가 높을수록 유리한 쪽이 나올 확률이 높아요. 티어 점수는 양 팀의 사람 수가 같을 때만 바뀌어요(봇 제외).`]),
+      el('p', 'rk-rule rk-ko', [`승리 +${RANK_STEP_MIN}~${RANK_STEP_MAX}, 패배 −${RANK_STEP_MIN}~${RANK_STEP_MAX}. 팀 내 피해량 순위가 높을수록 유리한 쪽이 나올 확률이 높아요. 단계마다 ${DIVISION_POINTS} RP. 티어 점수는 양 팀의 사람 수가 같을 때만 바뀌어요(봇 제외).`]),
     ]),
   ]);
   overlay.addEventListener('click', (e) => {

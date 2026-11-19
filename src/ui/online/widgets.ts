@@ -21,7 +21,7 @@ export function pingMeter(className = '') {
       const v = Math.round(ms);
       if (v === last) return;
       last = v;
-      num.textContent = v > 0 ? `${v} MS` : '-- MS';
+      num.textContent = v > 0 ? `${v}ms` : '--ms';
       root.dataset.level = v > 0 ? pingLevel(v) : 'none';
     },
   };
@@ -30,14 +30,14 @@ export function pingMeter(className = '') {
 /** 화면 오른쪽 위 연결 상태: 점 + ONLINE/CONNECTING/OFFLINE + 핑 */
 export function netChip() {
   const dot = el('i', 'nc-dot');
-  const label = txt('OFFLINE', 'nc-label');
+  const label = txt('오프라인', 'nc-label');
   const ping = pingMeter('nc-ping');
   const root = el('div', 'net-chip', [dot, label, ping.el]);
   return {
     el: root,
     setStatus(s: OnlineStatus) {
       root.dataset.status = s;
-      label.textContent = s === 'connected' ? 'ONLINE' : s === 'connecting' ? 'CONNECTING' : 'OFFLINE';
+      label.textContent = s === 'connected' ? '온라인' : s === 'connecting' ? '연결 중' : '오프라인';
       ping.el.hidden = s !== 'connected';
     },
     setPing: ping.set,

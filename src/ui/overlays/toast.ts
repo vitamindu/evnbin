@@ -17,5 +17,5 @@ export function toast(message: string) {
 
 /** 아직 구현하지 않은 기능 */
 export function comingSoon() {
-  toast('COMING SOON');
+  toast('준비 중이에요');
 }

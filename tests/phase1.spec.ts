@@ -53,7 +53,7 @@ test('T-01 first launch: loading bar then TAP TO START, no console errors', asyn
   expect(states.at(-1)).toEqual({ bar: '100%', loader: false, tap: true });
 
   // Final screen: the bar is replaced by TAP TO START.
-  await expect(tap).toHaveText('TAP TO START');
+  await expect(tap).toHaveText('터치해서 시작');
   await expect(tap).not.toHaveAttribute('hidden', /.*/);
   await expect(loader).toBeHidden();
   await expect(loader.locator('.bar i')).toHaveAttribute('style', /width:\s*100%/);
@@ -70,7 +70,7 @@ test('T-02 tap title goes to lobby with default fighter RIVET', async ({ page },
   await expect(page.locator('.title')).toHaveCount(0);
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'lobby');
   await expect(page.locator('.nameplate .np-name')).toHaveText('RIVET');
-  await expect(page.locator('.nameplate .role-chip')).toContainText('SCATTER');
+  await expect(page.locator('.nameplate .role-chip')).toContainText('산탄형');
   // docs/02 §1: the first tap also requests fullscreen (allowed only inside a user gesture).
   await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
   await shot(page, testInfo, '02-lobby');
@@ -78,7 +78,7 @@ test('T-02 tap title goes to lobby with default fighter RIVET', async ({ page },
 
 test('T-03 FIGHTERS button opens list: 4 cards + MORE SOON, RIVET SELECTED', async ({ page }, testInfo) => {
   await gotoLobby(page);
-  await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
+  await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'fighters');
 
@@ -86,13 +86,13 @@ test('T-03 FIGHTERS button opens list: 4 cards + MORE SOON, RIVET SELECTED', asy
   await expect(cards).toHaveCount(5);
   await expect(page.locator('.fcard[data-fighter]')).toHaveCount(4);
   await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO']);
-  await expect(page.locator('.fcard-soon')).toContainText('MORE SOON');
+  await expect(page.locator('.fcard-soon')).toContainText('곧 추가');
   await expect(cards.last()).toHaveClass(/fcard-soon/);
-  await expect(page.locator('.fighters-count')).toHaveText('4 / 4 UNLOCKED');
+  await expect(page.locator('.fighters-count')).toHaveText('4 / 4 보유');
 
   const rivet = page.locator('.fcard[data-fighter="rivet"]');
   await expect(rivet).toHaveClass(/is-selected/);
-  await expect(rivet.locator('.fcard-selected')).toHaveText('SELECTED');
+  await expect(rivet.locator('.fcard-selected')).toHaveText('선택됨');
   await expect(page.locator('.fcard-selected')).toHaveCount(1);
   await expect(page.locator('.fcard.is-selected')).toHaveCount(1);
 
@@ -111,14 +111,14 @@ test('T-04 select VOLLEY: button becomes SELECTED and a toast appears', async ({
   await expect(page.locator('.detail-name')).toHaveText('VOLLEY');
 
   const selectBtn = page.locator('.btn-select');
-  await expect(selectBtn).toHaveText('SELECT');
+  await expect(selectBtn).toHaveText('선택');
   await expect(selectBtn).not.toHaveClass(/is-selected/);
 
   let toasts = await toastCount(page);
   await selectBtn.tap();
-  await expect(selectBtn).toHaveText('SELECTED');
+  await expect(selectBtn).toHaveText('선택됨');
   await expect(selectBtn).toHaveClass(/is-selected/);
-  await expectNewToast(page, toasts, 'VOLLEY SELECTED');
+  await expectNewToast(page, toasts, 'VOLLEY 선택!');
   expect((await storedProfile(page))?.selected).toBe('volley');
   await shot(page, testInfo, '04-detail-volley-selected');
 
@@ -126,7 +126,7 @@ test('T-04 select VOLLEY: button becomes SELECTED and a toast appears', async ({
   toasts = await toastCount(page);
   await selectBtn.tap();
   await expectNoNewToast(page, toasts);
-  await expect(selectBtn).toHaveText('SELECTED');
+  await expect(selectBtn).toHaveText('선택됨');
 });
 
 test('T-05 back twice: lobby nameplate shows VOLLEY', async ({ page }) => {
@@ -135,14 +135,14 @@ test('T-05 back twice: lobby nameplate shows VOLLEY', async ({ page }) => {
   await page.locator('.detail .btn-back').tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await expect(page.locator('.fcard[data-fighter="volley"]')).toHaveClass(/is-selected/);
-  await expect(page.locator('.fcard[data-fighter="volley"] .fcard-selected')).toHaveText('SELECTED');
+  await expect(page.locator('.fcard[data-fighter="volley"] .fcard-selected')).toHaveText('선택됨');
   await expect(page.locator('.fcard[data-fighter="rivet"]')).not.toHaveClass(/is-selected/);
   await expect(page.locator('.fcard-selected')).toHaveCount(1);
 
   await page.locator('.fighters .btn-back').tap();
   await expect(page.locator('.lobby')).toBeVisible();
   await expect(page.locator('.nameplate .np-name')).toHaveText('VOLLEY');
-  await expect(page.locator('.nameplate .role-chip')).toContainText('MARKSMAN');
+  await expect(page.locator('.nameplate .role-chip')).toContainText('연사형');
 });
 
 test('T-06 selection persists across reload (VOLLEY)', async ({ page }) => {
@@ -153,7 +153,7 @@ test('T-06 selection persists across reload (VOLLEY)', async ({ page }) => {
   await tapToLobby(page);
   await expect(page.locator('.nameplate .np-name')).toHaveText('VOLLEY');
 
-  await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
+  await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fcard[data-fighter="volley"]')).toHaveClass(/is-selected/);
   await expect(page.locator('.fcard-selected')).toHaveCount(1);
 });
@@ -164,7 +164,7 @@ test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → HINAKO → RIVET
   const name = page.locator('.detail-name');
   const selectBtn = page.locator('.btn-select');
   await expect(name).toHaveText('RIVET');
-  await expect(selectBtn).toHaveText('SELECTED');
+  await expect(selectBtn).toHaveText('선택됨');
 
   const next = page.locator('.arrow-next');
   const prev = page.locator('.arrow-prev');
@@ -172,7 +172,7 @@ test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → HINAKO → RIVET
     await next.tap();
     await expect(name).toHaveText(expected);
     // SELECT label tracks whether the shown fighter is the selected one (RIVET by default).
-    await expect(selectBtn).toHaveText(expected === 'RIVET' ? 'SELECTED' : 'SELECT');
+    await expect(selectBtn).toHaveText(expected === 'RIVET' ? '선택됨' : '선택');
   }
   for (const expected of ['HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
     await prev.tap();
@@ -183,17 +183,16 @@ test('T-07 detail arrows cycle RIVET → VOLLEY → BOULDER → HINAKO → RIVET
 test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', async ({ page }) => {
   await gotoLobby(page);
   const targets: [string, Locator][] = [
-    ['SHOP', page.locator('.side-btn', { hasText: 'SHOP' })],
-    ['NEWS', page.locator('.side-btn', { hasText: 'NEWS' })],
-    ['FRIENDS', page.locator('.side-btn', { hasText: 'FRIENDS' })],
-    ['PARTY', page.locator('.side-btn', { hasText: 'PARTY' })],
-    ['CREW', page.locator('.side-btn', { hasText: 'CREW' })],
+    ['SHOP', page.locator('.side-btn[data-btn="shop"]')],
+    ['NEWS', page.locator('.side-btn[data-btn="news"]')],
+    ['FRIENDS', page.locator('.side-btn[data-btn="friends"]')],
+    ['PARTY', page.locator('.side-btn[data-btn="party"]')],
+    ['CREW', page.locator('.side-btn[data-btn="crew"]')],
     ['SEASON PASS', page.locator('.pass-card')],
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],
     // Also "준비 중" per docs/02 §2 lobby table:
     ['profile card', page.locator('.profile-card')],
-    ['trophy card', page.locator('.trophy-card')],
     ['coins', page.locator('.lb-top-right .currency').nth(0)],
     ['crystals', page.locator('.lb-top-right .currency').nth(1)],
   ];
@@ -201,7 +200,7 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
     await test.step(label, async () => {
       const toasts = await toastCount(page);
       await loc.tap();
-      await expectNewToast(page, toasts, 'COMING SOON', `${label} → COMING SOON toast`);
+      await expectNewToast(page, toasts, '준비 중이에요', `${label} → COMING SOON toast`);
       await expect(page.locator('.lobby'), `${label} → still lobby`).toBeVisible();
       await expect(page.locator('#app')).toHaveAttribute('data-bg', 'lobby');
       await expect(page.locator('.overlay'), `${label} → no popup`).toHaveCount(0);
@@ -211,7 +210,7 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
 
 test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING switches back', async ({ page }) => {
   await gotoLobby(page);
-  await expect(page.locator('.mode-card .mode-name')).toHaveText('TRAINING');
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('연습장');
   await page.locator('.mode-card').tap();
   const picker = page.locator('.mp-panel');
   await expect(picker).toBeVisible();
@@ -219,11 +218,11 @@ test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING 
   await expect(picker.locator('.mp-card[data-mode="training"]')).toHaveClass(/is-selected/);
   await picker.locator('.mp-card[data-mode="teamfight"]').tap();
   await expect(picker).toHaveCount(0);
-  await expect(page.locator('.mode-card .mode-name')).toHaveText('TEAM FIGHT');
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('팀 대결');
   expect((await storedSettings(page))?.playMode).toBe('teamfight');
   await page.locator('.mode-card').tap();
   await page.locator('.mp-card[data-mode="training"]').tap();
-  await expect(page.locator('.mode-card .mode-name')).toHaveText('TRAINING');
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('연습장');
   expect((await storedSettings(page))?.playMode).toBe('training');
 });
 
@@ -254,31 +253,31 @@ test('T-10 settings: GRAPHICS toggles HIGH/LOW, SHOW FPS shows the FPS meter', a
   await page.locator('.lb-top-right .icon-btn').tap();
   const panel = page.locator('.set-panel');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('.set-title')).toHaveText('SETTINGS');
+  await expect(panel.locator('.set-title')).toHaveText('설정');
 
-  const graphics = panel.locator('.set-row', { hasText: 'GRAPHICS' }).locator('.btn-toggle');
-  const fpsToggle = panel.locator('.set-row', { hasText: 'SHOW FPS' }).locator('.btn-toggle');
+  const graphics = panel.locator('.set-row[data-row="graphics"]').locator('.btn-toggle');
+  const fpsToggle = panel.locator('.set-row[data-row="fps"]').locator('.btn-toggle');
   const fpsMeter = page.locator('.fps');
 
-  await expect(graphics).toHaveText('HIGH');
+  await expect(graphics).toHaveText('높음');
   await graphics.tap();
-  await expect(graphics).toHaveText('LOW');
+  await expect(graphics).toHaveText('낮음');
   expect((await storedSettings(page))?.quality).toBe('low');
   await graphics.tap();
-  await expect(graphics).toHaveText('HIGH');
+  await expect(graphics).toHaveText('높음');
   expect((await storedSettings(page))?.quality).toBe('high');
 
-  await expect(fpsToggle).toHaveText('OFF');
+  await expect(fpsToggle).toHaveText('끔');
   await expect(fpsMeter).toBeHidden();
   await fpsToggle.tap();
-  await expect(fpsToggle).toHaveText('ON');
+  await expect(fpsToggle).toHaveText('켬');
   await expect(fpsMeter).toBeVisible();
   await expect(fpsMeter).toHaveText(/^\d+ FPS$/);
   expect((await storedSettings(page))?.showFps).toBe(true);
   await shot(page, testInfo, '10-settings');
 
   await fpsToggle.tap();
-  await expect(fpsToggle).toHaveText('OFF');
+  await expect(fpsToggle).toHaveText('끔');
   await expect(fpsMeter).toBeHidden();
 
   await panel.locator('.btn-close').tap();
@@ -293,12 +292,12 @@ test.describe('on a 2x display', () => {
     const canvasWidth = () => page.locator('#scene').evaluate((c: HTMLCanvasElement) => c.width);
     await expect.poll(canvasWidth).toBe(2560);
     await page.locator('.lb-top-right .icon-btn').tap();
-    const graphics = page.locator('.set-row', { hasText: 'GRAPHICS' }).locator('.btn-toggle');
+    const graphics = page.locator('.set-row[data-row="graphics"]').locator('.btn-toggle');
     await graphics.tap();
-    await expect(graphics).toHaveText('LOW');
+    await expect(graphics).toHaveText('낮음');
     await expect.poll(canvasWidth).toBe(1280);
     await graphics.tap();
-    await expect(graphics).toHaveText('HIGH');
+    await expect(graphics).toHaveText('높음');
     await expect.poll(canvasWidth).toBe(2560);
   });
 });
@@ -321,7 +320,7 @@ test.describe('portrait 800x1280', () => {
     await page.goto('/');
     const overlay = page.locator('.rotate-overlay');
     await expect(overlay).toBeVisible();
-    await expect(overlay).toHaveText('ROTATE YOUR DEVICE');
+    await expect(overlay).toHaveText('화면을 가로로 돌려 주세요');
     await expect(page.locator('html')).toHaveClass(/is-portrait/);
 
     const box = await overlay.boundingBox();

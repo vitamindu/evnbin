@@ -22,17 +22,17 @@ export function openMatchmaking(ctx: AppContext) {
 
   const overlay = el('div', 'overlay', [
     el('div', 'mm-panel panel', [
-      txt('SEARCHING', 'mm-title'),
+      txt('상대 찾는 중', 'mm-title'),
       el('div', 'mm-dots', [el('i'), el('i'), el('i')]),
-      txt('CRYSTAL RUSH · TRAINING YARD', 'mm-mode'),
+      txt('TRAINING YARD', 'mm-mode'),
       el('div', 'mm-teams', [
         el('div', 'mm-team mm-blue', [me, empty(), empty()]),
         txt('VS', 'mm-vs'),
         el('div', 'mm-team mm-red', [empty(), empty(), empty()]),
       ]),
       time,
-      el('p', 'mm-note', ['Battles arrive in the next build. Online 3v3 needs the game server.']),
-      button('btn-cancel', [txt('CANCEL')], () => close(), 'back'),
+      el('p', 'mm-note', ['온라인 3대3은 게임 서버가 필요해요.']),
+      button('btn-cancel', [txt('취소')], () => close(), 'back'),
     ]),
   ]);
 

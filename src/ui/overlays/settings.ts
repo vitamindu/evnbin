@@ -30,7 +30,12 @@ function normalizeServerUrl(raw: string): string | null {
 
 /** 설정 팝업: 전체화면, 그래픽 품질, FPS 표시, 진행 초기화, 서버 주소, 기기 정보 */
 export function openSettings(ctx: AppContext) {
-  const row = (label: string, control: HTMLElement) => el('div', 'set-row', [txt(label, 'set-label'), control]);
+  /** data-row: 글자와 무관한 E2E 선택자 */
+  const row = (id: string, label: string, control: HTMLElement) => {
+    const r = el('div', 'set-row', [txt(label, 'set-label'), control]);
+    r.dataset.row = id;
+    return r;
+  };
 
   const toggle = (get: () => string, onTap: () => void | Promise<void>) => {
     const label = txt(get());
@@ -42,7 +47,7 @@ export function openSettings(ctx: AppContext) {
   };
 
   const fullscreen = toggle(
-    () => (isFullscreen() ? 'ON' : 'OFF'),
+    () => (isFullscreen() ? '켬' : '끔'),
     async () => {
       if (isStandalone()) return;
       if (isFullscreen()) await exitFullscreen();
@@ -50,25 +55,25 @@ export function openSettings(ctx: AppContext) {
     },
   );
   const quality = toggle(
-    () => (getSettings().quality === 'high' ? 'HIGH' : 'LOW'),
+    () => (getSettings().quality === 'high' ? '높음' : '낮음'),
     () => updateSettings({ quality: getSettings().quality === 'high' ? 'low' : 'high' }),
   );
   const fps = toggle(
-    () => (getSettings().showFps ? 'ON' : 'OFF'),
+    () => (getSettings().showFps ? '켬' : '끔'),
     () => updateSettings({ showFps: !getSettings().showFps }),
   );
   let armed = false;
-  const resetLabel = txt('RESET');
+  const resetLabel = txt('초기화');
   const reset = button('btn-toggle btn-danger', [resetLabel], () => {
     if (!armed) {
       armed = true;
-      resetLabel.textContent = 'SURE?';
+      resetLabel.textContent = '정말요?';
       return;
     }
     resetProfile();
     armed = false;
-    resetLabel.textContent = 'RESET';
-    toast('PROGRESS RESET');
+    resetLabel.textContent = '초기화';
+    toast('진행을 초기화했어요');
   });
 
   // 서버 주소(온라인 TEAM FIGHT). 바꾸면(포커스를 잃거나 Enter) 저장한다
@@ -87,27 +92,27 @@ export function openSettings(ctx: AppContext) {
   server.addEventListener('change', () => {
     const url = normalizeServerUrl(server.value);
     if (url === null) {
-      toast('USE ws:// OR wss://');
+      toast('ws:// 또는 wss:// 주소를 넣어 주세요');
       server.value = getServerUrl();
       return;
     }
     setServerUrl(url);
     server.value = getServerUrl();
-    toast('SERVER SAVED');
+    toast('서버 주소를 저장했어요');
   });
 
   // 계정: 이름 + 로그아웃(로그인 안 했으면 OFFLINE + 로그인)
   const acct = getAccount();
   const accountCtl = el('div', 'set-account', [
-    txt(acct ? acct.username : 'OFFLINE', `set-acct-name${acct ? '' : ' is-off'}`),
-    button(`btn-toggle ${acct ? 'btn-danger btn-logout' : 'btn-login'}`, [txt(acct ? 'LOG OUT' : 'LOG IN')], async () => {
+    txt(acct ? acct.username : '오프라인', `set-acct-name${acct ? '' : ' is-off'}`),
+    button(`btn-toggle ${acct ? 'btn-danger btn-logout' : 'btn-login'}`, [txt(acct ? '로그아웃' : '로그인')], async () => {
       overlay.remove();
       if (acct) {
         const c = getOnlineClient();
         if (c.room) c.leaveRoom();
         if (c.status !== 'disconnected') c.disconnect();
         await logout();
-        toast('LOGGED OUT · 로그아웃했어요');
+        toast('로그아웃했어요');
       }
       ctx.go.login();
     }),
@@ -121,13 +126,13 @@ export function openSettings(ctx: AppContext) {
 
   const overlay = el('div', 'overlay', [
     el('div', 'set-panel panel', [
-      el('div', 'set-head', [txt('SETTINGS', 'set-title'), button('btn-close', [iconEl('close')], () => overlay.remove(), 'back')]),
-      row('ACCOUNT', accountCtl),
-      row('FULLSCREEN', fullscreen),
-      row('GRAPHICS', quality),
-      row('SHOW FPS', fps),
-      acct ? null : row('RESET PROGRESS', reset),
-      row('SERVER', server),
+      el('div', 'set-head', [txt('설정', 'set-title'), button('btn-close', [iconEl('close')], () => overlay.remove(), 'back')]),
+      row('account', '계정', accountCtl),
+      row('fullscreen', '전체 화면', fullscreen),
+      row('graphics', '그래픽', quality),
+      row('fps', 'FPS 표시', fps),
+      acct ? null : row('reset', '진행 초기화', reset),
+      row('server', '서버', server),
       info,
     ]),
   ]);

@@ -1150,7 +1150,7 @@
   gap: 2px;
 }
 .rs-title {
-  font-size: 100px;
+  font-size: 84px;
   line-height: 1.02;
   --o: 5px;
   white-space: nowrap;
@@ -1207,7 +1207,7 @@
   position: absolute;
   left: 440px;
   right: 20px;
-  top: 206px;
+  top: 222px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1225,7 +1225,7 @@
   display: grid;
   grid-template-columns: 1fr 80px 100px 130px;
   align-items: center;
-  height: 54px;
+  height: 52px;
   padding: 0 10px;
   border-radius: 12px;
 }

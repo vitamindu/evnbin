@@ -22,8 +22,8 @@ export function createTitleScreen(stage: Stage, onStart: () => void) {
     }),
   );
   const barFill = el('i');
-  const loader = el('div', 'title-loader', [el('div', 'bar', [barFill]), txt('LOADING', 'title-loading-label')]);
-  const tap = txt('TAP TO START', 'title-tap');
+  const loader = el('div', 'title-loader', [el('div', 'bar', [barFill]), txt('불러오는 중', 'title-loading-label')]);
+  const tap = txt('터치해서 시작', 'title-tap');
   tap.hidden = true;
   const footer = el('div', 'title-footer', [`v${GAME_VERSION} · PROTOTYPE`]);
   const root = el('div', 'title', [logo, loader, tap, footer]);

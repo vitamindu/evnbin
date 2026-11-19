@@ -36,8 +36,12 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     returnToBase: true,
   });
 
-  const sideBtn = (label: string, ico: IconName, fn: () => void, badge?: string) =>
-    button('side-btn', [iconEl(ico), txt(label), badge ? el('span', 'badge t-outline', [badge]) : null].filter(Boolean) as Node[], fn);
+  /** data-btn = 아이콘 이름(shop, fighters, …): 글자와 무관한 E2E 선택자 */
+  const sideBtn = (label: string, ico: IconName, fn: () => void, badge?: string) => {
+    const b = button('side-btn', [iconEl(ico), txt(label), badge ? el('span', 'badge t-outline', [badge]) : null].filter(Boolean) as Node[], fn);
+    b.dataset.btn = ico;
+    return b;
+  };
 
   // ── 왼쪽 위: 프로필 + 트로피
   const pName = txt('', 'pc-name');
@@ -63,7 +67,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     plateRole,
     plateName,
     el('span', 'np-chip', [iconEl('trophy'), plateTrophy]),
-    el('span', 'np-chip np-power', [txt('POWER', 'np-label'), platePower]),
+    el('span', 'np-chip np-power', [txt('파워', 'np-label'), platePower]),
   ]);
   const hit = el('div', 'stage-hit');
   attachDrag(hit, {
@@ -78,14 +82,14 @@ export function createLobbyScreen(ctx: AppContext): Screen {
   // ── 아래: 시즌 패스, 모드, 플레이
   const passCard = button(
     'pass-card',
-    [iconEl('pass', 'ico pass-ico'), el('span', 'pass-text', [txt('SEASON PASS', 'pass-title'), txt('SEASON 1', 'pass-sub')])],
+    [iconEl('pass', 'ico pass-ico'), el('span', 'pass-text', [txt('시즌 패스', 'pass-title'), txt('시즌 1', 'pass-sub')])],
     comingSoon,
   );
   // 모드 카드: 지금 고른 모드(설정에 저장). 탭하면 모드 선택 팝업, PLAY는 그 모드로 시작
   const modeIco = el('span', 'mode-ico-wrap');
   const modeName = txt('', 'mode-name');
   const modeMap = txt('', 'mode-map');
-  const modeTag = txt('MODE', 'mode-tag');
+  const modeTag = txt('모드', 'mode-tag');
   const modeCard = button(
     'mode-card',
     [modeIco, el('span', 'mode-text', [modeName, modeMap]), modeTag, iconEl('next', 'ico mode-more')],
@@ -97,7 +101,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     modeIco.replaceChildren(iconEl(m.icon, 'ico mode-ico'));
     modeName.textContent = m.name;
     modeMap.textContent = m.map;
-    modeTag.textContent = `MODE · ${m.online ? 'ONLINE' : 'OFFLINE'}`;
+    modeTag.textContent = `모드 · ${m.online ? '온라인' : '오프라인'}`;
   };
   renderMode();
   onSettingsChange(renderMode);
@@ -108,7 +112,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
       if (getSettings().playMode !== 'teamfight') return ctx.go.battle();
       // 오프라인(게스트)으로 들어왔으면 온라인 전에 로그인
       if (isOfflineGuest()) {
-        toast('LOG IN TO PLAY ONLINE · 온라인은 로그인 후');
+        toast('온라인은 로그인한 뒤에 할 수 있어요');
         return ctx.go.login();
       }
       ctx.go.online();
@@ -121,14 +125,14 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     el('div', 'lb-top-left', [profileCard, trophyCard]),
     el('div', 'lb-top-right', [currencyBar(comingSoon), button('icon-btn', [iconEl('gear')], () => openSettings(ctx))]),
     el('div', 'lb-side lb-side-left', [
-      sideBtn('SHOP', 'shop', comingSoon),
-      sideBtn('FIGHTERS', 'fighters', () => ctx.go.fighters(), String(FIGHTERS.length)),
-      sideBtn('NEWS', 'news', comingSoon),
+      sideBtn('상점', 'shop', comingSoon),
+      sideBtn('캐릭터', 'fighters', () => ctx.go.fighters(), String(FIGHTERS.length)),
+      sideBtn('소식', 'news', comingSoon),
     ]),
     el('div', 'lb-side lb-side-right', [
-      sideBtn('FRIENDS', 'friends', comingSoon),
-      sideBtn('PARTY', 'party', comingSoon),
-      sideBtn('CREW', 'crew', comingSoon),
+      sideBtn('친구', 'friends', comingSoon),
+      sideBtn('파티', 'party', comingSoon),
+      sideBtn('크루', 'crew', comingSoon),
     ]),
     nameplate,
     slotL,

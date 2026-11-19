@@ -22,7 +22,7 @@ export function openFighterPicker(ctx: AppContext, current: FighterId, onPick: (
   });
   const overlay = el('div', 'overlay', [
     el('div', 'fp-panel panel', [
-      el('div', 'mp-head', [txt('CHOOSE FIGHTER', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
+      el('div', 'mp-head', [txt('캐릭터 선택', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
       el('div', 'fp-cards', cards),
     ]),
   ]);

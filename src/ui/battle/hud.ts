@@ -85,7 +85,7 @@ export class BattleHud {
     }
     this.veil = el('div', 'ko-veil');
     this.respawnNum = txt('3', 'respawn-num');
-    this.respawn = el('div', 'respawn', [txt('KNOCKED OUT!', 'respawn-title'), txt('BACK IN', 'respawn-sub'), this.respawnNum]);
+    this.respawn = el('div', 'respawn', [txt('쓰러졌어요!', 'respawn-title'), txt('부활까지', 'respawn-sub'), this.respawnNum]);
     this.respawn.hidden = true;
     this.el = el('div', 'hud', [this.barLayer, this.popLayer, this.veil, this.respawn]);
   }

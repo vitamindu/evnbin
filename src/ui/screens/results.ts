@@ -32,10 +32,10 @@ export function createResultsScreen(ctx: AppContext) {
   const rankLine = txt('', 'rs-rank');
   const scoreMine = txt('0', 'rs-num');
   const scoreTheirs = txt('0', 'rs-num');
-  const scoreLine = el('div', 'rs-score', [el('span', 'rs-box is-blue', [txt('YOUR TEAM', 'rs-cap'), scoreMine]), txt('-', 'rs-dash'), el('span', 'rs-box is-red', [txt('ENEMY', 'rs-cap'), scoreTheirs])]);
+  const scoreLine = el('div', 'rs-score', [el('span', 'rs-box is-blue', [txt('우리 팀', 'rs-cap'), scoreMine]), txt('-', 'rs-dash'), el('span', 'rs-box is-red', [txt('상대 팀', 'rs-cap'), scoreTheirs])]);
   const tables = el('div', 'rs-tables');
-  const roomBtn = button('rs-room', [txt('BACK TO ROOM')], () => ctx.go.online(), 'select');
-  const lobbyBtn = button('rs-lobby', [iconEl('door'), txt('LOBBY')], () => {
+  const roomBtn = button('rs-room', [txt('방으로 돌아가기')], () => ctx.go.online(), 'select');
+  const lobbyBtn = button('rs-lobby', [iconEl('door'), txt('로비')], () => {
     const c = getOnlineClient();
     if (c.room) c.leaveRoom();
     c.disconnect();
@@ -47,14 +47,14 @@ export function createResultsScreen(ctx: AppContext) {
   let celebrate = false;
 
   const table = (rows: PlayerStats[], side: 'is-blue' | 'is-red', heading: string, myId: string | null, mvp: string | null) => {
-    const head = el('div', `rs-row rs-th ${side}`, [txt(heading, 'rs-team'), txt('KO', 'rs-c'), txt('DEATHS', 'rs-c'), txt('DAMAGE', 'rs-c rs-dmg')]);
+    const head = el('div', `rs-row rs-th ${side}`, [txt(heading, 'rs-team'), txt('KO', 'rs-c'), txt('쓰러짐', 'rs-c'), txt('피해량', 'rs-c rs-dmg')]);
     const body = rows.map((p) => {
       const f = getFighter(p.fighterId);
       return el('div', `rs-row ${side}${p.playerId === myId ? ' is-me' : ''}`, [
         el('span', 'rs-who', [
           portrait(ctx, p.fighterId, 'portrait rs-pf'),
           el('span', 'rs-names', [
-            el('span', 'rs-name-row', [txt(p.name, 'rs-name'), p.playerId === myId ? txt('YOU', 'slot-tag tag-you') : null, p.playerId === mvp ? iconEl('star', 'ico rs-star') : null]),
+            el('span', 'rs-name-row', [txt(p.name, 'rs-name'), p.playerId === myId ? txt('나', 'slot-tag tag-you') : null, p.playerId === mvp ? iconEl('star', 'ico rs-star') : null]),
             txt(f.name, 'rs-fighter'),
           ]),
         ]),
@@ -77,19 +77,19 @@ export function createResultsScreen(ctx: AppContext) {
     const outcome = r.winner === -1 ? 'draw' : r.winner === myTeam ? 'win' : 'lose';
     root.dataset.outcome = outcome;
     screen.bg = `results-${outcome}`;
-    title.textContent = outcome === 'win' ? 'VICTORY!' : outcome === 'lose' ? 'DEFEAT' : 'DRAW';
-    if (!r.ranked) rankLine.textContent = 'UNRANKED · UNEVEN TEAMS';
+    title.textContent = outcome === 'win' ? '승리!' : outcome === 'lose' ? '패배' : '무승부';
+    if (!r.ranked) rankLine.textContent = '일반전 · 양 팀 인원이 달라요';
     else if (me?.rankPoints !== undefined) {
       const d = me.rankDelta ?? 0;
       rankLine.textContent = `${rankLabel(rankOf(me.rankPoints))}  ${d >= 0 ? '+' : ''}${d} RP`;
-    } else rankLine.textContent = 'RANKED · LOG IN TO EARN RP';
+    } else rankLine.textContent = '랭크전 · 로그인하면 RP를 받아요';
     scoreMine.textContent = String(r.score[myTeam]);
     scoreTheirs.textContent = String(r.score[other]);
     // 최고 활약: KO가 가장 많은 사람(같으면 피해량) — 아무도 KO가 없으면 없음
     const best = [...r.stats].sort((a, b) => b.kills - a.kills || b.damage - a.damage)[0];
     const mvp = best && best.kills > 0 ? best.playerId : null;
     const sort = (t: Team) => r.stats.filter((p) => p.team === t).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
-    tables.replaceChildren(table(sort(myTeam), 'is-blue', 'YOUR TEAM', myId, mvp), table(sort(other), 'is-red', 'ENEMY TEAM', myId, mvp));
+    tables.replaceChildren(table(sort(myTeam), 'is-blue', '우리 팀', myId, mvp), table(sort(other), 'is-red', '상대 팀', myId, mvp));
     view.setFighter(me?.fighterId ?? getProfile().selected);
     celebrate = outcome === 'win';
     roomBtn.hidden = !c.room;

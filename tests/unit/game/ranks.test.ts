@@ -3,13 +3,13 @@ import { isRankedMatch, rankDelta, rankLabel, rankOf } from '../../../src/data/r
 
 describe('랭크', () => {
   it('점수 → 티어·단계', () => {
-    expect(rankLabel(rankOf(0))).toBe('BRONZE IV');
-    expect(rankLabel(rankOf(399))).toBe('BRONZE I');
-    expect(rankLabel(rankOf(400))).toBe('SILVER IV');
-    expect(rankLabel(rankOf(1999))).toBe('DIAMOND I');
-    expect(rankLabel(rankOf(2000))).toBe('MASTER');
-    expect(rankLabel(rankOf(2500))).toBe('GRANDMASTER');
-    expect(rankLabel(rankOf(9999))).toBe('CHALLENGER');
+    expect(rankLabel(rankOf(0))).toBe('브론즈 IV');
+    expect(rankLabel(rankOf(399))).toBe('브론즈 I');
+    expect(rankLabel(rankOf(400))).toBe('실버 IV');
+    expect(rankLabel(rankOf(1999))).toBe('다이아몬드 I');
+    expect(rankLabel(rankOf(2000))).toBe('마스터');
+    expect(rankLabel(rankOf(2500))).toBe('그랜드마스터');
+    expect(rankLabel(rankOf(9999))).toBe('챌린저');
     expect(rankOf(-50).points).toBe(0);
   });
   it('랭크 경기: 양 팀 사람 수가 같을 때만(봇 제외)', () => {

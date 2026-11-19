@@ -18,7 +18,7 @@ import { copyText, portrait, sideClass } from './widgets';
  * 색은 "내 팀 = 파랑, 상대 = 빨강"(전투 화면과 같은 규칙). 팀 이름 A/B는 모두에게 같다.
  */
 const TEAM_SIZE = 3;
-const TEAM_NAME: Record<Team, string> = { 0: 'TEAM A', 1: 'TEAM B' };
+const TEAM_NAME: Record<Team, string> = { 0: 'A팀', 1: 'B팀' };
 
 /** 맵 글자 → 미리보기 색(src/game/world/grid.ts 범례) */
 const MINI_COLORS: Record<string, string> = {
@@ -74,9 +74,9 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
   const copyBtn = button('rc-copy', [iconEl('copy')], async () => {
     const code = getClient().room?.code;
     if (!code) return;
-    toast((await copyText(code)) ? 'CODE COPIED' : `CODE: ${code}`);
+    toast((await copyText(code)) ? '코드를 복사했어요' : `코드: ${code}`);
   });
-  const codeCard = el('div', 'room-code panel', [txt('ROOM CODE', 'rc-label'), el('div', 'rc-row', [codeText, copyBtn]), txt('SHARE IT WITH FRIENDS', 'rc-hint')]);
+  const codeCard = el('div', 'room-code panel', [txt('방 코드', 'rc-label'), el('div', 'rc-row', [codeText, copyBtn]), txt('친구에게 알려 주세요', 'rc-hint')]);
 
   // ── 팀 열
   const teamHead = (team: Team) => {
@@ -99,39 +99,39 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
   const center = el('div', 'room-center', [
     txt('VS', 'room-vs'),
     el('div', 'room-map panel', [mini, mapName]),
-    el('div', 'room-facts', [txt('FIRST TO 10 KOs', 'room-fact'), txt('2:30', 'room-fact')]),
+    el('div', 'room-facts', [txt('10 KO 선승', 'room-fact'), txt('2:30', 'room-fact')]),
   ]);
 
   // ── 아래 줄
-  const switchBtn = button('room-switch', [iconEl('swap'), txt('SWITCH TEAM')], () => {
+  const switchBtn = button('room-switch', [iconEl('swap'), txt('팀 바꾸기')], () => {
     const c = getClient();
     const me = myPlayer(c);
     if (!me || !c.room) return;
     const other: Team = me.team === 0 ? 1 : 0;
     if (c.room.players.filter((p) => !p.bot && p.team === other).length >= TEAM_SIZE) {
-      toast(`${TEAM_NAME[other]} IS FULL`);
+      toast(`${TEAM_NAME[other]}이 꽉 찼어요`);
       return;
     }
     c.setTeam(other);
   });
-  const botsState = txt('OFF', 'rb-state');
-  const botsBtn = button('room-bots', [iconEl('bot'), el('span', 'rb-text', [txt('FILL WITH BOTS', 'rb-label'), el('span', 'rb-switch', [el('i'), botsState])])], () => {
+  const botsState = txt('끔', 'rb-state');
+  const botsBtn = button('room-bots', [iconEl('bot'), el('span', 'rb-text', [txt('빈자리 봇', 'rb-label'), el('span', 'rb-switch', [el('i'), botsState])])], () => {
     const c = getClient();
     if (!c.room) return;
     if (!myPlayer(c)?.host) {
-      toast('ONLY THE HOST CAN CHANGE THIS');
+      toast('방장만 바꿀 수 있어요');
       return;
     }
     c.setFillBots(!c.room.fillBots);
   });
   const hint = txt('', 'room-hint');
-  const readyLabel = txt('READY');
+  const readyLabel = txt('준비');
   const readyBtn = button('room-ready', [iconEl('check', 'ico ready-ico'), readyLabel], () => {
     const c = getClient();
     const me = myPlayer(c);
     if (me) c.setReady(!me.ready);
   });
-  const startLabel = txt('START');
+  const startLabel = txt('시작');
   let starting = 0;
   const startBtn = button(
     'room-start',
@@ -141,13 +141,13 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
       const me = myPlayer(c);
       if (!me?.host || !c.room) return;
       if (startBtn.classList.contains('is-disabled')) {
-        toast(hint.textContent || 'NOT READY YET');
+        toast(hint.textContent || '아직 준비가 안 됐어요');
         return;
       }
       if (!me.ready) c.setReady(true);
       c.startMatch();
       starting = performance.now();
-      startLabel.textContent = 'STARTING…';
+      startLabel.textContent = '시작하는 중…';
       startBtn.classList.add('is-disabled');
     },
     'select',
@@ -164,14 +164,14 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     if (!p) {
       return el('div', `slot is-empty ${side}`, [
         el('span', 'slot-pf slot-pf-empty', [fillBots ? iconEl('bot', 'ico slot-bot-ico') : txt('?', 'slot-q')]),
-        el('span', 'slot-text', [txt(fillBots ? 'BOT' : 'OPEN SLOT', 'slot-name'), txt(fillBots ? 'JOINS AT START' : 'WAITING FOR A FRIEND', 'slot-sub')]),
+        el('span', 'slot-text', [txt(fillBots ? '봇' : '빈자리', 'slot-name'), txt(fillBots ? '시작할 때 들어와요' : '친구를 기다리는 중', 'slot-sub')]),
       ]);
     }
     const f = getFighter(p.fighterId);
     const tags: HTMLElement[] = [];
-    if (mine) tags.push(txt('YOU', 'slot-tag tag-you'));
-    if (p.bot) tags.push(el('span', 'slot-tag tag-bot', [iconEl('bot'), txt('BOT')]));
-    if (!p.connected) tags.push(txt('OFFLINE', 'slot-tag tag-off'));
+    if (mine) tags.push(txt('나', 'slot-tag tag-you'));
+    if (p.bot) tags.push(el('span', 'slot-tag tag-bot', [iconEl('bot'), txt('봇')]));
+    if (!p.connected) tags.push(txt('끊김', 'slot-tag tag-off'));
     const pf = el('span', 'slot-pf', [
       portrait(ctx, p.fighterId, 'portrait'),
       p.host ? iconEl('crown', 'ico slot-crown') : null,
@@ -185,7 +185,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
       // 방장은 준비 대신 START를 누르므로 "NOT READY"는 띄우지 않는다
       p.bot || (p.host && !p.ready)
         ? null
-        : el('span', `slot-ready ${p.ready ? 'is-on' : ''}`, [p.ready ? iconEl('check') : null, txt(p.ready ? 'READY' : 'NOT READY')]),
+        : el('span', `slot-ready ${p.ready ? 'is-on' : ''}`, [p.ready ? iconEl('check') : null, txt(p.ready ? '준비 완료' : '준비 중')]),
     ];
     const cls = `slot ${side}${mine ? ' is-me' : ''}${p.bot ? ' is-bot' : ''}${p.connected ? '' : ' is-off'}${p.ready ? ' is-ready' : ''}`;
     if (!mine) return el('div', cls, children);
@@ -240,7 +240,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
 
     const host = !!me?.host;
     const lobby = room.phase === 'lobby';
-    botsState.textContent = room.fillBots ? 'ON' : 'OFF';
+    botsState.textContent = room.fillBots ? '켬' : '끔';
     botsBtn.classList.toggle('is-on', room.fillBots);
     botsBtn.classList.toggle('is-locked', !host);
     const otherTeam: Team = myTeam === 0 ? 1 : 0;
@@ -253,25 +253,25 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     readyBtn.hidden = host;
     startBtn.hidden = !host;
     readyBtn.classList.toggle('is-on', !!me?.ready);
-    readyLabel.textContent = me?.ready ? 'READY!' : 'READY';
-    if (performance.now() - starting > 3000) startLabel.textContent = 'START';
+    readyLabel.textContent = me?.ready ? '준비 완료' : '준비';
+    if (performance.now() - starting > 3000) startLabel.textContent = '시작';
     const canStart = host && lobby && waiting === 0 && enough && performance.now() - starting > 3000;
     startBtn.classList.toggle('is-disabled', !canStart);
 
     const humans: [number, number] = [0, 0];
     for (const pl of room.players) if (!pl.bot) humans[pl.team]++;
     const ranked = isRankedMatch(humans);
-    rankedTag.textContent = ranked ? 'RANKED' : 'UNRANKED · TEAMS NEED THE SAME NUMBER OF PLAYERS';
+    rankedTag.textContent = ranked ? '랭크전' : '일반전 · 양 팀 인원이 같아야 랭크전이에요';
     rankedTag.classList.toggle('is-ranked', ranked);
     let h: string;
-    if (room.phase === 'playing') h = 'MATCH STARTING…';
-    else if (room.phase === 'results') h = 'MATCH FINISHED';
+    if (room.phase === 'playing') h = '경기를 시작해요…';
+    else if (room.phase === 'results') h = '경기가 끝났어요';
     else if (host) {
-      if (waiting > 0) h = `WAITING FOR ${waiting} PLAYER${waiting > 1 ? 'S' : ''} TO GET READY`;
-      else if (!enough) h = 'INVITE A FRIEND OR TURN ON BOTS';
-      else h = 'EVERYONE IS READY!';
+      if (waiting > 0) h = `${waiting}명이 준비하기를 기다리는 중`;
+      else if (!enough) h = '친구를 부르거나 봇을 켜 주세요';
+      else h = '모두 준비됐어요!';
     } else {
-      h = me?.ready ? 'WAITING FOR THE HOST TO START' : 'TAP READY WHEN YOU ARE SET';
+      h = me?.ready ? '방장이 시작하기를 기다리는 중' : '다 됐으면 준비를 눌러 주세요';
     }
     hint.textContent = h;
     hint.classList.toggle('is-go', host && canStart);

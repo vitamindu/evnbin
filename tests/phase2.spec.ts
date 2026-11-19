@@ -556,8 +556,8 @@ test('T-31 player KO shows KNOCKED OUT + 3-2-1 countdown, input is ignored, then
   await waitForEvent(page, { type: 'death', unitId: '$player' }, m);
 
   await expect(page.locator('.respawn')).toBeVisible();
-  await expect(page.locator('.respawn-title')).toHaveText('KNOCKED OUT!');
-  await expect(page.locator('.respawn-sub')).toHaveText('BACK IN');
+  await expect(page.locator('.respawn-title')).toHaveText('쓰러졌어요!');
+  await expect(page.locator('.respawn-sub')).toHaveText('부활까지');
   await expect(page.locator('.respawn-num')).toHaveText(/^[123]$/);
   await expect(page.locator('.battle')).toHaveClass(/is-dead/);
   await expect(page.locator('.ko-veil')).toHaveClass(/is-on/);
@@ -631,7 +631,7 @@ test('T-33 HINAKO glb model loads: no load warning, textured portrait, textured 
   await tapToLobby(page);
   expect(glb).toEqual({ 'hinako.glb': 200, 'hinako_gun.glb': 200 });
 
-  await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
+  await page.locator('.side-btn[data-btn="fighters"]').tap();
   const img = page.locator('.fcard[data-fighter="hinako"] img');
   await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
   // A textured glb portrait has hundreds of colours; the capsule placeholder used on load failure ~15.

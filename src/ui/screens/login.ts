@@ -14,7 +14,7 @@ import { button, iconEl, txt } from '../widgets';
  * - 들어오면 저장된 토큰으로 자동 로그인(restore) → 되면 바로 로비.
  * - 입력 칸은 화면 위쪽(태블릿 키보드가 아래 절반을 덮어도 보이게), Enter로 다음 칸 / 제출.
  * - 서버에 닿지 않으면 "오프라인으로 계속"을 크게 보여 준다(연습장만). 평소에도 아래에 작게 있다.
- * 오류 문구는 영어 + 한국어 짧게.
+ * 오류 문구는 한국어로 짧게.
  */
 type Mode = 'login' | 'signup';
 
@@ -37,30 +37,28 @@ export function createLoginScreen(ctx: AppContext): Screen {
   idInput.maxLength = 12;
   const pwInput = input('password', 'current-password', 'Password');
   const pw2Input = input('password', 'new-password', 'Confirm password');
-  const field = (en: string, ko: string, i: HTMLInputElement) =>
-    el('label', 'auth-field', [el('span', 'auth-label', [txt(en), el('span', 'auth-ko', [ko])]), el('span', 'auth-box', [i])]);
-  const confirmField = field('CONFIRM', '비밀번호 확인', pw2Input);
+  const field = (label: string, i: HTMLInputElement) => el('label', 'auth-field', [txt(label, 'auth-label'), el('span', 'auth-box', [i])]);
+  const confirmField = field('비밀번호 확인', pw2Input);
 
-  const tabLogin = button('auth-tab', [txt('LOG IN')], () => setMode('login'));
-  const tabSignup = button('auth-tab', [txt('SIGN UP')], () => setMode('signup'));
-  const errEn = txt('', 'auth-err-en');
-  const errKo = el('span', 'auth-err-ko');
-  const err = el('div', 'auth-err', [errEn, errKo]);
-  const submitLabel = txt('LOG IN');
+  const tabLogin = button('auth-tab', [txt('로그인')], () => setMode('login'));
+  const tabSignup = button('auth-tab', [txt('회원가입')], () => setMode('signup'));
+  const errText = txt('', 'auth-err-en');
+  const err = el('div', 'auth-err', [errText]);
+  const submitLabel = txt('로그인');
   const submit = button('auth-submit', [submitLabel], () => void send(), 'select');
-  const checking = el('div', 'auth-checking', [txt('SIGNING IN', 'auth-checking-t'), el('div', 'mm-dots', [el('i'), el('i'), el('i')])]);
+  const checking = el('div', 'auth-checking', [txt('로그인 중', 'auth-checking-t'), el('div', 'mm-dots', [el('i'), el('i'), el('i')])]);
   const panel = el('div', 'auth-panel panel', [
     el('div', 'auth-tabs', [tabLogin, tabSignup]),
-    field('ID', '아이디', idInput),
-    field('PASSWORD', '비밀번호', pwInput),
+    field('아이디', idInput),
+    field('비밀번호', pwInput),
     confirmField,
     err,
     submit,
     checking,
   ]);
 
-  const offlineNote = el('span', 'auth-off-note', ['NO SERVER? TRAINING WORKS OFFLINE · 서버 없이 연습장만']);
-  const offlineBtn = button('auth-offline', [iconEl('modeTraining'), txt('PLAY OFFLINE')], () => {
+  const offlineNote = el('span', 'auth-off-note', ['서버가 없어도 연습장은 할 수 있어요']);
+  const offlineBtn = button('auth-offline', [iconEl('modeTraining'), txt('오프라인으로 하기')], () => {
     setOfflineGuest(true);
     ctx.go.lobby();
   });
@@ -83,25 +81,23 @@ export function createLoginScreen(ctx: AppContext): Screen {
     confirmField.hidden = m !== 'signup';
     pwInput.autocomplete = m === 'signup' ? 'new-password' : 'current-password';
     pwInput.enterKeyHint = m === 'signup' ? 'next' : 'go';
-    submitLabel.textContent = m === 'login' ? 'LOG IN' : 'CREATE ACCOUNT';
+    submitLabel.textContent = m === 'login' ? '로그인' : '가입하기';
     showError(null);
   }
 
   function showError(code: AccountErrorCode | 'mismatch' | 'empty' | null) {
     root.classList.toggle('is-unreachable', code === 'network');
     if (!code) {
-      errEn.textContent = '';
-      errKo.textContent = '';
+      errText.textContent = '';
       return;
     }
-    const [en, ko] =
+    const text =
       code === 'mismatch'
-        ? ["PASSWORDS DON'T MATCH", '비밀번호가 서로 달라요']
+        ? '비밀번호가 서로 달라요'
         : code === 'empty'
-          ? ['ENTER ID AND PASSWORD', '아이디와 비밀번호를 넣어 주세요']
+          ? '아이디와 비밀번호를 넣어 주세요'
           : accountErrorText(code);
-    errEn.textContent = en;
-    errKo.textContent = ko;
+    errText.textContent = text;
     panel.classList.remove('shake-a', 'shake-b');
     void panel.offsetWidth;
     panel.classList.add('shake-a');
@@ -111,7 +107,7 @@ export function createLoginScreen(ctx: AppContext): Screen {
     busy = b;
     root.classList.toggle('is-busy', b);
     if (label) submitLabel.textContent = label;
-    else submitLabel.textContent = mode === 'login' ? 'LOG IN' : 'CREATE ACCOUNT';
+    else submitLabel.textContent = mode === 'login' ? '로그인' : '가입하기';
   }
 
   async function send() {
@@ -122,7 +118,7 @@ export function createLoginScreen(ctx: AppContext): Screen {
     if (mode === 'signup' && pw !== pw2Input.value) return showError('mismatch');
     for (const i of [idInput, pwInput, pw2Input]) i.blur();
     showError(null);
-    setBusy(true, mode === 'login' ? 'LOGGING IN…' : 'CREATING…');
+    setBusy(true, mode === 'login' ? '로그인 중…' : '가입하는 중…');
     try {
       if (mode === 'login') await login(id, pw);
       else await signup(id, pw);

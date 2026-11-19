@@ -90,7 +90,7 @@ export async function gotoLobby(page: Page) {
 
 export async function gotoFighters(page: Page) {
   await gotoLobby(page);
-  await page.locator('.side-btn', { hasText: 'FIGHTERS' }).tap();
+  await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fighters')).toBeVisible();
 }
 
@@ -101,7 +101,7 @@ export async function selectVolley(page: Page) {
   await expect(page.locator('.detail')).toBeVisible();
   await expect(page.locator('.detail-name')).toHaveText('VOLLEY');
   await page.locator('.btn-select').tap();
-  await expect(page.locator('.btn-select')).toHaveText('SELECTED');
+  await expect(page.locator('.btn-select')).toHaveText('선택됨');
 }
 
 type ToastRecord = { text: string; rendered: boolean };

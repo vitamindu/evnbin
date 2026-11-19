@@ -75,7 +75,7 @@ export function createFakeOnlineClient(): FakeOnlineClient {
         const f = FIGHTERS[(team * 2 + i) % FIGHTERS.length]!;
         r.players.push({
           id: `bot-${team}-${i}`,
-          name: `BOT ${f.name}`,
+          name: `봇 ${f.name}`,
           fighterId: f.id,
           team,
           ready: true,

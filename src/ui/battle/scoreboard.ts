@@ -29,7 +29,7 @@ export class Scoreboard {
     this.mineBar = el('i');
     this.theirsBar = el('i');
     this.time = txt('2:30', 'sb-time');
-    this.target = txt('FIRST TO 10', 'sb-target');
+    this.target = txt('10 KO 선승', 'sb-target');
     this.el = el('div', 'scoreboard', [
       el('div', 'sb-team sb-blue', [this.mine, el('span', 'sb-bar', [this.mineBar])]),
       el('div', 'sb-clock', [this.time, this.target]),
@@ -59,7 +59,7 @@ export class Scoreboard {
     }
     if (goal !== this.last.target) {
       this.last.target = goal;
-      this.target.textContent = goal > 0 ? `FIRST TO ${goal}` : 'MOST KOs';
+      this.target.textContent = goal > 0 ? `${goal} KO 선승` : 'KO 많은 팀 승리';
     }
     const secs = match.ticksLeft < 0 ? -1 : Math.ceil(match.ticksLeft / TICK_RATE);
     if (secs !== this.last.secs) {
@@ -124,7 +124,7 @@ export class KoFeed {
 export function fighterNameOf(state: SimView): NameOf {
   return (id) => {
     const u = state.getUnit(id);
-    return u?.type === 'fighter' ? getFighter(u.fighterId).name : 'DUMMY';
+    return u?.type === 'fighter' ? getFighter(u.fighterId).name : '허수아비';
   };
 }
 
@@ -144,7 +144,7 @@ export class MatchBanner {
   show(winner: Team | -1, myTeam: Team, score: [number, number]) {
     const outcome = winner === -1 ? 'draw' : winner === myTeam ? 'win' : 'lose';
     this.el.dataset.outcome = outcome;
-    this.title.textContent = outcome === 'win' ? 'VICTORY!' : outcome === 'lose' ? 'DEFEAT' : 'DRAW';
+    this.title.textContent = outcome === 'win' ? '승리!' : outcome === 'lose' ? '패배' : '무승부';
     const a = score[myTeam];
     const b = score[myTeam === 0 ? 1 : 0];
     this.sub.textContent = `${a} - ${b}`;
