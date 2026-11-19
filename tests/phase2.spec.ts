@@ -425,13 +425,13 @@ test('T-28 HINAKO super (dragged right) leaps its full super range and drops 4 b
   expect(land.x).toBeCloseTo(SPAWN.x + hs.range, 1);
   expect(land.y).toBeCloseTo(SPAWN.y, 6);
 
-  // bombs burst 0.5 s after take-off, on a 1-tile ring around the take-off point
+  // bombs burst `fuse` seconds after take-off, on a 1-tile ring around the take-off point
   await expect.poll(async () => (await events(page, m, 'explode')).length).toBe(4);
   const ex = await events(page, m, 'explode');
   for (const e of ex) {
     expect(Math.hypot(e.pos.x - SPAWN.x, e.pos.y - SPAWN.y)).toBeCloseTo(1, 3);
     expect(e.isSuper).toBe(true);
-    expect(e.tick - sup.tick).toBe(15);
+    expect(e.tick - sup.tick).toBe(Math.round((getFighter('hinako').super.fuse ?? 0) * 30));
   }
   await fingers.dispose();
 });
