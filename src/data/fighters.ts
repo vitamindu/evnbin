@@ -111,7 +111,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: 'Junkyard mechanic who fixes problems with a rivet cannon.',
     palette: { primary: '#ff8a2a', secondary: '#1aa39a', accent: '#ffd23f', skin: '#f2b48a', dark: '#6b2f0e' },
     hp: 3800,
-    moveSpeed: 1.96,
+    moveSpeed: 2.35,
     attack: {
       name: 'Rivet Spray',
       description: 'Fires a fan of 5 rivets. The closer the target, the more rivets hit.',
@@ -149,7 +149,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: 'Signal-tower sniper who never misses a beat.',
     palette: { primary: '#2fb8e8', secondary: '#1d2a52', accent: '#7cf3ff', skin: '#c98a5e', dark: '#0e1a3a' },
     hp: 2800,
-    moveSpeed: 2.1,
+    moveSpeed: 2.52,
     attack: {
       name: 'Pulse Burst',
       description: 'Fires 6 quick shots in a straight line, alternating left and right.',
@@ -188,7 +188,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: 'Quarry worker with stone fists and zero brakes.',
     palette: { primary: '#5cb847', secondary: '#8d909c', accent: '#ffcf4a', skin: '#e8a46f', dark: '#24461b' },
     hp: 5600,
-    moveSpeed: 2.1,
+    moveSpeed: 2.52,
     attack: {
       name: 'Rock Buster',
       description: 'Blasts 5 stone shards in a short, wide fan. Devastating up close.',
@@ -226,7 +226,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: 'Quiet sharpshooter of the blossom shrine. Distance is her friend.',
     palette: { primary: '#f29ac0', secondary: '#7a2e45', accent: '#ffd6e8', skin: '#f6dcd2', dark: '#3a1824' },
     hp: 2400,
-    moveSpeed: 1.96,
+    moveSpeed: 2.35,
     attack: {
       name: 'Blossom Round',
       description: 'A single long-range rifle shot. The farther it travels, the harder it hits.',
@@ -271,5 +271,5 @@ export const STAT_MAX = {
   hp: 6000,
   damage: 2400, // 한 번 공격(모든 투사체) 기준
   range: 7.5,
-  speed: 2.5,
+  speed: 3.0,
 };

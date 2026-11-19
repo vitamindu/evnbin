@@ -15,8 +15,8 @@ function rangeLabel(r: number) {
   return 'LONG';
 }
 function speedLabel(s: number) {
-  if (s < 1.89) return 'SLOW';
-  if (s < 2.05) return 'NORMAL';
+  if (s < 2.27) return 'SLOW';
+  if (s < 2.46) return 'NORMAL';
   return 'FAST';
 }
 
