@@ -111,6 +111,8 @@ export interface ShotSpec {
   aoeRadius: number;
   /** 거리 비례 피해: 사거리 끝에서의 피해량(기본 공격만) */
   damageFar?: number;
+  /** 모든 대상 관통 */
+  pierce: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime: number;
   /** leap: 폭탄이 터지기까지(초) */
@@ -132,6 +134,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       breaksWalls: s.breaksWalls,
       knockback: s.knockback,
       lateralOffset: s.lateralOffset ?? 0,
+      pierce: s.pierce ?? false,
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
       leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
       fuse: s.fuse ?? DEFAULT_FUSE,
@@ -150,6 +153,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     breaksWalls: false,
     knockback: 0,
     lateralOffset: a.lateralOffset ?? 0,
+    pierce: a.pierce ?? false,
     aoeRadius: a.aoeRadius ?? DEFAULT_LOB_AOE,
     damageFar: a.damageFar,
     leapTime: DEFAULT_LEAP_TIME,
@@ -466,7 +470,7 @@ export class Sim implements SimView {
       breaksWalls: spec.breaksWalls,
       knockback: spec.knockback,
       ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
-      pierce: false,
+      pierce: spec.pierce,
       hitIds: [],
     });
   }

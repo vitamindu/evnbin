@@ -45,6 +45,9 @@ export function createBattleScreen(ctx: AppContext) {
   const qa = new URLSearchParams(location.search).has('qa');
 
   const feedback = new BattleFeedback();
+  /** 체력이 낮을 때 맞으면 화면 가장자리가 붉게 번쩍인다 */
+  const LOW_HP = 0.3;
+  const lowHp = el('div', 'lowhp-vignette');
   const hud = new BattleHud((dead) => root.classList.toggle('is-dead', dead));
   const metrics = new UiMetrics(() => input.layout());
   const input: BattleInput = new BattleInput(metrics, {
@@ -70,7 +73,7 @@ export function createBattleScreen(ctx: AppContext) {
   const exitBtn = button('btn-battle-exit', [iconEl('back')], () => exit(), 'back');
   const label = txt('TRAINING YARD', 'battle-label');
   const controls = el('div', 'battle-controls', [input.moveStick.el, input.superStick.el, input.attackStick.el]);
-  const root = el('div', 'battle', [hud.el, controls, label, scoreboard.el, ping.el, feed.el, banner.el, exitBtn, netVeil]);
+  const root = el('div', 'battle', [lowHp, hud.el, controls, label, scoreboard.el, ping.el, feed.el, banner.el, exitBtn, netVeil]);
   if (navigator.maxTouchPoints > 0) root.classList.add('has-touch');
 
   function exit() {
@@ -182,6 +185,12 @@ export function createBattleScreen(ctx: AppContext) {
     s.onEvents = (events) => {
       hud.onEvents(events);
       feedback.onEvents(events, s.playerId);
+      const me = s.player;
+      if (me.alive && me.hp / me.maxHp <= LOW_HP && events.some((e) => e.type === 'hit' && e.targetId === s.playerId)) {
+        lowHp.classList.remove('is-on');
+        void lowHp.offsetWidth; // 애니메이션 다시 시작
+        lowHp.classList.add('is-on');
+      }
       if (teamfight) feed.onEvents(events, s.state, s.playerId, nameOf);
     };
     s.onFrame = () => {

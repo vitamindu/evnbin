@@ -828,3 +828,27 @@
   font-size: 20px;
   color: #dbe3ff;
 }
+
+/* 체력 30% 이하에서 맞으면 화면 가장자리가 붉게 번쩍인다 */
+.lowhp-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(220, 20, 40, 0.35) 78%, rgba(200, 0, 25, 0.75) 100%);
+  z-index: 1;
+}
+.lowhp-vignette.is-on {
+  animation: lowhp-flash 0.7s ease-out;
+}
+@keyframes lowhp-flash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

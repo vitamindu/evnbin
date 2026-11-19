@@ -44,6 +44,8 @@ const SHOT_COLOR: Record<string, string> = {
   boulder: '#4d5270',
   hinako: '#ec2a7c',
   dummy: '#cf1d2c',
+  /** 상대 팀 탄환은 캐릭터와 상관없이 빨간색 */
+  enemy: '#e01b2b',
 };
 
 /** 가로(u) 방향으로 앞→뒤 투명해지고, 세로(v) 가장자리가 부드러운 꼬리 텍스처 */
@@ -279,6 +281,8 @@ export class BattleView {
 
   private shotColor(owner: Unit | undefined): string {
     if (!owner) return SHOT_COLOR.dummy!;
+    const myTeam = this.units.get(this.followId)?.unit.team;
+    if (myTeam !== undefined && owner.team !== myTeam) return SHOT_COLOR.enemy!;
     return (owner.type === 'fighter' ? SHOT_COLOR[owner.fighterId] : SHOT_COLOR.dummy) ?? '#ff7a00';
   }
 

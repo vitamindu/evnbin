@@ -42,6 +42,8 @@ export interface AttackDef {
   reload: number;
   /** 적중 1회당 궁극기 충전량(0~1). count발 모두 맞으면 count배 */
   superChargePerHit: number;
+  /** true면 탄이 모든 대상을 관통한다 */
+  pierce?: boolean;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
   lateralOffset?: number;
   /** lob: 착탄 범위 반지름(타일) */
@@ -71,6 +73,8 @@ export interface SuperDef {
   aoeRadius?: number;
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일) */
   lateralOffset?: number;
+  /** true면 탄이 모든 대상을 관통한다(맞힌 대상마다 한 번씩 피해) */
+  pierce?: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime?: number;
   /** leap: 폭탄이 떨어져 터지기까지의 시간(초) */
@@ -177,6 +181,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       range: 7.7,
       breaksWalls: true,
       knockback: 0,
+      pierce: true,
     },
   },
   {
@@ -188,7 +193,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     tagline: '채석장 일꾼. 돌주먹에 브레이크는 없다.',
     palette: { primary: '#5cb847', secondary: '#8d909c', accent: '#ffcf4a', skin: '#e8a46f', dark: '#24461b' },
     hp: 5600,
-    moveSpeed: 2.52,
+    moveSpeed: 2.2,
     attack: {
       name: 'Rock Buster',
       description: '돌 파편 5개를 짧고 넓게 날린다. 붙으면 무시무시하다.',
