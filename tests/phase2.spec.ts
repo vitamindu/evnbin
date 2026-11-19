@@ -1,3 +1,4 @@
+import { getFighter } from '../src/data/fighters';
 import type { Page } from '@playwright/test';
 import {
   ATTACK_STICK,
@@ -358,7 +359,7 @@ test('T-26 RIVET super (dragged at the crates) breaks walls: wallsBroken event +
   await fingers.dispose();
 });
 
-test('T-27 BOULDER super (E key, auto-aim) dashes ~9 tiles', async ({ page }, testInfo) => {
+test('T-27 BOULDER super (E key, auto-aim) dashes its full super range', async ({ page }, testInfo) => {
   await openBattle(page, 'boulder');
   await setSuperCharge(page, 1);
   await expect(page.locator('.stick-super')).toHaveClass(/is-ready/);
@@ -380,15 +381,17 @@ test('T-27 BOULDER super (E key, auto-aim) dashes ~9 tiles', async ({ page }, te
   const end = rows.find((r) => r.tick > dash.at(-1)!.tick)!;
   const moved = Math.hypot(end.x - SPAWN.x, end.y - SPAWN.y);
   // range 9 at 9 tiles/s → ~30 ticks; walking would cover only ~3 tiles in that time
-  expect(moved, `dash distance (${dash.length} dash ticks)`).toBeGreaterThan(8.5);
-  expect(end.x).toBeCloseTo(SPAWN.x + 9, 1);
+  const bs = getFighter('boulder').super;
+  const dashTicks = (bs.range / bs.projectileSpeed) * 30;
+  expect(moved, `dash distance (${dash.length} dash ticks)`).toBeGreaterThan(bs.range - 0.5);
+  expect(end.x).toBeCloseTo(SPAWN.x + bs.range, 1);
   expect(end.y).toBeCloseTo(SPAWN.y, 6);
-  expect(dash.length).toBeGreaterThanOrEqual(25);
-  expect(dash.length).toBeLessThanOrEqual(35);
+  expect(dash.length).toBeGreaterThanOrEqual(Math.floor(dashTicks * 0.85));
+  expect(dash.length).toBeLessThanOrEqual(Math.ceil(dashTicks * 1.15));
   await shot(page, testInfo, '27-boulder-dash');
 });
 
-test('T-28 HINAKO super (dragged right) leaps over 7.5 tiles and drops 4 bombs at take-off', async ({ page }, testInfo) => {
+test('T-28 HINAKO super (dragged right) leaps its full super range and drops 4 bombs at take-off', async ({ page }, testInfo) => {
   await openBattle(page, 'hinako');
   await setSuperCharge(page, 1);
   await expect(page.locator('.stick-super')).toHaveClass(/is-ready/);
@@ -415,9 +418,11 @@ test('T-28 HINAKO super (dragged right) leaps over 7.5 tiles and drops 4 bombs a
   const rows = (await trace(page)).filter((r) => r.tick >= sup.tick);
   const leapTicks = rows.filter((r) => r.action === 'leap').length;
   const land = rows.find((r) => r.action === null)!;
-  expect(leapTicks, '0.7 s in the air').toBeGreaterThanOrEqual(19);
-  expect(leapTicks).toBeLessThanOrEqual(23);
-  expect(land.x).toBeCloseTo(SPAWN.x + 7.5, 1);
+  const hs = getFighter('hinako').super;
+  const airTicks = Math.round((hs.leapTime ?? 0) * 30);
+  expect(leapTicks, `${hs.leapTime} s in the air`).toBeGreaterThanOrEqual(airTicks - 2);
+  expect(leapTicks).toBeLessThanOrEqual(airTicks + 2);
+  expect(land.x).toBeCloseTo(SPAWN.x + hs.range, 1);
   expect(land.y).toBeCloseTo(SPAWN.y, 6);
 
   // bombs burst 0.5 s after take-off, on a 1-tile ring around the take-off point
