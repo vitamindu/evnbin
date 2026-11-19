@@ -7,7 +7,8 @@ import { getSettings, onSettingsChange } from '../../state/settings';
 import type { AppContext } from '../context';
 import { MODES, openModePicker } from '../overlays/modePicker';
 import { openSettings } from '../overlays/settings';
-import { comingSoon } from '../overlays/toast';
+import { comingSoon, toast } from '../overlays/toast';
+import { isOfflineGuest } from '../account/session';
 import { attachDrag, button, currencyBar, iconEl, roleChip, txt } from '../widgets';
 import type { IconName } from '../icons';
 
@@ -99,7 +100,15 @@ export function createLobbyScreen(ctx: AppContext): Screen {
   const playBtn = button(
     'btn-play',
     [txt('PLAY')],
-    () => (getSettings().playMode === 'teamfight' ? ctx.go.online() : ctx.go.battle()),
+    () => {
+      if (getSettings().playMode !== 'teamfight') return ctx.go.battle();
+      // 오프라인(게스트)으로 들어왔으면 온라인 전에 로그인
+      if (isOfflineGuest()) {
+        toast('LOG IN TO PLAY ONLINE · 온라인은 로그인 후');
+        return ctx.go.login();
+      }
+      ctx.go.online();
+    },
     'select',
   );
 

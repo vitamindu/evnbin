@@ -66,11 +66,21 @@ export async function openTitle(page: Page) {
   await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });
 }
 
-/** Title → tap → lobby. */
+/**
+ * Phase 4: after TAP TO START comes the login / sign-up screen. Offline suites skip it with
+ * PLAY OFFLINE (training only), which is always offered under the form.
+ */
+export async function passLogin(page: Page) {
+  await expect(page.locator('.login')).toBeVisible();
+  await page.locator('.auth-offline').tap();
+  await expect(page.locator('.lobby')).toBeVisible();
+}
+
+/** Title → tap → login (play offline) → lobby. */
 export async function tapToLobby(page: Page) {
   await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });
   await page.locator('.title').tap();
-  await expect(page.locator('.lobby')).toBeVisible();
+  await passLogin(page);
 }
 
 export async function gotoLobby(page: Page) {
@@ -121,10 +131,10 @@ export async function storedProfile(page: Page): Promise<{ selected?: string } |
   }, PROFILE_KEY);
 }
 
-export async function storedSettings(page: Page): Promise<{ quality?: string; showFps?: boolean } | null> {
+export async function storedSettings(page: Page): Promise<{ quality?: string; showFps?: boolean; playMode?: string } | null> {
   return page.evaluate((k) => {
     const raw = localStorage.getItem(k);
-    return raw ? (JSON.parse(raw) as { quality?: string; showFps?: boolean }) : null;
+    return raw ? (JSON.parse(raw) as { quality?: string; showFps?: boolean; playMode?: string }) : null;
   }, SETTINGS_KEY);
 }
 

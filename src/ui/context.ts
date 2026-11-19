@@ -20,6 +20,8 @@ export interface AppContext {
   overlayLayer: HTMLElement;
   portraits: Record<FighterId, string>;
   go: {
+    /** 로그인 / 회원가입(저장된 토큰이 있으면 자동 로그인 후 로비) */
+    login(): void;
     lobby(): void;
     fighters(): void;
     fighterDetail(id: FighterId): void;

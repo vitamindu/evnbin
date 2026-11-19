@@ -7,6 +7,7 @@ import {
   gotoLobby,
   lobbyLayoutProblems,
   openTitle,
+  passLogin,
   selectVolley,
   shot,
   storedProfile,
@@ -65,7 +66,7 @@ test('T-01 first launch: loading bar then TAP TO START, no console errors', asyn
 test('T-02 tap title goes to lobby with default fighter RIVET', async ({ page }, testInfo) => {
   await openTitle(page);
   await page.locator('.title').tap();
-  await expect(page.locator('.lobby')).toBeVisible();
+  await passLogin(page);
   await expect(page.locator('.title')).toHaveCount(0);
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'lobby');
   await expect(page.locator('.nameplate .np-name')).toHaveText('RIVET');
@@ -188,7 +189,6 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
     ['PARTY', page.locator('.side-btn', { hasText: 'PARTY' })],
     ['CREW', page.locator('.side-btn', { hasText: 'CREW' })],
     ['SEASON PASS', page.locator('.pass-card')],
-    ['MODE', page.locator('.mode-card')],
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],
     // Also "준비 중" per docs/02 §2 lobby table:
@@ -207,6 +207,24 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
       await expect(page.locator('.overlay'), `${label} → no popup`).toHaveCount(0);
     });
   }
+});
+
+test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING switches back', async ({ page }) => {
+  await gotoLobby(page);
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('TRAINING');
+  await page.locator('.mode-card').tap();
+  const picker = page.locator('.mp-panel');
+  await expect(picker).toBeVisible();
+  await expect(picker.locator('.mp-card')).toHaveCount(2);
+  await expect(picker.locator('.mp-card[data-mode="training"]')).toHaveClass(/is-selected/);
+  await picker.locator('.mp-card[data-mode="teamfight"]').tap();
+  await expect(picker).toHaveCount(0);
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('TEAM FIGHT');
+  expect((await storedSettings(page))?.playMode).toBe('teamfight');
+  await page.locator('.mode-card').tap();
+  await page.locator('.mp-card[data-mode="training"]').tap();
+  await expect(page.locator('.mode-card .mode-name')).toHaveText('TRAINING');
+  expect((await storedSettings(page))?.playMode).toBe('training');
 });
 
 test('T-09 PLAY opens the Training Yard battle and the back button returns to the lobby', async ({ page }, testInfo) => {
