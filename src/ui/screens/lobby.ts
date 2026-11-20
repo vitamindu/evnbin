@@ -109,7 +109,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     'btn-play',
     [txt('PLAY')],
     () => {
-      if (getSettings().playMode !== 'teamfight') return ctx.go.battle();
+      if (getSettings().playMode === 'training') return ctx.go.battle();
       // 오프라인(게스트)으로 들어왔으면 온라인 전에 로그인
       if (isOfflineGuest()) {
         toast('온라인은 로그인한 뒤에 할 수 있어요');
@@ -130,7 +130,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
       sideBtn('소식', 'news', comingSoon),
     ]),
     el('div', 'lb-side lb-side-right', [
-      sideBtn('친구', 'friends', comingSoon),
+      sideBtn('친구', 'friends', () => ctx.go.friends()),
       sideBtn('파티', 'party', comingSoon),
       sideBtn('크루', 'crew', comingSoon),
     ]),

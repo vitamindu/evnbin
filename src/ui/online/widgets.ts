@@ -1,7 +1,8 @@
 import { el } from '../../core/dom';
 import { getFighter, type FighterId } from '../../data/fighters';
 import type { Team } from '../../game/types';
-import type { OnlineStatus } from '../../net/api';
+import type { MatchMode } from '../../game/types';
+import type { OnlineClient, OnlineStatus } from '../../net/api';
 import type { AppContext } from '../context';
 import { txt } from '../widgets';
 
@@ -97,4 +98,9 @@ export function cleanCode(raw: string): string {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
     .slice(0, 4);
+}
+
+/** 방장: 방의 경기 방식 바꾸기(OnlineClient.setMode가 아직 계약에 없을 수 있어 선택적으로 부른다) */
+export function setRoomMode(client: OnlineClient, mode: MatchMode) {
+  (client as OnlineClient & { setMode?: (m: MatchMode) => void }).setMode?.(mode);
 }

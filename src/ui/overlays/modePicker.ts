@@ -40,7 +40,7 @@ export const MODES: Record<MatchMode, ModeInfo> = {
     id: 'crystal',
     name: '크리스탈 러시',
     map: 'BLOSSOM ARENA',
-    icon: 'modeTeamfight',
+    icon: 'modeRush',
     online: true,
     blurb: '가운데 크리스탈을 모아 끝까지 지켜요',
     facts: ['3 대 3', '10개 + 12초 버티기'],
@@ -78,7 +78,7 @@ export function openModePicker(ctx: AppContext, onPicked?: (m: MatchMode) => voi
   const overlay = el('div', 'overlay', [
     el('div', 'mp-panel', [
       el('div', 'mp-head', [txt('모드 선택', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
-      el('div', 'mp-cards', [card(MODES.training), card(MODES.teamfight)]),
+      el('div', 'mp-cards', [card(MODES.training), card(MODES.teamfight), card(MODES.crystal)]),
     ]),
   ]);
   overlay.addEventListener('click', (e) => {

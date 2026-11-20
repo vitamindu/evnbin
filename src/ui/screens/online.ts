@@ -9,7 +9,8 @@ import { getOnlineClient } from '../online/clientFactory';
 import { errorFrom, errorText } from '../online/errors';
 import { createHubPanel } from '../online/hubPanel';
 import { createRoomPanel } from '../online/roomPanel';
-import { netChip } from '../online/widgets';
+import { netChip, setRoomMode } from '../online/widgets';
+import { getSettings } from '../../state/settings';
 import { openSettings } from '../overlays/settings';
 import { toast } from '../overlays/toast';
 import { button, header, txt } from '../widgets';
@@ -140,6 +141,9 @@ export function createOnlineScreen(ctx: AppContext): Screen {
     try {
       if (!(await ready())) return;
       await getClient().createRoom();
+      // 로비에서 크리스탈 러시를 골랐으면 방도 그 모드로
+      const mode = getSettings().playMode;
+      if (mode === 'crystal') setRoomMode(getClient(), mode);
       if (shown) setView('room');
     } catch (e) {
       toast(errorFrom(e, '방을 만들지 못했어요'));

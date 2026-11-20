@@ -35,10 +35,13 @@ export function createLoginScreen(ctx: AppContext): Screen {
   };
   const idInput = input('text', 'username', 'ID');
   idInput.maxLength = 12;
+  const nickInput = input('text', 'nickname', 'Nickname');
+  nickInput.maxLength = 10;
   const pwInput = input('password', 'current-password', 'Password');
   const pw2Input = input('password', 'new-password', 'Confirm password');
   const field = (label: string, i: HTMLInputElement) => el('label', 'auth-field', [txt(label, 'auth-label'), el('span', 'auth-box', [i])]);
   const confirmField = field('비밀번호 확인', pw2Input);
+  const nickField = field('닉네임 (다른 사람에게 보이는 이름)', nickInput);
 
   const tabLogin = button('auth-tab', [txt('로그인')], () => setMode('login'));
   const tabSignup = button('auth-tab', [txt('회원가입')], () => setMode('signup'));
@@ -50,6 +53,7 @@ export function createLoginScreen(ctx: AppContext): Screen {
   const panel = el('div', 'auth-panel panel', [
     el('div', 'auth-tabs', [tabLogin, tabSignup]),
     field('아이디', idInput),
+    nickField,
     field('비밀번호', pwInput),
     confirmField,
     err,
@@ -79,13 +83,14 @@ export function createLoginScreen(ctx: AppContext): Screen {
     tabLogin.classList.toggle('is-on', m === 'login');
     tabSignup.classList.toggle('is-on', m === 'signup');
     confirmField.hidden = m !== 'signup';
+    nickField.hidden = m !== 'signup';
     pwInput.autocomplete = m === 'signup' ? 'new-password' : 'current-password';
     pwInput.enterKeyHint = m === 'signup' ? 'next' : 'go';
     submitLabel.textContent = m === 'login' ? '로그인' : '가입하기';
     showError(null);
   }
 
-  function showError(code: AccountErrorCode | 'mismatch' | 'empty' | null) {
+  function showError(code: AccountErrorCode | 'mismatch' | 'empty' | 'noNick' | null) {
     root.classList.toggle('is-unreachable', code === 'network');
     if (!code) {
       errText.textContent = '';
@@ -94,7 +99,9 @@ export function createLoginScreen(ctx: AppContext): Screen {
     const text =
       code === 'mismatch'
         ? '비밀번호가 서로 달라요'
-        : code === 'empty'
+        : code === 'noNick'
+          ? '닉네임을 넣어 주세요'
+          : code === 'empty'
           ? '아이디와 비밀번호를 넣어 주세요'
           : accountErrorText(code);
     errText.textContent = text;
@@ -115,13 +122,15 @@ export function createLoginScreen(ctx: AppContext): Screen {
     const id = idInput.value.trim();
     const pw = pwInput.value;
     if (!id || !pw) return showError('empty');
+    const nick = nickInput.value.trim();
+    if (mode === 'signup' && !nick) return showError('noNick');
     if (mode === 'signup' && pw !== pw2Input.value) return showError('mismatch');
-    for (const i of [idInput, pwInput, pw2Input]) i.blur();
+    for (const i of [idInput, nickInput, pwInput, pw2Input]) i.blur();
     showError(null);
     setBusy(true, mode === 'login' ? '로그인 중…' : '가입하는 중…');
     try {
       if (mode === 'login') await login(id, pw);
-      else await signup(id, pw);
+      else await signup(id, pw, nick);
       setOfflineGuest(false);
       pwInput.value = '';
       pw2Input.value = '';
@@ -136,6 +145,10 @@ export function createLoginScreen(ctx: AppContext): Screen {
   idInput.enterKeyHint = 'next';
   pw2Input.enterKeyHint = 'go';
   idInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') (mode === 'signup' ? nickInput : pwInput).focus();
+  });
+  nickInput.enterKeyHint = 'next';
+  nickInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') pwInput.focus();
   });
   pwInput.addEventListener('keydown', (e) => {
@@ -177,7 +190,7 @@ export function createLoginScreen(ctx: AppContext): Screen {
     },
     onHide() {
       shown = false;
-      for (const i of [idInput, pwInput, pw2Input]) i.blur();
+      for (const i of [idInput, nickInput, pwInput, pw2Input]) i.blur();
     },
   };
 }

@@ -5,7 +5,7 @@ import { getServerUrl, setServerUrl } from '../../net/config';
 import { resetProfile } from '../../state/profile';
 import { getSettings, updateSettings } from '../../state/settings';
 import type { AppContext } from '../context';
-import { getAccount, logout } from '../account/accountApi';
+import { accountErrorCode, accountErrorText, changeNickname, getAccount, logout } from '../account/accountApi';
 import { getOnlineClient } from '../online/clientFactory';
 import { toast } from './toast';
 import { button, iconEl, txt } from '../widgets';
@@ -104,6 +104,7 @@ export function openSettings(ctx: AppContext) {
   // 계정: 이름 + 로그아웃(로그인 안 했으면 OFFLINE + 로그인)
   const acct = getAccount();
   const accountCtl = el('div', 'set-account', [
+    acct ? txt('아이디', 'set-acct-cap') : null,
     txt(acct ? acct.username : '오프라인', `set-acct-name${acct ? '' : ' is-off'}`),
     button(`btn-toggle ${acct ? 'btn-danger btn-logout' : 'btn-login'}`, [txt(acct ? '로그아웃' : '로그인')], async () => {
       overlay.remove();
@@ -118,6 +119,45 @@ export function openSettings(ctx: AppContext) {
     }),
   ]);
 
+  // 닉네임 변경(로그인 중일 때만)
+  const nick = el('input', 'set-input set-nick');
+  nick.type = 'text';
+  nick.maxLength = 10;
+  nick.spellcheck = false;
+  nick.autocomplete = 'off';
+  nick.enterKeyHint = 'done';
+  nick.setAttribute('aria-label', 'Nickname');
+  nick.value = acct?.profile.name ?? '';
+  let saving = false;
+  const saveNick = async () => {
+    const v = nick.value.trim();
+    if (saving || !acct) return;
+    if (v === getAccount()?.profile.name) {
+      toast('지금 쓰는 닉네임이에요');
+      return;
+    }
+    saving = true;
+    nickSave.classList.add('is-disabled');
+    try {
+      await changeNickname(v);
+      nick.value = getAccount()?.profile.name ?? v;
+      toast('닉네임을 바꿨어요');
+    } catch (e) {
+      toast(accountErrorText(accountErrorCode(e)));
+    } finally {
+      saving = false;
+      nickSave.classList.remove('is-disabled');
+    }
+  };
+  nick.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      nick.blur();
+      void saveNick();
+    }
+  });
+  const nickSave = button('btn-toggle btn-nick-save', [txt('저장')], () => void saveNick());
+  const nickCtl = el('div', 'set-account', [nick, nickSave]);
+
   const dpr = window.devicePixelRatio || 1;
   const info = el('p', 'set-info', [
     `${GAME_TITLE} v${GAME_VERSION} · screen ${window.innerWidth}×${window.innerHeight} @${dpr}x` +
@@ -131,6 +171,7 @@ export function openSettings(ctx: AppContext) {
       row('fullscreen', '전체 화면', fullscreen),
       row('graphics', '그래픽', quality),
       row('fps', 'FPS 표시', fps),
+      acct ? row('nickname', '닉네임', nickCtl) : null,
       acct ? null : row('reset', '진행 초기화', reset),
       row('server', '서버', server),
       info,

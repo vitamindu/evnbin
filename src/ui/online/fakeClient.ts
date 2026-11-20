@@ -1,5 +1,5 @@
 import { FIGHTERS, type FighterId } from '../../data/fighters';
-import type { Team } from '../../game/types';
+import type { MatchMode, Team } from '../../game/types';
 import type { OnlineClient, OnlineEvents, OnlineStatus } from '../../net/api';
 import type { MatchResult, MatchStartInfo, PlayerStats, RoomPlayer, RoomState } from '../../net/protocol';
 import { FakeOnlineSession } from './fakeSession';
@@ -24,6 +24,7 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 type Listeners = { [K in keyof OnlineEvents]?: Set<(v: OnlineEvents[K]) => void> };
 
 export interface FakeOnlineClient extends OnlineClient {
+  setMode(mode: MatchMode): void;
   finishMatch(demo?: boolean): void;
   dropConnection(): void;
   emitError(code: string): void;
@@ -283,6 +284,22 @@ export function createFakeOnlineClient(): FakeOnlineClient {
       if (!room || !p?.host) return;
       room.fillBots = fill;
       later(60, publish);
+    },
+
+    setMode(mode) {
+      const p = me();
+      if (!room || !p) return;
+      if (!p.host) return emit('error', { code: 'not_host', message: 'only the host can change the mode' });
+      if (mode !== 'teamfight' && mode !== 'crystal') return;
+      room.mode = mode;
+      for (const q of room.players) if (!q.bot && q.id !== ME) q.ready = false;
+      later(60, publish);
+      // 친구들은 잠시 뒤 다시 준비
+      later(1500, () => {
+        if (!room) return;
+        for (const q of room.players) if (q.id !== ME) q.ready = true;
+        publish();
+      });
     },
 
     setReady(ready) {

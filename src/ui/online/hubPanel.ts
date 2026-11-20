@@ -30,7 +30,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
   nameInput.setAttribute('aria-label', 'Your name');
   const commitName = () => {
     const acct = getAccount();
-    if (acct) return acct.username;
+    if (acct) return acct.profile.name;
     const v = cleanName(nameInput.value) || '플레이어';
     nameInput.value = v;
     if (v !== getProfile().name) {
@@ -148,7 +148,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
     const acct = getAccount();
     nameBox.hidden = !!acct;
     acctBox.hidden = !acct;
-    acctName.textContent = acct?.username ?? '';
+    acctName.textContent = acct?.profile.name ?? '';
     if (document.activeElement !== nameInput) nameInput.value = p.name;
     const f = getFighter(p.selected);
     pfBox.replaceChildren(portrait(ctx, f.id, 'portrait hub-portrait'));

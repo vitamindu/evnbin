@@ -10,7 +10,7 @@ import type { AppContext } from '../context';
 import { openFighterPicker } from '../overlays/fighterPicker';
 import { toast } from '../overlays/toast';
 import { button, iconEl, txt } from '../widgets';
-import { copyText, portrait, sideClass } from './widgets';
+import { copyText, portrait, setRoomMode, sideClass } from './widgets';
 
 /**
  * 방 화면: 가운데 위 방 코드(복사), 왼쪽 TEAM A / 오른쪽 TEAM B 슬롯 3칸씩, 가운데 맵 미리보기,
@@ -96,11 +96,25 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
   mini.width = 264;
   mini.height = 152;
   const mapName = txt('', 'room-map-name');
-  const center = el('div', 'room-center', [
-    txt('VS', 'room-vs'),
-    el('div', 'room-map panel', [mini, mapName]),
-    el('div', 'room-facts', [txt('10 KO 선승', 'room-fact'), txt('2:30', 'room-fact')]),
-  ]);
+  // 경기 방식: 방장만 바꿀 수 있고, 모두에게 지금 모드가 보인다
+  const modeBtn = (mode: 'teamfight' | 'crystal', label: string, ico: 'modeTeamfight' | 'modeRush') => {
+    const b = button('room-mode-btn', [iconEl(ico), txt(label)], () => {
+      const c = getClient();
+      if (!c.room || c.room.mode === mode) return;
+      if (!myPlayer(c)?.host) {
+        toast('방장만 모드를 바꿀 수 있어요');
+        return;
+      }
+      setRoomMode(c, mode);
+    });
+    b.dataset.mode = mode;
+    return b;
+  };
+  const modeTeam = modeBtn('teamfight', '팀 대결', 'modeTeamfight');
+  const modeRush = modeBtn('crystal', '크리스탈 러시', 'modeRush');
+  const modeSwitch = el('div', 'room-mode', [modeTeam, modeRush]);
+  const facts = el('div', 'room-facts');
+  const center = el('div', 'room-center', [txt('VS', 'room-vs'), modeSwitch, el('div', 'room-map panel', [mini, mapName]), facts]);
 
   // ── 아래 줄
   const switchBtn = button('room-switch', [iconEl('swap'), txt('팀 바꾸기')], () => {
@@ -239,6 +253,17 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     }
 
     const host = !!me?.host;
+    const crystal = room.mode === 'crystal';
+    modeTeam.classList.toggle('is-on', !crystal);
+    modeRush.classList.toggle('is-on', crystal);
+    modeSwitch.classList.toggle('is-locked', !host);
+    const factKey = `${room.mode}`;
+    if (facts.dataset.mode !== factKey) {
+      facts.dataset.mode = factKey;
+      facts.replaceChildren(
+        ...(crystal ? ['크리스탈 10개 + 12초', '3:00'] : ['10 KO 선승', '2:30']).map((t) => txt(t, 'room-fact')),
+      );
+    }
     const lobby = room.phase === 'lobby';
     botsState.textContent = room.fillBots ? '켬' : '끔';
     botsBtn.classList.toggle('is-on', room.fillBots);

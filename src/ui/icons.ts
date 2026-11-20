@@ -120,6 +120,27 @@ export const ICONS = {
       `<g transform="rotate(14 33 27)"><path d="M33 11l10 4v8c0 8-4.5 12.5-10 15.5C27.5 35.5 23 31 23 23v-8z" fill="#ff5d5d" ${S}/></g>` +
       `<path d="M24 1.5l2.6 5.2 5.7.8-4.2 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.2-4 5.7-.8z" fill="#ffd34d" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/>`,
   ),
+  /** 크리스탈 러시: 보라 크리스탈 하나(HUD·머리 위 개수) */
+  rushGem: svg(
+    `<path d="M24 3l13 11-13 31L11 14z" fill="#c38bff" ${S}/>` +
+      `<path d="M11 14h26M24 3l-5 11 5 31 5-31z" fill="none" stroke="#7a3fd0" stroke-width="2" stroke-linejoin="round"/>` +
+      `<path d="M19 9l-3 4" stroke="#f3e6ff" stroke-width="2.5" stroke-linecap="round"/>`,
+  ),
+  /** 크리스탈 러시 모드: 큰 크리스탈 + 작은 크리스탈 둘 + 반짝임 */
+  modeRush: svg(
+    `<path d="M10 22l6 5-6 15-6-15z" fill="#9fd8ff" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>` +
+      `<path d="M38 22l6 5-6 15-6-15z" fill="#ff9fd0" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>` +
+      `<path d="M24 5l11 10-11 29-11-29z" fill="#c38bff" ${S}/>` +
+      `<path d="M13 15h22M24 5l-4 10 4 29 4-29z" fill="none" stroke="#7a3fd0" stroke-width="2" stroke-linejoin="round"/>` +
+      `<path d="M41 6v8M37 10h8" stroke="#ffd34d" stroke-width="3" stroke-linecap="round"/>`,
+  ),
+  /** 새로 고침 */
+  refresh: svg(
+    `<path d="M38 20A15 15 0 1 0 39 30" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round"/>` +
+      `<path d="M38 20A15 15 0 1 0 39 30" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>` +
+      `<path d="M30 17h10V7" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `<path d="M30 17h10V7" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
   // 온라인 방
   copy: svg(
     `<rect x="17" y="5" width="24" height="29" rx="5" fill="#c9d3ff" ${S}/>` +

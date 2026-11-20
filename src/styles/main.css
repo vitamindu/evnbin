@@ -646,6 +646,9 @@ img {
   color: #6ff0d4;
   white-space: nowrap;
 }
+.mode-card[data-mode='crystal'] {
+  background: linear-gradient(100deg, #5a2fae 0%, #2a1f78 55%, #1b2669 100%);
+}
 .mode-card[data-mode='training'] .mode-tag {
   background: #5a6390;
 }
@@ -1276,7 +1279,7 @@ img {
 /* 방: 가운데 열(맵 미리보기) 아래 */
 .room-ranked {
   position: absolute;
-  top: 496px;
+  top: 560px;
   left: 50%;
   max-width: 300px;
   transform: translateX(-50%);
