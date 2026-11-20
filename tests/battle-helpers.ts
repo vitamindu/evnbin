@@ -2,6 +2,8 @@ import type { CDPSession, Page } from '@playwright/test';
 import type { BattleSession } from '../src/battle/session';
 import type { FighterId } from '../src/data/fighters';
 import type { SimEvent, Vec2 } from '../src/game/types';
+import { TRAINING_YARD } from '../src/data/maps/training';
+import { Grid, Tile, circleBlocked, hasLineOfSight } from '../src/game/world';
 import { PROFILE_KEY, expect, tapToLobby } from './fixtures';
 
 /**
@@ -17,8 +19,89 @@ export const NAMES: Record<FighterId, string> = { rivet: 'RIVET', volley: 'VOLLE
 export const MAX_HP: Record<FighterId, number> = { rivet: 3800, volley: 2800, boulder: 5600, hinako: 2400 };
 export const FIGHTER_IDS: FighterId[] = ['rivet', 'volley', 'boulder', 'hinako'];
 
-/** TRAINING YARD (src/data/maps/training.ts): team-0 spawn `A` at tile (3, 9) → centre (3.5, 9.5). */
-export const SPAWN: Vec2 = { x: 3.5, y: 9.5 };
+/**
+ * TRAINING YARD facts derived from the map definition (no literal coordinates: the map can be redrawn).
+ * Uses the same pure world code the sim uses.
+ */
+export const YARD = new Grid(TRAINING_YARD);
+/** team-0 spawn (first `A`) */
+export const SPAWN: Vec2 = { ...YARD.teamSpawns[0][0]! };
+export const DUMMIES = YARD.dummySpawns.map((d) => ({ pos: { ...d.pos }, behavior: d.behavior }));
+export const TURRET_RANGE_TILES = 8;
+
+const free = (p: Vec2, r = 0.45) => !circleBlocked(YARD, p.x, p.y, r);
+export const circleFree = free;
+const floorCentres = (): Vec2[] => {
+  const out: Vec2[] = [];
+  for (let y = 0; y < YARD.height; y++)
+    for (let x = 0; x < YARD.width; x++) if (YARD.get(x, y) === Tile.Floor) out.push({ x: x + 0.5, y: y + 0.5 });
+  return out;
+};
+const d2 = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/** Breakable wall tile nearest the spawn whose centre is reachable by a straight shot (clear line up to the wall). */
+export function nearestBreakableWall(maxDist: number): { tile: [number, number]; centre: Vec2 } {
+  let best: { tile: [number, number]; centre: Vec2; d: number } | null = null;
+  for (let y = 0; y < YARD.height; y++)
+    for (let x = 0; x < YARD.width; x++) {
+      if (YARD.get(x, y) !== Tile.Wall) continue;
+      const c = { x: x + 0.5, y: y + 0.5 };
+      const d = d2(SPAWN, c);
+      if (d > maxDist || (best && d >= best.d)) continue;
+      const k = (d - 0.75) / d; // stop just before the wall tile
+      if (!hasLineOfSight(YARD, SPAWN, { x: SPAWN.x + (c.x - SPAWN.x) * k, y: SPAWN.y + (c.y - SPAWN.y) * k })) continue;
+      best = { tile: [x, y], centre: c, d };
+    }
+  if (!best) throw new Error('no breakable wall in reach of the spawn');
+  return best;
+}
+
+/**
+ * A free, open floor spot (not bush) 3–4.5 tiles from `target` with line of sight, where `target` is the
+ * nearest dummy, and (unless wanted) outside turret range.
+ */
+export function standNear(target: Vec2, opts: { nearTurretOk?: boolean } = {}): Vec2 {
+  const turrets = DUMMIES.filter((d) => d.behavior === 'turret').map((d) => d.pos);
+  const cands = floorCentres().filter((p) => {
+    const d = d2(p, target);
+    if (d < 3 || d > 4.5 || !free(p) || !hasLineOfSight(YARD, p, target)) return false;
+    if (DUMMIES.some((o) => d2(o.pos, target) > 0.01 && d2(o.pos, p) <= d + 0.5)) return false;
+    if (!opts.nearTurretOk && turrets.some((t) => d2(t, p) <= TURRET_RANGE_TILES + 1)) return false;
+    return true;
+  });
+  if (!cands.length) throw new Error(`no spot near ${JSON.stringify(target)}`);
+  // prefer an oblique angle so auto-aim is distinguishable from the default facing
+  cands.sort((a, b) => Math.abs(Math.abs(b.x - target.x) - Math.abs(b.y - target.y)) - Math.abs(Math.abs(a.x - target.x) - Math.abs(a.y - target.y)));
+  return cands.find((p) => Math.abs(p.x - target.x) >= 1 && Math.abs(p.y - target.y) >= 1) ?? cands[0]!;
+}
+
+/** Idle dummy that has a stand spot (out of turret range) next to it. */
+export function idleDummyWithSpot(): { dummy: Vec2; spot: Vec2 } {
+  for (const d of DUMMIES.filter((x) => x.behavior === 'idle')) {
+    try {
+      return { dummy: d.pos, spot: standNear(d.pos) };
+    } catch {
+      /* try the next one */
+    }
+  }
+  throw new Error('no idle dummy with a free spot');
+}
+
+/** Free spot ~3 tiles from the turret with a clear line of sight (inside its range), not in a bush. */
+export function turretSpot(): { turret: Vec2; spot: Vec2 } {
+  const turret = DUMMIES.find((d) => d.behavior === 'turret')!.pos;
+  const spot = floorCentres()
+    .filter((p) => free(p) && d2(p, turret) >= 2.5 && d2(p, turret) <= 4 && hasLineOfSight(YARD, p, turret))
+    .sort((a, b) => Math.abs(d2(a, turret) - 3) - Math.abs(d2(b, turret) - 3))[0];
+  if (!spot) throw new Error('no spot near the turret');
+  return { turret, spot };
+}
+
+/** Whether a straight move of a circle (radius r) from `a` by `dist` along `dir` stays clear. */
+export function clearPath(a: Vec2, dir: number, dist: number, r: number) {
+  for (let t = 0; t <= dist; t += 0.05) if (!free({ x: a.x + Math.cos(dir) * t, y: a.y + Math.sin(dir) * t }, r)) return false;
+  return true;
+}
 /** Design-px centres from docs/03 / phase2-plan at 1280×800 (scale 1, so also CSS px). */
 export const ATTACK_STICK: Vec2 = { x: 1140, y: 640 };
 export const SUPER_BTN: Vec2 = { x: 1010, y: 700 };

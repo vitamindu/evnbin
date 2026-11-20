@@ -6,7 +6,13 @@ import {
   Fingers,
   MAX_HP,
   NAMES,
+  DUMMIES,
   SPAWN,
+  circleFree,
+  clearPath,
+  idleDummyWithSpot,
+  nearestBreakableWall,
+  turretSpot,
   SUPER_BTN,
   aimState,
   angleClose,
@@ -36,15 +42,16 @@ import { expect, shot, tapToLobby, test } from './fixtures';
  * Every test opens `/?qa` so the running BattleSession is readable as `window.__fgBattle`.
  * The fixture fails a test on any console.error / page error.
  *
- * Map landmarks used below (src/data/maps/training.ts, tile centres):
- *  spawn A (3.5, 9.5) · breakable crates # (7..8, 5..6) · idle dummy (25.5, 9.5) · turret (30.5, 12.5)
+ * Map positions (spawn, dummies, walls, stand spots) are derived from TRAINING_YARD at runtime
+ * (tests/battle-helpers.ts), never hardcoded, and aim directions are computed from them.
  */
 
 // swiftshader is slow and the sim only advances ~10-17 ticks per real second here.
 test.describe.configure({ timeout: 120_000 });
 
-const IDLE_DUMMY = { x: 25.5, y: 9.5 };
-const TURRET = { x: 30.5, y: 12.5 };
+/** Team-0 default facing (straight up on the vertical maps), read from a fresh fighter. */
+const facingAtSpawn = async (page: Page) => (await player(page)).facing;
+const dirTo = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.atan2(b.y - a.y, b.x - a.x);
 
 /** Id of the unit standing at a map position (dummies don't move except patrol). */
 async function unitIdAt(page: Page, p: { x: number; y: number }) {
@@ -86,7 +93,7 @@ for (const id of FIGHTER_IDS) {
     const units = await page.evaluate(() =>
       (window as QaWindow).__fgBattle!.sim.units.map((u) => (u.type === 'dummy' ? u.behavior : u.type)),
     );
-    expect(units).toEqual(['fighter', 'idle', 'idle', 'idle', 'turret', 'patrol']);
+    expect(units).toEqual(['fighter', ...DUMMIES.map((d) => d.behavior)]);
 
     // The loop keeps ticking and the own bar shows full HP + 3 full ammo cells.
     await waitTicks(page, 15);
@@ -198,12 +205,13 @@ test('T-22 touch: floating move stick appears under the finger, dead zone, follo
 test('T-23 tap the attack stick: auto-aim shot, ammo cell used; with no ammo → noAmmo + ammo bar shakes', async ({ page }) => {
   await openBattle(page);
   await waitFullAmmo(page);
+  const facing = await facingAtSpawn(page);
   const since = await eventMark(page);
 
   await page.touchscreen.tap(ATTACK_STICK.x, ATTACK_STICK.y);
   const atk = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: false }, since);
-  // no enemy within 7.5 tiles of the spawn → fires the way the fighter faces (+x)
-  expect(angleClose(atk.dir, 0)).toBe(true);
+  // no enemy in range of the spawn → fires the way the fighter faces
+  expect(angleClose(atk.dir, facing)).toBe(true);
   const row = (await trace(page)).find((r) => r.tick === atk.tick)!;
   expect(row.ammo).toBeGreaterThanOrEqual(2);
   expect(row.ammo).toBeLessThan(2.1);
@@ -313,33 +321,31 @@ test('T-25 super button: grey + denied while charge < 1, ring shows charge, glow
   expect(await btn.locator('.super-glow').evaluate((e) => getComputedStyle(e).animationName)).toBe('super-glow');
   await shot(page, testInfo, '25-super-ready');
 
+  const facing = await facingAtSpawn(page);
   m = await eventMark(page);
   await page.touchscreen.tap(SUPER_BTN.x, SUPER_BTN.y);
   const sup = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: true }, m);
-  expect(angleClose(sup.dir, 0), 'auto-aimed super with no target goes the facing way').toBe(true);
+  expect(angleClose(sup.dir, facing), 'auto-aimed super with no target goes the facing way').toBe(true);
   expect((await player(page)).superCharge).toBe(0);
   await expect(btn).toHaveClass(/is-charging/);
 });
 
 test('T-26 RIVET super (dragged at the crates) breaks walls: wallsBroken event + grid tiles become floor', async ({ page }, testInfo) => {
   await openBattle(page, 'rivet');
-  const crates = [
-    [7, 5],
-    [8, 5],
-    [7, 6],
-    [8, 6],
-  ];
+  const wall = nearestBreakableWall(getFighter('rivet').super.range - 0.5);
+  const crates = [wall.tile];
   const tilesNow = () =>
     page.evaluate((ts) => ts.map(([x, y]) => (window as QaWindow).__fgBattle!.sim.grid.get(x!, y!) as number), crates);
-  expect(await tilesNow(), 'crates are breakable walls (Tile.Wall = 1)').toEqual([1, 1, 1, 1]);
+  expect(await tilesNow(), 'target is a breakable wall (Tile.Wall = 1)').toEqual([1]);
+  const aimDir = dirTo(SPAWN, wall.centre);
   const version0 = await page.evaluate(() => (window as QaWindow).__fgBattle!.sim.grid.version);
   await setSuperCharge(page, 1);
   await expect(page.locator('.stick-super')).toHaveClass(/is-ready/);
 
-  // spawn (3.5, 9.5) → crate corner (7.5, 5.5) is straight up-right; drag the super stick that way
+  // drag the super stick from the spawn toward the nearest breakable wall (screen x/y = map x/y)
   const fingers = await Fingers.create(page);
   await fingers.down(1, SUPER_BTN.x, SUPER_BTN.y);
-  await fingers.move(1, SUPER_BTN.x + 60, SUPER_BTN.y - 60, 4);
+  await fingers.move(1, SUPER_BTN.x + Math.cos(aimDir) * 85, SUPER_BTN.y + Math.sin(aimDir) * 85, 4);
   await expect(page.locator('.stick-super')).toHaveClass(/is-aiming/);
   await expect.poll(async () => (await aimState(page)).shapes).toEqual(['rivet|super']);
   await shot(page, testInfo, '26-rivet-super-aim');
@@ -347,7 +353,7 @@ test('T-26 RIVET super (dragged at the crates) breaks walls: wallsBroken event +
   await fingers.up(1);
 
   const sup = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: true }, m);
-  expect(angleClose(sup.dir, -Math.PI / 4)).toBe(true);
+  expect(angleClose(sup.dir, aimDir, 0.03), `dir ${sup.dir} vs ${aimDir}`).toBe(true);
   const broken = await waitForEvent(page, { type: 'wallsBroken' }, m);
   const brokenTiles = broken.tiles.map((t) => `${t.x},${t.y}`);
   expect(brokenTiles.some((t) => crates.some(([x, y]) => t === `${x},${y}`)), `broken ${brokenTiles}`).toBe(true);
@@ -363,11 +369,14 @@ test('T-27 BOULDER super (E key, auto-aim) dashes its full super range', async (
   await openBattle(page, 'boulder');
   await setSuperCharge(page, 1);
   await expect(page.locator('.stick-super')).toHaveClass(/is-ready/);
+  const facing = await facingAtSpawn(page);
+  const bs = getFighter('boulder').super;
+  expect(clearPath(SPAWN, facing, bs.range, 0.5), 'test premise: dash lane from the spawn is open').toBe(true);
   const m = await eventMark(page);
   await page.keyboard.press('KeyE');
   const sup = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: true }, m);
-  // nothing within 9 tiles → facing (+x)
-  expect(angleClose(sup.dir, 0)).toBe(true);
+  // nothing in range → facing
+  expect(angleClose(sup.dir, facing)).toBe(true);
   await page.waitForFunction(
     (t) => {
       const w = window as QaWindow;
@@ -380,33 +389,43 @@ test('T-27 BOULDER super (E key, auto-aim) dashes its full super range', async (
   const dash = rows.filter((r) => r.action === 'dash');
   const end = rows.find((r) => r.tick > dash.at(-1)!.tick)!;
   const moved = Math.hypot(end.x - SPAWN.x, end.y - SPAWN.y);
-  // range 9 at 9 tiles/s → ~30 ticks; walking would cover only ~3 tiles in that time
-  const bs = getFighter('boulder').super;
+  // walking would cover only a third of this in the same time
   const dashTicks = (bs.range / bs.projectileSpeed) * 30;
   expect(moved, `dash distance (${dash.length} dash ticks)`).toBeGreaterThan(bs.range - 0.5);
-  expect(end.x).toBeCloseTo(SPAWN.x + bs.range, 1);
-  expect(end.y).toBeCloseTo(SPAWN.y, 6);
+  expect(end.x).toBeCloseTo(SPAWN.x + Math.cos(facing) * bs.range, 1);
+  expect(end.y).toBeCloseTo(SPAWN.y + Math.sin(facing) * bs.range, 1);
   expect(dash.length).toBeGreaterThanOrEqual(Math.floor(dashTicks * 0.85));
   expect(dash.length).toBeLessThanOrEqual(Math.ceil(dashTicks * 1.15));
   await shot(page, testInfo, '27-boulder-dash');
 });
 
-test('T-28 HINAKO super (dragged right) leaps its full super range and drops 4 bombs at take-off', async ({ page }, testInfo) => {
+test('T-28 HINAKO super (dragged forward) leaps its full super range and drops 4 bombs at take-off', async ({ page }, testInfo) => {
   await openBattle(page, 'hinako');
   await setSuperCharge(page, 1);
   await expect(page.locator('.stick-super')).toHaveClass(/is-ready/);
 
+  const hs = getFighter('hinako').super;
+  // leap the way the fighter faces (toward the dummies); the landing spot must be open for an exact check
+  const facing = await facingAtSpawn(page);
+  const ux = Math.round(Math.cos(facing));
+  const uy = Math.round(Math.sin(facing));
+  const target = { x: SPAWN.x + ux * hs.range, y: SPAWN.y + uy * hs.range };
   const fingers = await Fingers.create(page);
   await fingers.down(1, SUPER_BTN.x, SUPER_BTN.y);
-  await fingers.move(1, SUPER_BTN.x + 100, SUPER_BTN.y, 4);
+  await fingers.move(1, SUPER_BTN.x + ux * 100, SUPER_BTN.y + uy * 100, 4);
   await expect.poll(async () => (await aimState(page)).shapes).toEqual(['hinako|super']);
-  await expect.poll(async () => (await aimState(page)).aim).toEqual({ which: 'super', aim: { x: 1, y: 0 } });
+  await expect
+    .poll(async () => {
+      const a = (await aimState(page)).aim;
+      return a && { which: a.which, x: Math.round(a.aim.x), y: Math.round(a.aim.y) };
+    })
+    .toEqual({ which: 'super', x: ux, y: uy });
   await shot(page, testInfo, '28-hinako-leap-aim');
   const m = await eventMark(page);
   await fingers.up(1);
 
   const sup = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: true }, m);
-  expect(angleClose(sup.dir, 0)).toBe(true);
+  expect(angleClose(sup.dir, Math.atan2(uy, ux))).toBe(true);
   const startRow = (await trace(page)).find((r) => r.tick === sup.tick)!;
   expect(startRow.action).toBe('leap');
   expect(startRow.lobs, 'four bombs in the air right after take-off').toBe(4);
@@ -418,12 +437,12 @@ test('T-28 HINAKO super (dragged right) leaps its full super range and drops 4 b
   const rows = (await trace(page)).filter((r) => r.tick >= sup.tick);
   const leapTicks = rows.filter((r) => r.action === 'leap').length;
   const land = rows.find((r) => r.action === null)!;
-  const hs = getFighter('hinako').super;
   const airTicks = Math.round((hs.leapTime ?? 0) * 30);
   expect(leapTicks, `${hs.leapTime} s in the air`).toBeGreaterThanOrEqual(airTicks - 2);
   expect(leapTicks).toBeLessThanOrEqual(airTicks + 2);
-  expect(land.x).toBeCloseTo(SPAWN.x + hs.range, 1);
-  expect(land.y).toBeCloseTo(SPAWN.y, 6);
+  if (!circleFree(target, 0.4)) throw new Error(`test premise: leap target ${JSON.stringify(target)} is blocked`);
+  expect(land.x).toBeCloseTo(target.x, 1);
+  expect(land.y).toBeCloseTo(target.y, 1);
 
   // bombs burst `fuse` seconds after take-off, on a 1-tile ring around the take-off point
   await expect.poll(async () => (await events(page, m, 'explode')).length).toBe(4);
@@ -440,16 +459,17 @@ test('T-28 HINAKO super (dragged right) leaps its full super range and drops 4 b
 
 test('T-29 hitting a dummy shows a merged damage number, lowers its bar and charges the super', async ({ page }, testInfo) => {
   await openBattle(page);
-  const dummyId = await unitIdAt(page, IDLE_DUMMY);
-  // (22.5, 7.5): idle dummy 3.6 tiles away at an angle, clear line of sight, turret out of range
-  await teleport(page, 22.5, 7.5);
+  const { dummy, spot } = idleDummyWithSpot();
+  const dummyId = await unitIdAt(page, dummy);
+  // spot 3–4.5 tiles from an idle dummy (nearest enemy), clear line of sight, turret out of range
+  await teleport(page, spot.x, spot.y);
   await waitCameraSettled(page);
   await waitFullAmmo(page);
   const m = await eventMark(page);
   await page.touchscreen.tap(ATTACK_STICK.x, ATTACK_STICK.y);
 
   const atk = await waitForEvent(page, { type: 'attack', unitId: '$player' }, m);
-  expect(angleClose(atk.dir, Math.atan2(2, 3)), `auto-aim at the dummy, dir ${atk.dir}`).toBe(true);
+  expect(angleClose(atk.dir, dirTo(spot, dummy)), `auto-aim at the dummy, dir ${atk.dir}`).toBe(true);
   await waitForEvent(page, { type: 'hit', sourceId: '$player', targetId: dummyId }, m);
   await waitTicks(page, 4); // remaining rivets of the same volley
   const hits = (await events(page, m, 'hit')).filter((e) => e.targetId === dummyId);
@@ -483,7 +503,8 @@ test('T-29 hitting a dummy shows a merged damage number, lowers its bar and char
 
 test('T-30 overhead HP bars: own bar (green, ammo cells) and red dummy bars track their units on screen', async ({ page }, testInfo) => {
   await openBattle(page);
-  await teleport(page, 22.5, 7.5);
+  const { spot } = idleDummyWithSpot();
+  await teleport(page, spot.x, spot.y);
   await waitCameraSettled(page);
   await waitTicks(page, 2);
 
@@ -514,7 +535,7 @@ test('T-30 overhead HP bars: own bar (green, ammo cells) and red dummy bars trac
     expect(r.cls).toContain('is-enemy');
   }
   const visibleDummies = rows.filter((r) => r.type === 'dummy' && r.onScreen);
-  expect(visibleDummies.length, 'at least the idle dummy at (25.5, 9.5) is on screen').toBeGreaterThan(0);
+  expect(visibleDummies.length, 'at least the idle dummy next to the stand spot is on screen').toBeGreaterThan(0);
   for (const r of rows) {
     expect(r.hidden, `${r.type} bar hidden iff off screen`).toBe(!r.onScreen);
     if (!r.onScreen) continue;
@@ -542,9 +563,10 @@ test('T-31 player KO shows KNOCKED OUT + 3-2-1 countdown, input is ignored, then
       if (!document.querySelector<HTMLElement>('.respawn')!.hidden && seen.at(-1) !== num.textContent) seen.push(num.textContent!);
     }).observe(document.querySelector('.respawn')!, { subtree: true, childList: true, characterData: true, attributes: true });
   });
-  const turretId = await unitIdAt(page, TURRET);
-  // 3 tiles south of the turret with a clear line of sight; HP 1 and no regen until hit
-  await teleport(page, TURRET.x, TURRET.y + 3);
+  const { turret, spot } = turretSpot();
+  const turretId = await unitIdAt(page, turret);
+  // ~3 tiles from the turret with a clear line of sight; HP 1 and no regen until hit
+  await teleport(page, spot.x, spot.y);
   await page.evaluate(() => {
     const b = (window as QaWindow).__fgBattle!;
     b.player.hp = 1;
@@ -687,17 +709,25 @@ test('T-34 PC: left click fires at the clicked ground point, right click supers 
   const at = async (dx: number, dy: number) => toDesign(page, { x: SPAWN.x + dx, y: SPAWN.y + dy });
 
   let m = await eventMark(page);
-  const a = await at(3, 2);
+  // points ahead of the spawn (toward the map centre) so they are on screen
+  const f = await facingAtSpawn(page);
+  const ahead = (fwd: number, side: number) => ({
+    dx: Math.cos(f) * fwd - Math.sin(f) * side,
+    dy: Math.sin(f) * fwd + Math.cos(f) * side,
+  });
+  const p1 = ahead(3, 2);
+  const a = await at(p1.dx, p1.dy);
   await page.mouse.click(a.x, a.y);
   const atk = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: false }, m);
-  expect(angleClose(atk.dir, Math.atan2(2, 3)), `left click dir ${atk.dir}`).toBe(true);
+  expect(angleClose(atk.dir, Math.atan2(p1.dy, p1.dx)), `left click dir ${atk.dir}`).toBe(true);
 
   await setSuperCharge(page, 1);
   m = await eventMark(page);
-  const s = await at(3, -3);
+  const p2 = ahead(3, -3);
+  const s = await at(p2.dx, p2.dy);
   await page.mouse.click(s.x, s.y, { button: 'right' });
   const sup = await waitForEvent(page, { type: 'attack', unitId: '$player', isSuper: true }, m);
-  expect(angleClose(sup.dir, -Math.PI / 4), `right click dir ${sup.dir}`).toBe(true);
+  expect(angleClose(sup.dir, Math.atan2(p2.dy, p2.dx)), `right click dir ${sup.dir}`).toBe(true);
 
   await waitFullAmmo(page);
   m = await eventMark(page);
