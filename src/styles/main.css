@@ -693,15 +693,15 @@ img {
 }
 .fighter-grid {
   position: absolute;
-  top: 150px;
+  top: 128px;
   left: 50%;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, 224px);
+  grid-template-columns: repeat(4, 230px);
   gap: 18px;
 }
 .fcard {
-  height: 450px;
+  height: 292px;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
@@ -720,7 +720,7 @@ img {
 }
 .fcard-portrait {
   position: relative;
-  height: 330px;
+  height: 200px;
   background:
     radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--c) 55%, white) 0%, var(--c) 48%, color-mix(in srgb, var(--c) 55%, black) 100%);
   border-bottom: 3px solid var(--ink);

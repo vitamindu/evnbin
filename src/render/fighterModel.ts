@@ -347,10 +347,104 @@ function buildBoulder(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
+// ───────────────────────── FUSE: 투척형 불꽃놀이 장인(오리지널) ─────────────────────────
+function buildFuse(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.56, torsoH: 0.5, torsoD: 0.4, headR: 0.38, headLift: 0.86,
+    legR: 0.11, legLen: 0.18, legX: 0.14, armR: 0.09, armLen: 0.26, shoeH: 0.12,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.primary, legs: c.secondary, shoes: '#2a2238', skin: c.skin });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.2, spread: 0.32, y: -0.04 });
+  // 축제 머리띠 + 매듭 리본
+  const band = part(g.add(new THREE.TorusGeometry(r * 0.98, 0.05, 8, 28)), toon(c.accent));
+  band.rotation.x = Math.PI / 2 - 0.15;
+  band.position.y = r * 0.35;
+  rig.head.add(band);
+  for (const sx of [-1, 1]) {
+    const tail = part(g.add(new RoundedBoxGeometry(0.1, 0.22, 0.04, 1, 0.02)), toon(c.accent));
+    tail.position.set(sx * 0.07, r * 0.2, -r * 0.98);
+    tail.rotation.set(0.3, 0, sx * 0.5);
+    rig.head.add(tail);
+  }
+  // 둥근 고글(이마 위로 올림)
+  for (const sx of [-1, 1]) {
+    const lens = part(g.add(new THREE.CylinderGeometry(r * 0.2, r * 0.2, 0.06, 18)), toon('#7fe4ff'));
+    lens.rotation.x = Math.PI / 2 - 0.5;
+    lens.position.set(sx * r * 0.3, r * 0.62, r * 0.66);
+    rig.head.add(lens);
+  }
+  // 등에 로켓 통 3개
+  const tubeGeo = g.add(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 12));
+  const capGeo = g.add(new THREE.ConeGeometry(0.08, 0.14, 12));
+  [-0.14, 0, 0.14].forEach((x, i) => {
+    const tube = part(tubeGeo, toon(i === 1 ? c.accent : c.primary));
+    tube.position.set(x, rig.torso.position.y + 0.12, -p.torsoD / 2 - 0.08);
+    rig.body.add(tube);
+    const cap = part(capGeo, toon(c.secondary));
+    cap.position.set(x, rig.torso.position.y + 0.44, -p.torsoD / 2 - 0.08);
+    rig.body.add(cap);
+  });
+  // 손에 든 폭죽 폭탄(심지에 불꽃)
+  rig.armR.rotation.set(-0.7, 0, 0.25);
+  const bomb = part(g.add(new THREE.SphereGeometry(0.15, 16, 12)), toon(c.secondary));
+  bomb.position.copy(rig.handR.position).add(new THREE.Vector3(0, -0.04, 0.12));
+  rig.armR.add(bomb);
+  const stripe = part(g.add(new THREE.TorusGeometry(0.15, 0.025, 6, 20)), toon(c.accent), { outline: false });
+  stripe.position.copy(bomb.position);
+  rig.armR.add(stripe);
+  const spark = new THREE.Mesh(g.add(new THREE.SphereGeometry(0.05, 8, 6)), new THREE.MeshBasicMaterial({ color: '#fff3a0' }));
+  spark.position.copy(bomb.position).add(new THREE.Vector3(0, 0.2, 0));
+  rig.armR.add(spark);
+  return rig;
+}
+
+// ───────────────────────── SHARD: 얼음 수정 아이(오리지널) ─────────────────────────
+function buildShard(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.52, torsoH: 0.52, torsoD: 0.42, headR: 0.37, headLift: 0.85,
+    legR: 0.11, legLen: 0.18, legX: 0.14, armR: 0.09, armLen: 0.26, shoeH: 0.12,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.secondary, legs: c.dark, shoes: '#1a2440', skin: c.skin, hands: c.primary });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.22, spread: 0.32, y: 0.0 });
+  // 머리 위 얼음 가시(각진 원뿔 5개)
+  const spikeGeo = g.add(new THREE.ConeGeometry(r * 0.22, r * 0.85, 5));
+  [[0, 1.0, 0, 0], [-0.45, 0.82, 0, 0.5], [0.45, 0.82, 0, -0.5], [-0.25, 0.85, -0.35, 0.3], [0.25, 0.85, -0.35, -0.3]].forEach(([x, y, z, rz]) => {
+    const s = part(spikeGeo, toon(c.primary));
+    s.position.set(x! * r, y! * r, z! * r);
+    s.rotation.set(z! ? -0.4 : 0, 0, rz!);
+    rig.head.add(s);
+  });
+  // 어깨 수정 덩어리
+  const crystalGeo = g.add(new THREE.OctahedronGeometry(0.17, 0));
+  for (const sx of [-1, 1]) {
+    const cr = part(crystalGeo, toon(c.primary));
+    cr.position.set(sx * (p.torsoW / 2 + 0.04), rig.torso.position.y + p.torsoH * 0.42, 0);
+    cr.scale.set(0.8, 1.4, 0.8);
+    cr.rotation.z = sx * -0.4;
+    rig.body.add(cr);
+  }
+  // 가슴의 빛나는 얼음 핵
+  const core = new THREE.Mesh(g.add(new THREE.OctahedronGeometry(0.1, 0)), new THREE.MeshBasicMaterial({ color: c.accent }));
+  core.position.set(0, rig.torso.position.y + 0.05, p.torsoD / 2 + 0.03);
+  rig.body.add(core);
+  // 손 위에 떠 있는 얼음 결정
+  rig.armR.rotation.set(-0.8, 0, 0.2);
+  const orb = part(g.add(new THREE.OctahedronGeometry(0.12, 0)), toon(c.primary));
+  orb.position.copy(rig.handR.position).add(new THREE.Vector3(0, 0.05, 0.18));
+  rig.armR.add(orb);
+  return rig;
+}
+
 const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
   boulder: buildBoulder,
+  fuse: buildFuse,
+  shard: buildShard,
 };
 
 /** 캐릭터마다 다른 대기 동작 속도 */

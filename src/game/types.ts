@@ -177,6 +177,20 @@ export interface SpawnFighter {
 /** 경기 방식. training: 연습장(끝 없음), teamfight: 3대3 쓰러뜨리기 대결 */
 export type MatchMode = 'training' | 'teamfight' | 'crystal';
 
+/** 바닥에 일정 시간 남는 지대(SHARD 궁극기 등): 안의 적을 느리게 하고 초당 피해 */
+export interface Zone {
+  id: EntityId;
+  type: 'zone';
+  ownerId: EntityId;
+  team: Team;
+  pos: Vec2;
+  radius: number;
+  untilTick: number;
+  /** 이동 속도 감소 비율(0~1) */
+  slow: number;
+  dps: number;
+}
+
 /** 크리스탈 러시: 바닥에 놓인 크리스탈 */
 export interface Crystal {
   id: EntityId;
@@ -211,5 +225,7 @@ export interface SimView {
   readonly lobs: readonly Lob[];
   /** 크리스탈 러시가 아니면 빈 배열 */
   readonly crystals: readonly Crystal[];
+  /** 지대(서리 지대 등). 없으면 빈 배열 */
+  readonly zones: readonly Zone[];
   getUnit(id: EntityId): Unit | undefined;
 }

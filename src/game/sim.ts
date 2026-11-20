@@ -66,6 +66,7 @@ import {
   type Vec2,
   type MatchMode,
   type Crystal,
+  type Zone,
   type MatchState,
 } from './types';
 import { angleOf, clampLen, dist, fromAngle, len } from './vec';
@@ -207,6 +208,8 @@ export class Sim implements SimView {
   /** 경기 진행 상태(점수·시간). teamfight 규칙은 Gameplay 담당 */
   /** 크리스탈 러시: 바닥의 크리스탈(규칙은 Gameplay 담당) */
   crystals: Crystal[] = [];
+  /** 지대(서리 지대 등). 규칙은 Gameplay 담당 */
+  zones: Zone[] = [];
   match: MatchState = { mode: 'training', score: [0, 0], targetScore: 0, ticksLeft: -1, winner: null };
   readonly grid: Grid;
   readonly rng: Rng;

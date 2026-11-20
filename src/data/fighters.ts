@@ -4,8 +4,8 @@
  * 거리 단위는 타일(1타일 = 월드 1유닛), 시간 단위는 초.
  */
 
-export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako';
-export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper';
+export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard';
+export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control';
 
 /** 기본 공격 형태. 새 캐릭터는 가능하면 이 조합으로 표현하고, 부족할 때만 종류를 추가한다. */
 export type AttackKind =
@@ -18,7 +18,8 @@ export type AttackKind =
 export type SuperKind =
   | AttackKind
   | 'dash' // 조준 방향으로 긴 돌진
-  | 'leap'; // 조준 지점으로 높이 뛰어 벽을 넘어 이동, 뛴 자리에 폭탄을 떨어뜨림
+  | 'leap' // 조준 지점으로 높이 뛰어 벽을 넘어 이동, 뛴 자리에 폭탄을 떨어뜨림
+  | 'zone'; // 조준 지점(포물선)에 일정 시간 남는 지대: 안의 적을 느리게 하고 계속 피해
 
 export interface AttackDef {
   name: string;
@@ -46,6 +47,8 @@ export interface AttackDef {
   speedJitter?: number;
   /** true면 탄이 모든 대상을 관통한다 */
   pierce?: boolean;
+  /** 탄이 맞거나 사거리 끝에 닿으면 사방으로 파편이 갈라져 나간다 */
+  split?: { count: number; damage: number; range: number; speed: number };
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
   lateralOffset?: number;
   /** lob: 착탄 범위 반지름(타일) */
@@ -79,6 +82,8 @@ export interface SuperDef {
   speedJitter?: number;
   /** true면 탄이 모든 대상을 관통한다(맞힌 대상마다 한 번씩 피해) */
   pierce?: boolean;
+  /** zone: 지대 반지름(타일), 유지 시간(초), 이동 속도 감소 비율(0~1), 초당 피해 */
+  zone?: { radius: number; duration: number; slow: number; dps: number };
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime?: number;
   /** leap: 폭탄이 떨어져 터지기까지의 시간(초) */
@@ -269,8 +274,87 @@ export const FIGHTERS: readonly FighterDef[] = [
       fuse: 2,
     },
   },
-];
-export function getFighter(id: FighterId): FighterDef {
+  {
+    id: 'fuse',
+    model: { type: 'primitive' },
+    name: 'FUSE',
+    role: 'thrower',
+    roleLabel: '투척형',
+    tagline: '축제 불꽃놀이를 만드는 장인. 벽 뒤에 숨어도 소용없어요.',
+    palette: { primary: '#ff5d73', secondary: '#2b2f6b', accent: '#ffd23f', skin: '#f2c19a', dark: '#5a1d2a' },
+    hp: 2600,
+    moveSpeed: 2.35,
+    attack: {
+      name: 'Popper Toss',
+      description: '작은 폭죽 폭탄 2개를 벽 너머로 던져요. 떨어진 자리에서 터져요.',
+      kind: 'lob',
+      damage: 560,
+      count: 2,
+      spreadDeg: 0,
+      burstInterval: 0,
+      range: 5.6,
+      projectileSpeed: 0,
+      ammo: 3,
+      reload: 1.9,
+      superChargePerHit: 0.12,
+      aoeRadius: 0.9,
+    },
+    super: {
+      name: 'Grand Finale',
+      description: '큰 불꽃 폭탄을 던져 넓은 범위를 터뜨리고 벽을 부수며 적을 밀어내요.',
+      kind: 'lob',
+      damage: 1400,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 0,
+      range: 5.6,
+      breaksWalls: true,
+      knockback: 1.5,
+      aoeRadius: 2,
+    },
+  },
+  {
+    id: 'shard',
+    model: { type: 'primitive' },
+    name: 'SHARD',
+    role: 'control',
+    roleLabel: '견제형',
+    tagline: '얼음 수정에서 태어난 아이. 닿는 것마다 산산조각 내요.',
+    palette: { primary: '#5fd6ff', secondary: '#2a4a9a', accent: '#e6fbff', skin: '#bfefff', dark: '#173062' },
+    hp: 2700,
+    moveSpeed: 2.35,
+    attack: {
+      name: 'Shatter Shot',
+      description: '얼음 탄이 맞거나 끝까지 날아가면 6갈래 파편으로 갈라져요.',
+      kind: 'burst',
+      damage: 520,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      range: 5.2,
+      projectileSpeed: 8.5,
+      ammo: 3,
+      reload: 1.6,
+      superChargePerHit: 0.06,
+      split: { count: 6, damage: 260, range: 2.2, speed: 8 },
+    },
+    super: {
+      name: 'Frost Field',
+      description: '조준한 곳에 서리 지대를 깔아요. 안에 있는 적은 4초 동안 느려지고 계속 피해를 받아요.',
+      kind: 'zone',
+      damage: 0,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 0,
+      range: 5.6,
+      breaksWalls: false,
+      knockback: 0,
+      zone: { radius: 2.2, duration: 4, slow: 0.4, dps: 420 },
+    },
+  },
+];export function getFighter(id: FighterId): FighterDef {
   const f = FIGHTERS.find((x) => x.id === id);
   if (!f) throw new Error(`Unknown fighter: ${id}`);
   return f;

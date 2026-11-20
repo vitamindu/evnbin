@@ -6,7 +6,7 @@
  *       → 클라이언트 input(매 틱) / 서버 snap(일정 간격) → end → 다시 room
  */
 import type { FighterId } from '../data/fighters';
-import type { Crystal, Lob, MatchMode, MatchState, Projectile, SimEvent, Team, Unit, Vec2 } from '../game/types';
+import type { Crystal, Zone, Lob, MatchMode, MatchState, Projectile, SimEvent, Team, Unit, Vec2 } from '../game/types';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -65,6 +65,8 @@ export interface Snapshot {
   projectiles: Projectile[];
   lobs: Lob[];
   crystals: Crystal[];
+  /** 없으면 빈 배열로 본다(옛 서버) */
+  zones?: Zone[];
   match: MatchState;
   /** 직전 snap 이후 생긴 사건(효과·피해 숫자·벽 파괴 등) */
   events: SimEvent[];

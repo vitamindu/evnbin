@@ -78,6 +78,9 @@ export class FakeOnlineSession implements BattleLike {
       get crystals() {
         return sim.crystals;
       },
+      get zones() {
+        return sim.zones;
+      },
       get tick() {
         return sim.tick;
       },

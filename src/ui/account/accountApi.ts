@@ -123,6 +123,8 @@ function fakeModule(): AccountModule {
         volley: { trophies: 8, power: 1 },
         boulder: { trophies: 0, power: 1 },
         hinako: { trophies: 4, power: 1 },
+        fuse: { trophies: 0, power: 1 },
+        shard: { trophies: 0, power: 1 },
       },
     };
   };

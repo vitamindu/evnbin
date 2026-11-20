@@ -143,6 +143,8 @@ export class BattleView {
   private readonly shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', map: this.dotTex, transparent: true, opacity: 0.32, depthWrite: false });
   private readonly glowMats = new Map<string, { halo: THREE.MeshBasicMaterial; trail: THREE.MeshBasicMaterial }>();
   private dustTimer = 0;
+  /** 지대(SHARD 서리 지대 등): 서리 원판 + 팀 색 테두리 */
+  private readonly zones = new Map<EntityId, THREE.Group>();
   /** 크리스탈 러시: 바닥의 크리스탈(오리지널 디자인: 깎인 보석 + 바닥 빛 고리) */
   private readonly crystals = new Map<EntityId, THREE.Group>();
   private readonly crystalGeo = new THREE.OctahedronGeometry(0.32, 0).scale(0.8, 1.25, 0.8);
@@ -254,6 +256,41 @@ export class BattleView {
         g.removeFromParent();
         this.crystals.delete(id);
       }
+    }
+
+    const zoneSeen = new Set<EntityId>();
+    const myTeam = sim.getUnit(this.followId)?.team ?? 0;
+    for (const z of sim.zones ?? []) {
+      zoneSeen.add(z.id);
+      if (this.zones.has(z.id)) continue;
+      const g = new THREE.Group();
+      const fillMat = new THREE.MeshBasicMaterial({ color: '#bff3ff', transparent: true, opacity: 0.35, depthWrite: false });
+      const fill = new THREE.Mesh(new THREE.CircleGeometry(z.radius, 40).rotateX(-Math.PI / 2), fillMat);
+      const ringMat = new THREE.MeshBasicMaterial({ color: z.team === myTeam ? SHOT_COLOR.ally! : SHOT_COLOR.enemy!, transparent: true, opacity: 0.8, depthWrite: false });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(z.radius - 0.12, z.radius, 48).rotateX(-Math.PI / 2), ringMat);
+      fill.position.y = 0.04;
+      ring.position.y = 0.05;
+      g.add(fill, ring);
+      // 서리 결정 몇 개
+      for (let i = 0; i < 6; i++) {
+        const a2 = (i / 6) * Math.PI * 2;
+        const m = new THREE.Mesh(this.crystalGeo, this.crystalRingMat);
+        m.scale.setScalar(0.45);
+        m.position.set(Math.cos(a2) * z.radius * 0.55, 0.2, Math.sin(a2) * z.radius * 0.55);
+        g.add(m);
+      }
+      g.position.set(z.pos.x, 0, z.pos.y);
+      this.scene.add(g);
+      this.zones.set(z.id, g);
+    }
+    for (const [id, g] of this.zones) {
+      if (zoneSeen.has(id)) continue;
+      g.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh && m.geometry !== this.crystalGeo) m.geometry.dispose();
+      });
+      g.removeFromParent();
+      this.zones.delete(id);
     }
 
     const lobSeen = new Set<EntityId>();
@@ -450,6 +487,7 @@ export class BattleView {
         l.shell.scale.setScalar(1.1 + (on ? 0.15 : 0));
       }
     }
+    for (const g of this.zones.values()) g.rotation.y = t * 0.3;
     for (const g of this.crystals.values()) {
       const gem = g.getObjectByName('gem')!;
       const ph = g.userData.phase as number;
