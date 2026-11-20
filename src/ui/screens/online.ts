@@ -46,7 +46,7 @@ export function createOnlineScreen(ctx: AppContext): Screen {
 
   // ── 머리줄
   const chip = netChip();
-  const hdr = header('팀 대결', () => back(), chip.el);
+  const hdr = header('온라인 대전', () => back(), chip.el);
 
   // ── 연결 상태 패널
   const cpTitle = txt('', 'cp-title');

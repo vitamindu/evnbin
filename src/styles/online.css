@@ -1651,3 +1651,256 @@
 .room-center {
   gap: 8px;
 }
+
+/* ───────────── 친구 ───────────── */
+.friends-screen {
+  position: absolute;
+  inset: 0;
+}
+.fr-refresh.is-spinning .ico {
+  animation: spin 0.8s linear infinite;
+}
+.fr-body {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 100px;
+  bottom: 30px;
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 28px;
+}
+.fr-addpanel,
+.fr-listpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px 22px;
+  min-height: 0;
+}
+.fr-addpanel {
+  align-self: start;
+}
+.fr-title {
+  font-size: 30px;
+  --o: 3px;
+}
+.fr-desc {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  color: #cfd8ff;
+}
+.fr-addrow {
+  display: flex;
+  gap: 10px;
+}
+.fr-box {
+  flex: 1;
+  min-width: 0;
+}
+.fr-input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 26px;
+  caret-color: var(--yellow);
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+.fr-input::placeholder {
+  color: #59639a;
+}
+.fr-add {
+  width: 120px;
+  height: 60px;
+  gap: 4px;
+  font-size: 24px;
+  background: var(--btn-orange);
+}
+.fr-add .ico {
+  width: 24px;
+  height: 24px;
+}
+.fr-err {
+  min-height: 24px;
+  font-size: 18px;
+  color: #ff9a9a;
+}
+.fr-me {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 2px solid var(--panel-line);
+}
+.fr-me-cap {
+  font-size: 16px;
+  color: var(--muted);
+}
+.fr-mynick {
+  font-size: 28px;
+  color: var(--yellow);
+}
+.fr-listhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.fr-count {
+  font-size: 18px;
+  color: var(--muted);
+}
+.fr-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 4px 4px 0;
+}
+.fr-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 84px;
+  padding: 0 12px 0 16px;
+  border-radius: 16px;
+  border: 3px solid var(--ink);
+  background: linear-gradient(90deg, rgba(62, 140, 255, 0.22), rgba(12, 19, 66, 0.9) 60%);
+}
+.fr-row.is-off {
+  background: rgba(255, 255, 255, 0.05);
+}
+.fr-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: #6b739c;
+}
+.fr-row.is-on .fr-dot {
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(72, 209, 106, 0.8);
+}
+.fr-row.is-room .fr-dot {
+  background: var(--yellow);
+  box-shadow: 0 0 10px rgba(255, 211, 77, 0.8);
+}
+.fr-emblem {
+  width: 60px;
+  height: 60px;
+}
+.fr-row.is-off .fr-emblem {
+  filter: grayscale(0.7) brightness(0.8);
+}
+.fr-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fr-name {
+  font-size: 28px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-row.is-off .fr-name {
+  color: #c4cae6;
+}
+.fr-rank {
+  font-size: 16px;
+  color: var(--muted);
+}
+.fr-status {
+  flex: none;
+  padding: 4px 12px 6px;
+  border-radius: 12px;
+  border: 3px solid var(--ink);
+  font-size: 18px;
+  background: #4a5280;
+}
+.fr-row.is-on .fr-status {
+  background: var(--btn-green);
+}
+.fr-row.is-room .fr-status {
+  background: linear-gradient(#ffd967, #f0a21a);
+}
+.fr-del {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  background: var(--btn-slate);
+}
+.fr-del .ico {
+  width: 26px;
+  height: 26px;
+}
+.fr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 60px 20px;
+  font-size: 22px;
+  color: #cfd8ff;
+  text-align: center;
+}
+.fr-guest {
+  position: absolute;
+  left: 50%;
+  top: 200px;
+  width: 600px;
+  margin-left: -300px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.fr-guest-ico {
+  width: 96px;
+  height: 96px;
+}
+.fr-guest-t {
+  font-size: 30px;
+  --o: 3px;
+}
+
+/* 가입: 칸이 4개라 조금 낮게 */
+.login[data-mode='signup'] .auth-box {
+  height: 54px;
+}
+.login[data-mode='signup'] .auth-panel {
+  gap: 9px;
+}
+.login[data-mode='signup'] .auth-err {
+  min-height: 34px;
+}
+.login[data-mode='signup'] .auth-submit {
+  height: 76px;
+}
+.btn-nick-save {
+  width: 110px;
+  background: var(--btn-orange);
+}
+.set-nick {
+  width: 220px;
+}
+.set-acct-cap {
+  font-size: 15px;
+  color: var(--muted);
+}

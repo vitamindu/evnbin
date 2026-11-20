@@ -1,7 +1,7 @@
 import type { BattleLike } from '../../battle/types';
 import { el } from '../../core/dom';
 import { TICK_RATE, type EntityId, type SimEvent, type Unit, type Vec2 } from '../../game/types';
-import { txt } from '../widgets';
+import { iconEl, txt } from '../widgets';
 
 /**
  * 전투 HUD. UI 담당.
@@ -30,6 +30,10 @@ interface UnitBar {
   lag: HTMLElement;
   num: HTMLElement;
   ammo: { box: HTMLElement; segs: HTMLElement[]; vals: number[] } | null;
+  /** 크리스탈 러시: 들고 있는 크리스탈 수(머리 위) */
+  gems: HTMLElement;
+  gemNum: HTMLElement;
+  gemCount: number;
   hp: number;
   maxHp: number;
   x: number;
@@ -185,7 +189,10 @@ export class BattleHud {
     const fill = el('i', 'ub-fill');
     const lag = el('i', 'ub-lag');
     const num = txt('', 'ub-num');
-    const children: HTMLElement[] = [num, el('div', 'ub-bar', [lag, fill])];
+    const gemNum = txt('0', 'ub-gem-num');
+    const gems = el('div', 'ub-gems', [iconEl('rushGem', 'ico ub-gem'), gemNum]);
+    gems.hidden = true;
+    const children: HTMLElement[] = [gems, num, el('div', 'ub-bar', [lag, fill])];
     let ammo: UnitBar['ammo'] = null;
     if (isMe && u.type === 'fighter') {
       const segs: HTMLElement[] = [];
@@ -203,7 +210,7 @@ export class BattleHud {
     const root = el('div', cls, [el('div', 'ub-in', children)]);
     root.hidden = true;
     this.barLayer.append(root);
-    return { id: u.id, root, fill, lag, num, ammo, hp: -1, maxHp: -1, x: NaN, y: NaN, shown: false, seen: 0 };
+    return { id: u.id, root, fill, lag, num, ammo, gems, gemNum, gemCount: 0, hp: -1, maxHp: -1, x: NaN, y: NaN, shown: false, seen: 0 };
   }
 
   private updateBar(s: BattleLike, u: Unit, ally: boolean) {
@@ -241,6 +248,13 @@ export class BattleHud {
       b.num.textContent = String(Math.ceil(u.hp));
       b.hp = u.hp;
       b.maxHp = u.maxHp;
+    }
+
+    const carried = u.type === 'fighter' ? (u.crystals ?? 0) : 0;
+    if (carried !== b.gemCount) {
+      b.gemCount = carried;
+      b.gems.hidden = carried <= 0;
+      b.gemNum.textContent = String(carried);
     }
 
     if (b.ammo && u.type === 'fighter') {

@@ -13,6 +13,8 @@ import { BattleFeedback } from '../battle/feedback';
 import { BattleHud } from '../battle/hud';
 import { BattleInput } from '../battle/input';
 import { UiMetrics } from '../battle/metrics';
+import { CrystalBoard } from '../battle/crystalBoard';
+import { toast } from '../overlays/toast';
 import { KoFeed, MatchBanner, Scoreboard, fighterNameOf, type NameOf } from '../battle/scoreboard';
 import { pingMeter } from '../online/widgets';
 import { button, iconEl, txt } from '../widgets';
@@ -59,6 +61,7 @@ export function createBattleScreen(ctx: AppContext) {
     denied: () => feedback.denied(),
   });
   const scoreboard = new Scoreboard();
+  const crystalBoard = new CrystalBoard((text) => toast(text));
   const feed = new KoFeed();
   const banner = new MatchBanner();
   const ping = pingMeter('battle-ping');
@@ -73,7 +76,7 @@ export function createBattleScreen(ctx: AppContext) {
   const exitBtn = button('btn-battle-exit', [iconEl('back')], () => exit(), 'back');
   const label = txt('TRAINING YARD', 'battle-label');
   const controls = el('div', 'battle-controls', [input.moveStick.el, input.superStick.el, input.attackStick.el]);
-  const root = el('div', 'battle', [lowHp, hud.el, controls, label, scoreboard.el, ping.el, feed.el, banner.el, exitBtn, netVeil]);
+  const root = el('div', 'battle', [lowHp, hud.el, controls, label, scoreboard.el, crystalBoard.el, crystalBoard.countdown, ping.el, feed.el, banner.el, exitBtn, netVeil]);
   if (navigator.maxTouchPoints > 0) root.classList.add('has-touch');
 
   function exit() {
@@ -159,12 +162,18 @@ export function createBattleScreen(ctx: AppContext) {
     online = m;
     ended = false;
     lostOnce = false;
-    const teamfight = s.match.mode === 'teamfight';
+    // teamfight: KO 점수판 / crystal: 크리스탈 점수판 + 카운트다운. 둘 다 팀 경기(KO 알림·끝 배너)
+    const mode = s.match.mode;
+    const teamfight = mode !== 'training';
+    const crystal = mode === 'crystal';
     root.classList.toggle('is-online', !!m);
     root.classList.toggle('is-teamfight', teamfight);
+    root.classList.toggle('is-crystal', crystal);
     label.hidden = teamfight;
-    scoreboard.el.hidden = !teamfight;
+    scoreboard.el.hidden = !teamfight || crystal;
+    crystalBoard.el.hidden = !crystal;
     feed.el.hidden = !teamfight;
+    crystalBoard.reset();
     ping.el.hidden = !m;
     scoreboard.reset();
     feed.clear();
@@ -198,7 +207,8 @@ export function createBattleScreen(ctx: AppContext) {
       hud.frame();
       feedback.superCharge(s.player.superCharge);
       if (teamfight) {
-        scoreboard.update(s.match, s.player.team);
+        if (crystal) crystalBoard.update(s.match, s.player.team);
+        else scoreboard.update(s.match, s.player.team);
         feed.frame();
         const w = s.match.winner;
         if (w !== null && !ended) markEnded(w, s.match.score);

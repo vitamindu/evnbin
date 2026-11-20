@@ -1,6 +1,6 @@
 import type { BattleLike } from '../../battle/types';
-import { getFighter } from '../../data/fighters';
 import { getMap } from '../../data/maps';
+import { botInput } from '../../game/bot';
 import { Sim } from '../../game/sim';
 import {
   TICK_DT,
@@ -20,7 +20,7 @@ import { BattleView } from '../../render/battle/battleView';
 
 /**
  * 가짜 온라인 경기(?fakeonline 전용, 화면 확인용). 서버 없이 이 탭 안에서 Sim을 돌린다.
- * - 나 말고는 아주 단순한 봇(가까운 적에게 다가가 쏘기). 진짜 봇은 Gameplay의 src/game/bot.ts.
+ * - 나 말고는 Gameplay의 봇(src/game/bot.ts).
  * - teamfight 규칙(점수·시간·승패)은 Sim이 아직 모르면 여기서 흉내 낸다.
  */
 export interface FakeStats {
@@ -29,13 +29,6 @@ export interface FakeStats {
   damage: number;
 }
 
-interface BotMind {
-  stuck: number;
-  wanderUntil: number;
-  wander: Vec2;
-  strafe: number;
-  last: Vec2;
-}
 
 export class FakeOnlineSession implements BattleLike {
   readonly kind = 'online' as const;
@@ -52,7 +45,6 @@ export class FakeOnlineSession implements BattleLike {
   private readonly ownRules: boolean;
   private readonly ownMatch: MatchState;
   private readonly view_: SimView;
-  private readonly minds = new Map<EntityId, BotMind>();
   private acc = 0;
   private finished = false;
   private pendingAttack: { aim: Aim } | null = null;
@@ -75,8 +67,8 @@ export class FakeOnlineSession implements BattleLike {
     this.playerId = myEntityId;
     for (const u of this.sim.units) this.stats.set(u.id, { kills: 0, deaths: 0, damage: 0 });
     // Sim이 teamfight 규칙을 이미 돌리면 그것을, 아니면 여기서 흉내 낸 것을 쓴다
-    this.ownRules = this.sim.match.mode !== 'teamfight';
-    this.ownMatch = { mode: 'teamfight', score: [0, 0], targetScore: 10, ticksLeft: Math.round(seconds * TICK_RATE), winner: null };
+    this.ownRules = this.sim.match.mode !== info.mode;
+    this.ownMatch = { mode: info.mode, score: [0, 0], targetScore: 10, ticksLeft: Math.round(seconds * TICK_RATE), winner: null };
     const sim = this.sim;
     const self = this;
     this.view_ = {
@@ -164,7 +156,7 @@ export class FakeOnlineSession implements BattleLike {
       this.pendingAttack = null;
       this.pendingSuper = null;
       inputs.set(this.playerId, mine);
-      for (const u of this.sim.units) if (u.type === 'fighter' && u.id !== this.playerId && u.alive) inputs.set(u.id, this.botInput(u));
+      for (const u of this.sim.units) if (u.type === 'fighter' && u.id !== this.playerId && u.alive) inputs.set(u.id, botInput(this.sim, u.id));
       const events = this.sim.step(inputs);
       this.tally(events);
       this.view.snapshot(this.sim);
@@ -225,53 +217,5 @@ export class FakeOnlineSession implements BattleLike {
       }
     }
     events.push(...extra);
-  }
-
-  /** 아주 단순한 봇: 가까운 적에게 다가가 사거리 안이면 쏘고, 체력이 낮으면 물러난다. 끼면 잠깐 아무 데로나 */
-  private botInput(f: Fighter): FighterInput {
-    let mind = this.minds.get(f.id);
-    if (!mind) {
-      mind = { stuck: 0, wanderUntil: 0, wander: { x: 0, y: 0 }, strafe: Math.random() < 0.5 ? -1 : 1, last: { ...f.pos } };
-      this.minds.set(f.id, mind);
-    }
-    const tick = this.sim.tick;
-    const def = getFighter(f.fighterId);
-    let target: Fighter | null = null;
-    let best = Infinity;
-    for (const u of this.sim.units) {
-      if (u.type !== 'fighter' || !u.alive || u.team === f.team) continue;
-      const d = Math.hypot(u.pos.x - f.pos.x, u.pos.y - f.pos.y);
-      if (d < best) {
-        best = d;
-        target = u;
-      }
-    }
-    const input: FighterInput = { move: { x: 0, y: 0 } };
-    if (tick < mind.wanderUntil) {
-      input.move = mind.wander;
-    } else if (target) {
-      const dx = (target.pos.x - f.pos.x) / (best || 1);
-      const dy = (target.pos.y - f.pos.y) / (best || 1);
-      if (tick % 90 === f.id * 7 % 90) mind.strafe = -mind.strafe;
-      if (f.hp < f.maxHp * 0.3) input.move = { x: -dx, y: -dy };
-      else if (best > def.attack.range * 0.8) input.move = { x: dx * 0.9 - dy * 0.3 * mind.strafe, y: dy * 0.9 + dx * 0.3 * mind.strafe };
-      else input.move = { x: -dy * mind.strafe, y: dx * mind.strafe };
-      if (best <= def.attack.range * 0.95 && f.ammo >= 1 && Math.random() < 0.08) input.attack = { aim: null };
-      if (f.superCharge >= 1 && best <= def.super.range) input.super = { aim: null };
-    }
-    const l = Math.hypot(input.move.x, input.move.y);
-    if (l > 1) input.move = { x: input.move.x / l, y: input.move.y / l };
-    // 이동하려는데 거의 안 움직였으면 끼인 것
-    const moved = Math.hypot(f.pos.x - mind.last.x, f.pos.y - mind.last.y);
-    mind.last = { ...f.pos };
-    if (l > 0.1 && moved < 0.005) mind.stuck++;
-    else mind.stuck = 0;
-    if (mind.stuck > 10) {
-      const a = Math.random() * Math.PI * 2;
-      mind.wander = { x: Math.cos(a), y: Math.sin(a) };
-      mind.wanderUntil = tick + 25;
-      mind.stuck = 0;
-    }
-    return input;
   }
 }

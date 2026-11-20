@@ -185,7 +185,6 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
   const targets: [string, Locator][] = [
     ['SHOP', page.locator('.side-btn[data-btn="shop"]')],
     ['NEWS', page.locator('.side-btn[data-btn="news"]')],
-    ['FRIENDS', page.locator('.side-btn[data-btn="friends"]')],
     ['PARTY', page.locator('.side-btn[data-btn="party"]')],
     ['CREW', page.locator('.side-btn[data-btn="crew"]')],
     ['SEASON PASS', page.locator('.pass-card')],
@@ -214,7 +213,7 @@ test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING 
   await page.locator('.mode-card').tap();
   const picker = page.locator('.mp-panel');
   await expect(picker).toBeVisible();
-  await expect(picker.locator('.mp-card')).toHaveCount(2);
+  await expect(picker.locator('.mp-card')).toHaveCount(3);
   await expect(picker.locator('.mp-card[data-mode="training"]')).toHaveClass(/is-selected/);
   await picker.locator('.mp-card[data-mode="teamfight"]').tap();
   await expect(picker).toHaveCount(0);
