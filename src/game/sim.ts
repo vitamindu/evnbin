@@ -37,6 +37,11 @@ import {
   CRYSTAL_SPAWN_INTERVAL_TICKS,
   CRYSTAL_SPAWN_SCATTER,
   CRYSTAL_WIN_COUNT,
+  LOB_FLIGHT_TICKS,
+  LOB_MIN_DIST,
+  LOB_SPACING,
+  ZONE_HIT_TICKS,
+  ZONE_MIN_DIST,
   TURRET_DAMAGE,
   TURRET_INTERVAL_TICKS,
   TURRET_RANGE,
@@ -126,6 +131,12 @@ export interface ShotSpec {
   pierce: boolean;
   /** spread: 탄마다 속도 ±비율 */
   speedJitter: number;
+  /** 데이터에 탄속이 있었는가(lob은 0이면 고정 비행 시간) */
+  speedGiven: boolean;
+  /** 기본 공격 파편 */
+  split?: { count: number; damage: number; range: number; speed: number };
+  /** zone 궁극기 */
+  zone?: { radius: number; duration: number; slow: number; dps: number };
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime: number;
   /** leap: 폭탄이 터지기까지(초) */
@@ -149,6 +160,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       lateralOffset: s.lateralOffset ?? 0,
       pierce: s.pierce ?? false,
       speedJitter: s.speedJitter ?? 0,
+      speedGiven: s.projectileSpeed > 0,
+      zone: s.zone,
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
       leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
       fuse: s.fuse ?? DEFAULT_FUSE,
@@ -169,6 +182,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     lateralOffset: a.lateralOffset ?? 0,
     pierce: a.pierce ?? false,
     speedJitter: a.speedJitter ?? 0,
+    speedGiven: a.projectileSpeed > 0,
+    split: a.split,
     aoeRadius: a.aoeRadius ?? DEFAULT_LOB_AOE,
     damageFar: a.damageFar,
     leapTime: DEFAULT_LEAP_TIME,
@@ -225,6 +240,14 @@ export class Sim implements SimView {
   /** 이번 틱에 받은 넉백 방향의 합(같은 틱 여러 발을 하나로 합친다) */
   /** 공격 묶음 번호(넉백 한 번 규칙) */
   private nextGroup = 1;
+  /** 파편으로 갈라지는 본탄 → 파편 값 */
+  private readonly splitters = new Map<EntityId, { count: number; damage: number; range: number; speed: number }>();
+  /** stepProjectile 동안 마지막으로 맞힌 유닛 */
+  private lastHitId: EntityId | null = null;
+  /** 지대별·유닛별 아직 주지 않은 소수 피해 */
+  private readonly zoneAcc = new Map<string, number>();
+  /** lob id → 넉백 거리 */
+  private readonly lobKnock = new Map<EntityId, number>();
   /** 대상별로 이미 넉백을 준 탄 묶음 */
   private readonly knockedBy = new Map<EntityId, Set<number>>();
   private readonly knockAcc = new Map<EntityId, { sx: number; sy: number; distance: number; fx: number; fy: number }>();
@@ -325,6 +348,7 @@ export class Sim implements SimView {
     if (!over) for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
     this.stepProjectiles();
     this.stepLobs();
+    if (!over) this.stepZones();
     if (!over && this.match.mode === 'crystal') this.stepCrystals();
     if (!over) for (const u of this.units) if (u.alive) this.regen(u);
     if (this.broken.length) this.events.push({ type: 'wallsBroken', tiles: dedupeTiles(this.broken) });
@@ -485,7 +509,7 @@ export class Sim implements SimView {
 
     const move = input ? clampLen(input.move, 1) : { x: 0, y: 0 };
     if (len(move) > 0.05) {
-      const speed = def.moveSpeed * TICK_DT;
+      const speed = def.moveSpeed * TICK_DT * (1 - this.slowAt(f));
       const next = moveCircle(this.grid, f.pos, f.radius, move.x * speed, move.y * speed);
       f.moving = dist(next, f.pos) > 1e-4;
       f.pos = next;
@@ -538,6 +562,9 @@ export class Sim implements SimView {
         break;
       case 'leap':
         this.startLeap(f, spec, dir, ratio);
+        break;
+      case 'zone':
+        this.placeZone(f, spec, dir, ratio);
         break;
     }
   }
@@ -608,6 +635,7 @@ export class Sim implements SimView {
       ...(groupId !== undefined ? { groupId } : {}),
       hitIds: [],
     });
+    if (spec.split && spec.split.count > 0) this.splitters.set(this.projectiles[this.projectiles.length - 1]!.id, spec.split);
   }
 
   /** 근접: 전방 부채꼴 안, 시야가 트인 적에게 즉시 피해 */
@@ -632,28 +660,39 @@ export class Sim implements SimView {
   }
 
   /** 포물선: 조준 비율만큼 떨어진 지점에 비행 시간 뒤 범위 피해 */
+  /**
+   * 포물선: 조준 비율만큼(최소 LOB_MIN_DIST) 떨어진 지점에 count개를 조준과 수직으로 LOB_SPACING 간격으로 나란히.
+   * 비행 시간은 데이터 탄속(없으면 LOB_FLIGHT_TICKS). 궁극기 넉백은 폭발 중심에서 밀어낸다.
+   */
   private fireLob(f: Fighter, spec: ShotSpec, dir: number, ratio: number) {
-    const d = spec.range * Math.max(0, Math.min(1, ratio));
-    const to = {
-      x: Math.max(0, Math.min(this.grid.width, f.pos.x + Math.cos(dir) * d)),
-      y: Math.max(0, Math.min(this.grid.height, f.pos.y + Math.sin(dir) * d)),
-    };
-    const flight = Math.max(1, Math.round((dist(f.pos, to) / spec.projectileSpeed) * TICK_RATE));
-    this.lobs.push({
-      id: this.nextId++,
-      type: 'lob',
-      ownerId: f.id,
-      team: f.team,
-      from: { ...f.pos },
-      to,
-      startTick: this.tick,
-      endTick: this.tick + flight,
-      damage: spec.damage,
-      aoeRadius: spec.aoeRadius,
-      isSuper: spec.isSuper,
-      breaksWalls: spec.breaksWalls,
-    });
+    const d = Math.max(LOB_MIN_DIST, spec.range * Math.max(0, Math.min(1, ratio)));
+    const cx = f.pos.x + Math.cos(dir) * d;
+    const cy = f.pos.y + Math.sin(dir) * d;
+    const px = -Math.sin(dir);
+    const py = Math.cos(dir);
+    for (let i = 0; i < spec.count; i++) {
+      const off = (i - (spec.count - 1) / 2) * LOB_SPACING;
+      const to = this.clampToMap({ x: cx + px * off, y: cy + py * off });
+      const flight = spec.speedGiven ? Math.max(1, Math.round((dist(f.pos, to) / spec.projectileSpeed) * TICK_RATE)) : LOB_FLIGHT_TICKS;
+      const id = this.nextId++;
+      this.lobs.push({
+        id,
+        type: 'lob',
+        ownerId: f.id,
+        team: f.team,
+        from: { ...f.pos },
+        to,
+        startTick: this.tick,
+        endTick: this.tick + flight,
+        damage: spec.damage,
+        aoeRadius: spec.aoeRadius,
+        isSuper: spec.isSuper,
+        breaksWalls: spec.breaksWalls,
+      });
+      if (spec.knockback > 0) this.lobKnock.set(id, spec.knockback);
+    }
   }
+
 
   /**
    * 돌진 한 틱: 앞쪽의 부서지는 벽을 부수고 직선으로 나아간다.
@@ -871,8 +910,97 @@ export class Sim implements SimView {
 
   private stepProjectiles() {
     const keep: Projectile[] = [];
-    for (const p of this.projectiles) if (this.stepProjectile(p)) keep.push(p);
-    this.projectiles = keep;
+    const shards: Projectile[] = [];
+    for (const p of this.projectiles) {
+      this.lastHitId = null;
+      if (this.stepProjectile(p)) {
+        keep.push(p);
+        continue;
+      }
+      const split = this.splitters.get(p.id);
+      if (split) {
+        this.splitters.delete(p.id);
+        if (!this.over) shards.push(...this.makeShards(p, split, this.lastHitId));
+      }
+    }
+    this.projectiles = keep.concat(shards);
+  }
+
+  /**
+   * 파편: 본탄이 맞거나 벽·사거리 끝에서 멈춘 자리에서 split.count개를 360도로 고르게(첫 파편은 본탄 진행 방향).
+   * 다시 갈라지지 않고, 본탄이 맞힌 대상은 맞히지 않는다. 다음 틱부터 날아간다.
+   */
+  private makeShards(p: Projectile, split: { count: number; damage: number; range: number; speed: number }, hitId: EntityId | null): Projectile[] {
+    const base = angleOf(p.vel);
+    const out: Projectile[] = [];
+    for (let i = 0; i < split.count; i++) {
+      out.push({
+        id: this.nextId++,
+        type: 'projectile',
+        ownerId: p.ownerId,
+        team: p.team,
+        pos: { ...p.pos },
+        vel: fromAngle(base + (i * Math.PI * 2) / split.count, split.speed),
+        radius: PROJECTILE_RADIUS,
+        damage: split.damage,
+        remaining: split.range,
+        isSuper: false,
+        breaksWalls: false,
+        knockback: 0,
+        pierce: false,
+        hitIds: hitId !== null ? [hitId] : [],
+      });
+    }
+    return out;
+  }
+
+  /** 지대: 조준 지점(최소 ZONE_MIN_DIST)에 바로 깔린다 */
+  private placeZone(f: Fighter, spec: ShotSpec, dir: number, ratio: number) {
+    const z = spec.zone;
+    if (!z) return;
+    const d = Math.max(ZONE_MIN_DIST, spec.range * Math.max(0, Math.min(1, ratio)));
+    const pos = this.clampToMap({ x: f.pos.x + Math.cos(dir) * d, y: f.pos.y + Math.sin(dir) * d });
+    this.zones.push({
+      id: this.nextId++,
+      type: 'zone',
+      ownerId: f.id,
+      team: f.team,
+      pos,
+      radius: z.radius,
+      untilTick: this.tick + Math.max(1, secToTicks(z.duration)),
+      slow: z.slow,
+      dps: z.dps,
+    });
+  }
+
+  /** 지대 한 틱: 끝난 지대 정리, 안의 적에게 피해를 모아 ZONE_HIT_TICKS마다 정수로 준다 */
+  private stepZones() {
+    if (!this.zones.length) return;
+    this.zones = this.zones.filter((z) => this.tick < z.untilTick);
+    for (const z of this.zones) {
+      for (const u of this.units) {
+        if (!isHittable(u) || u.team === z.team) continue;
+        if (dist(u.pos, z.pos) > z.radius + u.radius) continue;
+        const key = `${z.id}:${u.id}`;
+        const acc = (this.zoneAcc.get(key) ?? 0) + z.dps * TICK_DT;
+        if ((this.tick - z.id) % ZONE_HIT_TICKS === 0 && acc >= 1) {
+          const dmg = Math.floor(acc);
+          this.zoneAcc.set(key, acc - dmg);
+          this.damage(u, dmg, z.ownerId, true);
+        } else this.zoneAcc.set(key, acc);
+      }
+    }
+    if (this.zoneAcc.size > 64) {
+      const live = new Set(this.zones.map((z) => z.id));
+      for (const k of [...this.zoneAcc.keys()]) if (!live.has(Number(k.split(':')[0]))) this.zoneAcc.delete(k);
+    }
+  }
+
+  /** 적 지대 안이면 가장 큰 감속 비율(0~1) */
+  private slowAt(f: Fighter): number {
+    let s = 0;
+    for (const z of this.zones) if (z.team !== f.team && dist(f.pos, z.pos) <= z.radius + f.radius) s = Math.max(s, z.slow);
+    return Math.min(1, s);
   }
 
   /**
@@ -939,6 +1067,7 @@ export class Sim implements SimView {
   /** traveled: 발사 지점부터 맞은 지점까지 날아간 거리(거리 비례 피해용) */
   private projectileHit(p: Projectile, u: Unit, traveled: number) {
     if (this.over) return; // 경기가 끝난 뒤의 탄은 아무 효과 없음
+    this.lastHitId = u.id;
     this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper);
     if (u.alive && p.knockback > 0) {
       // 같은 공격 묶음의 탄은 한 대상을 한 번만 밀어낸다(피해는 탄마다)
@@ -976,8 +1105,11 @@ export class Sim implements SimView {
         if (!isHittable(u) || u.team === l.team) continue;
         if (dist(u.pos, l.to) > l.aoeRadius + u.radius) continue;
         this.damage(u, l.damage, l.ownerId, l.isSuper);
+        const kb = this.lobKnock.get(l.id);
+        if (kb && u.alive) this.applyKnockback(u, u.pos.x - l.to.x, u.pos.y - l.to.y, kb, angleOf({ x: l.to.x - l.from.x, y: l.to.y - l.from.y }));
         if (!l.isSuper && owner?.type === 'fighter') this.chargeFromHit(owner);
       }
+      this.lobKnock.delete(l.id);
     }
     this.lobs = keep;
   }
