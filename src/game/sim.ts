@@ -279,6 +279,7 @@ export class Sim implements SimView {
           id: this.nextId++,
           type: 'dummy',
           behavior: d.behavior,
+          ...(d.axis ? { patrolAxis: d.axis } : {}),
           team: 1,
           pos: { ...d.pos },
           spawn: { ...d.pos },
@@ -782,8 +783,14 @@ export class Sim implements SimView {
 
   private resetDummyBehavior(d: Dummy) {
     if (d.behavior === 'patrol') {
-      d.patrolFrom = { x: d.spawn.x - PATROL_HALF_WIDTH, y: d.spawn.y };
-      d.patrolTo = { x: d.spawn.x + PATROL_HALF_WIDTH, y: d.spawn.y };
+      // 맵 글자로 방향을 정한다: p = 좌우, q = 위아래
+      if (d.patrolAxis === 'y') {
+        d.patrolFrom = { x: d.spawn.x, y: d.spawn.y - PATROL_HALF_WIDTH };
+        d.patrolTo = { x: d.spawn.x, y: d.spawn.y + PATROL_HALF_WIDTH };
+      } else {
+        d.patrolFrom = { x: d.spawn.x - PATROL_HALF_WIDTH, y: d.spawn.y };
+        d.patrolTo = { x: d.spawn.x + PATROL_HALF_WIDTH, y: d.spawn.y };
+      }
       d.patrolForward = true;
     }
     if (d.behavior === 'turret') d.nextFireTick = this.tick + TURRET_INTERVAL_TICKS;
@@ -1088,7 +1095,8 @@ export class Sim implements SimView {
 }
 
 function defaultFacing(team: Team): number {
-  return team === 0 ? 0 : Math.PI;
+  // 세로 맵: 팀0은 아래에서 위로(−y), 팀1은 위에서 아래로(+y)
+  return team === 0 ? -Math.PI / 2 : Math.PI / 2;
 }
 
 function knockOf(u: Unit): KnockState | null {

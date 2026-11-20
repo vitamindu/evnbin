@@ -33,7 +33,7 @@ export enum Ground {
  *  #  벽(부서짐)      X  단단한 벽    B  수풀              W  물
  *  C  크리스탈 생성 지점(바닥, 크리스탈 러시)
  *  A  팀0 출발 지점(바닥)       Z  팀1 출발 지점(바닥)
- *  d  더미(가만히)  p  더미(왕복)  t  더미(마주 쏨)   — 모두 바닥 위
+ *  d  더미(가만히)  p  더미(좌우 왕복)  q  더미(위아래 왕복)  t  더미(마주 쏨)   — 모두 바닥 위
  * 출발 지점·더미 칸의 바닥 무늬는 왼쪽 칸의 바닥 무늬를 따른다.
  */
 export interface MapDef {
@@ -45,6 +45,8 @@ export interface MapDef {
 export interface DummySpawn {
   pos: Vec2;
   behavior: DummyBehavior;
+  /** patrol 방향('q' 글자면 위아래) */
+  axis?: 'x' | 'y';
 }
 
 const CHAR_TILE: Record<string, Tile> = {
@@ -60,6 +62,7 @@ const CHAR_TILE: Record<string, Tile> = {
   Z: Tile.Floor,
   d: Tile.Floor,
   p: Tile.Floor,
+  q: Tile.Floor,
   t: Tile.Floor,
 };
 
@@ -68,7 +71,7 @@ const CHAR_GROUND: Record<string, Ground> = { ',': Ground.Grass, '=': Ground.Lan
 /** 바닥 무늬를 왼쪽 칸에서 물려받는 글자 */
 const INHERITS_GROUND = new Set(['A', 'Z', 'd', 'p', 't']);
 
-const DUMMY_CHAR: Record<string, DummyBehavior> = { d: 'idle', p: 'patrol', t: 'turret' };
+const DUMMY_CHAR: Record<string, DummyBehavior> = { d: 'idle', p: 'patrol', q: 'patrol', t: 'turret' };
 
 export class Grid {
   readonly id: string;
@@ -101,7 +104,7 @@ export class Grid {
         if (ch === 'A') this.teamSpawns[0].push(center);
         if (ch === 'Z') this.teamSpawns[1].push(center);
         const b = DUMMY_CHAR[ch];
-        if (b) this.dummySpawns.push({ pos: center, behavior: b });
+        if (b) this.dummySpawns.push({ pos: center, behavior: b, ...(ch === 'q' ? { axis: 'y' as const } : {}) });
         if (ch === 'C') this.crystalSpawns.push(center);
       }
     });

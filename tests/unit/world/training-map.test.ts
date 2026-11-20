@@ -37,12 +37,12 @@ function reachable(grid: Grid, from: Vec2, passWalls: boolean): Set<number> {
 const key = (grid: Grid, p: Vec2) => Math.floor(p.y) * grid.width + Math.floor(p.x);
 
 describe('연습장 맵', () => {
-  it('가로로 긴 크기이고 모든 줄 길이가 같다', () => {
+  it('세로로 긴 크기이고 모든 줄 길이가 같다', () => {
     const grid = g();
-    expect(grid.width).toBeGreaterThanOrEqual(30);
-    expect(grid.width).toBeLessThanOrEqual(36);
-    expect(grid.height).toBeGreaterThanOrEqual(17);
-    expect(grid.height).toBeLessThanOrEqual(21);
+    expect(grid.height).toBeGreaterThanOrEqual(30);
+    expect(grid.height).toBeLessThanOrEqual(36);
+    expect(grid.width).toBeGreaterThanOrEqual(17);
+    expect(grid.width).toBeLessThanOrEqual(21);
     for (const row of TRAINING_YARD.rows) expect(row.length).toBe(grid.width);
   });
 
@@ -58,15 +58,16 @@ describe('연습장 맵', () => {
     }
   });
 
-  it('팀0 출발 지점은 왼쪽, 더미는 오른쪽(idle 3+, patrol 1, turret 1)', () => {
+  it('팀0 출발 지점은 아래쪽, 더미는 위쪽(idle 3+, patrol 1, turret 1)', () => {
     const grid = g();
     expect(grid.teamSpawns[0].length).toBeGreaterThanOrEqual(1);
-    for (const s of grid.teamSpawns[0]) expect(s.x).toBeLessThan(grid.width / 4);
+    for (const s of grid.teamSpawns[0]) expect(s.y).toBeGreaterThan((grid.height * 3) / 4);
     const count = (b: string) => grid.dummySpawns.filter((d) => d.behavior === b).length;
     expect(count('idle')).toBeGreaterThanOrEqual(3);
     expect(count('patrol')).toBe(1);
+    expect(grid.dummySpawns.find((d) => d.behavior === 'patrol')!.axis).toBe('y');
     expect(count('turret')).toBe(1);
-    for (const d of grid.dummySpawns) expect(d.pos.x).toBeGreaterThan(grid.width / 2);
+    for (const d of grid.dummySpawns) expect(d.pos.y).toBeLessThan(grid.height / 2);
   });
 
   it('모든 종류의 지형이 있다', () => {
@@ -79,22 +80,22 @@ describe('연습장 맵', () => {
     expect(walls.length).toBeGreaterThanOrEqual(4);
   });
 
-  it('왕복 더미는 좌우 3타일씩 막힘 없이 움직인다', () => {
+  it('왕복 더미는 위아래 3타일씩 막힘 없이 움직인다', () => {
     const grid = g();
     const p = grid.dummySpawns.find((d) => d.behavior === 'patrol')!;
     for (const dir of [-1, 1]) {
       let pos = { ...p.pos };
-      for (let i = 0; i < 30; i++) pos = moveCircle(grid, pos, 0.45, dir * 0.1, 0);
-      expect(pos.x).toBeCloseTo(p.pos.x + dir * 3, 6);
-      expect(pos.y).toBeCloseTo(p.pos.y, 6);
+      for (let i = 0; i < 30; i++) pos = moveCircle(grid, pos, 0.45, 0, dir * 0.1);
+      expect(pos.y).toBeCloseTo(p.pos.y + dir * 3, 6);
+      expect(pos.x).toBeCloseTo(p.pos.x, 6);
     }
   });
 
-  it('포탑 더미는 서쪽이 일부 가려져 있다(엄폐) — 그래도 보이는 칸이 있다', () => {
+  it('포탑 더미는 남쪽(플레이어 쪽)이 일부 가려져 있다(엄폐) — 그래도 보이는 칸이 있다', () => {
     const grid = g();
     const t = grid.dummySpawns.find((d) => d.behavior === 'turret')!;
-    const west = { x: t.pos.x - 4, y: t.pos.y };
-    expect(hasLineOfSight(grid, t.pos, west)).toBe(false);
+    const south = { x: t.pos.x, y: t.pos.y + 4 };
+    expect(hasLineOfSight(grid, t.pos, south)).toBe(false);
     let visible = 0;
     for (let y = 1; y < grid.height - 1; y++) {
       for (let x = 1; x < grid.width - 1; x++) {
@@ -122,17 +123,17 @@ describe('연습장 맵', () => {
     for (const d of grid.dummySpawns) expect(all.has(key(grid, d.pos))).toBe(true);
   });
 
-  it('사격장 레인: 과녁 더미 왼쪽으로 10타일 이상 트인 레인', () => {
+  it('사격장 레인: 과녁 더미 아래쪽으로 10타일 이상 트인 레인', () => {
     const grid = g();
     const target = grid.dummySpawns.find((d) => grid.ground(Math.floor(d.pos.x), Math.floor(d.pos.y)) === Ground.Lane);
     expect(target).toBeDefined();
     const tx = Math.floor(target!.pos.x);
     const ty = Math.floor(target!.pos.y);
     for (let k = 1; k <= 10; k++) {
-      expect(grid.get(tx - k, ty)).toBe(Tile.Floor);
-      expect(grid.ground(tx - k, ty)).toBe(Ground.Lane);
+      expect(grid.get(tx, ty + k)).toBe(Tile.Floor);
+      expect(grid.ground(tx, ty + k)).toBe(Ground.Lane);
     }
-    expect(hasLineOfSight(grid, { x: target!.pos.x - 10, y: target!.pos.y }, target!.pos)).toBe(true);
+    expect(hasLineOfSight(grid, { x: target!.pos.x, y: target!.pos.y + 10 }, target!.pos)).toBe(true);
   });
 });
 

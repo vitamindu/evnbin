@@ -82,6 +82,8 @@ export interface Dummy extends UnitBase {
   patrolFrom?: Vec2;
   patrolTo?: Vec2;
   patrolForward?: boolean;
+  /** patrol 방향: 'x' 좌우(기본), 'y' 위아래 */
+  patrolAxis?: 'x' | 'y';
   nextFireTick?: number;
 }
 

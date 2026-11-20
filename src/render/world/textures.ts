@@ -214,6 +214,38 @@ export function buildFloorTexture(grid: Grid, ppt = 64): THREE.CanvasTexture {
 }
 
 /** 사격장 레인: 테두리 선, 과녁까지의 거리 눈금(2타일마다 숫자) */
+/** 세로 사격장: 좌우 테두리, 과녁(위)에서 아래로 2타일마다 거리 숫자 */
+function drawVerticalLane(ctx: CanvasRenderingContext2D, tx: number, ty: number, left: number, right: number, bottom: number, P: number) {
+  ctx.fillStyle = FLOOR.laneLine;
+  ctx.fillRect(left * P, ty * P, 4, (bottom + 1 - ty) * P);
+  ctx.fillRect((right + 1) * P - 4, ty * P, 4, (bottom + 1 - ty) * P);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.round(P * 0.46)}px 'Lilita One', 'Arial Black', sans-serif`;
+  for (let k = 1; ty + k <= bottom; k++) {
+    const y = (ty + k + 0.5) * P;
+    if (k % 2 === 1) {
+      ctx.fillStyle = FLOOR.laneLine;
+      ctx.fillRect(left * P, y - 2, P * 0.22, 4);
+      ctx.fillRect((right + 1) * P - P * 0.22, y - 2, P * 0.22, 4);
+      continue;
+    }
+    const nx = (left + 0.45) * P;
+    ctx.fillStyle = 'rgba(247,249,255,0.9)';
+    for (let x = nx + P * 0.32; x < (right + 1) * P - 8; x += 16) ctx.fillRect(x, y - 2.5, 9, 5);
+    ctx.fillStyle = 'rgba(30,34,60,0.55)';
+    roundRect(ctx, nx - P * 0.3, y - P * 0.26, P * 0.6, P * 0.5, 9);
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = OUTLINE_COLOR;
+    ctx.strokeText(String(k), nx, y + 1);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(String(k), nx, y + 1);
+  }
+  void tx;
+}
+
 function drawLanes(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
   const lane = (tx: number, ty: number) => grid.ground(tx, ty) === Ground.Lane && grid.get(tx, ty) === Tile.Floor;
   for (const d of grid.dummySpawns) {
@@ -228,6 +260,20 @@ function drawLanes(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
     while (lane(left - 1, ty)) left--;
     let right = tx;
     while (lane(right + 1, ty)) right++;
+
+    // 세로 레인(과녁이 위쪽 끝, 아래로 갈수록 멀다)
+    let vTop = ty;
+    while (lane(tx, vTop - 1)) vTop--;
+    let vBottom = ty;
+    while (lane(tx, vBottom + 1)) vBottom++;
+    let vLeft = tx;
+    while (lane(vLeft - 1, ty + 1)) vLeft--;
+    let vRight = tx;
+    while (lane(vRight + 1, ty + 1)) vRight++;
+    if (vBottom - ty > right - left) {
+      drawVerticalLane(ctx, tx, ty, vLeft, vRight, vBottom, P);
+      continue;
+    }
 
     // 테두리 선
     ctx.fillStyle = FLOOR.laneLine;
@@ -318,12 +364,20 @@ function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
     const y = d.pos.y * P;
     const col = DUMMY_PAD[d.behavior] ?? '#e84a4a';
     if (d.behavior === 'patrol') {
-      // 왕복 경로: 좌우 3타일 점선 + 끝 표시
+      // 왕복 경로: 3타일 점선 + 끝 표시('q'면 위아래, 아니면 좌우)
       ctx.fillStyle = col;
-      for (let k = -3 * P; k < 3 * P; k += 22) ctx.fillRect(x + k + 4, y - 3, 12, 6);
-      for (const e of [-1, 1]) {
-        roundRect(ctx, x + e * 3 * P - 4, y - P * 0.28, 8, P * 0.56, 4);
-        ctx.fill();
+      if (d.axis === 'y') {
+        for (let k = -3 * P; k < 3 * P; k += 22) ctx.fillRect(x - 3, y + k + 4, 6, 12);
+        for (const e of [-1, 1]) {
+          roundRect(ctx, x - P * 0.28, y + e * 3 * P - 4, P * 0.56, 8, 4);
+          ctx.fill();
+        }
+      } else {
+        for (let k = -3 * P; k < 3 * P; k += 22) ctx.fillRect(x + k + 4, y - 3, 12, 6);
+        for (const e of [-1, 1]) {
+          roundRect(ctx, x + e * 3 * P - 4, y - P * 0.28, 8, P * 0.56, 4);
+          ctx.fill();
+        }
       }
     }
     if (d.behavior === 'turret') {
