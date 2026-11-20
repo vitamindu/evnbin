@@ -17,6 +17,8 @@ export interface BufferedSnap {
   lobs: readonly Lob[];
   /** 바닥의 크리스탈(움직이지 않으므로 보간 없이 뒤 snap 것을 쓴다) */
   crystals?: readonly Crystal[];
+  /** 바닥 장판(움직이지 않는다) */
+  zones?: readonly Zone[];
   match: MatchState;
   /** 이 snap에 실려 온 사건(직전 snap 이후) */
   events: readonly SimEvent[];
@@ -118,6 +120,7 @@ function fromSnap(s: BufferedSnap, tick: number): NetSimView {
     s.lobs.filter((l) => l.startTick <= tick && tick < l.endTick).map((l) => ({ ...l })),
     s.match,
     (s.crystals ?? []).map((c) => ({ ...c })),
+    (s.zones ?? []).map((z) => ({ ...z })),
   );
 }
 
@@ -190,7 +193,7 @@ function interpolate(a: BufferedSnap, b: BufferedSnap, t: number): NetSimView {
     if (l.startTick <= t && t < l.endTick) lobs.push({ ...l });
   }
 
-  return new NetSimView(t, units, projectiles, lobs, a.match, (b.crystals ?? []).map((c) => ({ ...c })));
+  return new NetSimView(t, units, projectiles, lobs, a.match, (b.crystals ?? []).map((c) => ({ ...c })), (b.zones ?? []).map((z) => ({ ...z })));
 }
 
 function extrapolate(prev: BufferedSnap | null, last: BufferedSnap, t: number): NetSimView {

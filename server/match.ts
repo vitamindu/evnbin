@@ -173,6 +173,7 @@ export class Match {
       projectiles: this.sim.projectiles,
       lobs: this.sim.lobs,
       crystals: this.sim.crystals ?? [],
+      zones: this.sim.zones ?? [],
       match: this.sim.match,
     };
     const body = JSON.stringify({ ...state, events: this.events }, roundReplacer).slice(1);
