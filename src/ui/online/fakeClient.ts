@@ -285,6 +285,13 @@ export function createFakeOnlineClient(): FakeOnlineClient {
       later(60, publish);
     },
 
+    setMode(mode) {
+      const p = me();
+      if (!room || !p?.host || room.phase !== 'lobby') return;
+      room.mode = mode;
+      later(60, publish);
+    },
+
     setReady(ready) {
       const p = me();
       if (!p) return;

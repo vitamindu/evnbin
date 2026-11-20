@@ -1,5 +1,5 @@
 import type { FighterId } from '../data/fighters';
-import type { Team } from '../game/types';
+import type { MatchMode, Team } from '../game/types';
 import type { BattleLike } from '../battle/types';
 import type { MatchResult, MatchStartInfo, RoomState } from './protocol';
 
@@ -33,6 +33,8 @@ export interface OnlineClient {
   setFighter(fighterId: FighterId): void;
   setTeam(team: Team): void;
   setFillBots(fill: boolean): void;
+  /** 방장만: 경기 방식(teamfight | crystal) */
+  setMode(mode: MatchMode): void;
   setReady(ready: boolean): void;
   /** 방장만 */
   startMatch(): void;

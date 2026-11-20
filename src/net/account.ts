@@ -141,8 +141,10 @@ export async function call<T>(method: string, path: string, body?: unknown, toke
 }
 
 /** 가입(아이디·비밀번호·닉네임). 성공하면 바로 로그인 상태 */
-export async function signup(username: string, password: string, nickname: string): Promise<Profile> {
-  const r = await call<AuthResponse>('POST', '/api/signup', { username: username.trim(), password, nickname: nickname.trim() });
+export async function signup(username: string, password: string, nickname?: string): Promise<Profile> {
+  // 닉네임 칸이 없는 화면에서 부르면 아이디를 닉네임으로 쓴다
+  const nick = (nickname ?? username).trim();
+  const r = await call<AuthResponse>('POST', '/api/signup', { username: username.trim(), password, nickname: nick });
   setToken(r.token);
   setProfile(r.profile, r.username);
   return r.profile;
