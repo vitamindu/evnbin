@@ -178,6 +178,15 @@ export class Room {
     return null;
   }
 
+  /** 방장만: 경기 방식(teamfight | crystal) */
+  setMode(id: string, mode: MatchMode): RoomError | null {
+    if (id !== this.hostId) return 'not_host';
+    if (this.phase !== 'lobby') return 'in_progress';
+    if (mode !== 'teamfight' && mode !== 'crystal') return null;
+    this.mode = mode;
+    return null;
+  }
+
   setFillBots(id: string, fill: boolean): RoomError | null {
     if (id !== this.hostId) return 'not_host';
     if (this.phase !== 'lobby') return 'in_progress';

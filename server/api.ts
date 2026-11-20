@@ -37,6 +37,11 @@ const STATUS: Record<AccountApiError, number> = {
   weak_password: 400,
   bad_request: 400,
   rate_limited: 429,
+  nickname_taken: 409,
+  invalid_nickname: 400,
+  not_found: 404,
+  already_friends: 409,
+  self: 400,
 };
 
 class HttpError extends Error {
@@ -76,6 +81,8 @@ export interface ApiDeps {
   limiter: RateLimiter;
   allowedOrigins: readonly string[];
   log: (m: string) => void;
+  /** 그 계정이 지금 웹소켓으로 연결돼 있는가, 방에 있는가(친구 목록용) */
+  presence?: (account: string) => { online: boolean; inRoom: boolean };
 }
 
 /** /api/*이면 처리하고 true. 아니면 false(다른 경로는 app.ts가 처리) */
@@ -86,7 +93,7 @@ export function handleApi(req: IncomingMessage, res: ServerResponse, deps: ApiDe
   const headers: Record<string, string> = { 'content-type': 'application/json', 'cache-control': 'no-store', vary: 'Origin' };
   if (originAllowed(origin, deps.allowedOrigins)) {
     headers['access-control-allow-origin'] = origin!;
-    headers['access-control-allow-methods'] = 'GET, POST, PUT, OPTIONS';
+    headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
     headers['access-control-allow-headers'] = 'Content-Type, Authorization';
     headers['access-control-max-age'] = '600';
   }
@@ -113,15 +120,15 @@ export function handleApi(req: IncomingMessage, res: ServerResponse, deps: ApiDe
   return true;
 }
 
-async function route(req: IncomingMessage, path: string, { store, limiter, log }: ApiDeps): Promise<unknown> {
+async function route(req: IncomingMessage, path: string, { store, limiter, log, presence }: ApiDeps): Promise<unknown> {
   const ip = clientIp(req);
   const method = req.method ?? 'GET';
   if (method === 'POST' && path === '/api/signup') {
     if (limiter.signupBlocked(ip)) throw new HttpError('rate_limited');
     const b = await readJson(req);
-    const r = await store.signup(b.username, b.password);
+    const r = await store.signup(b.username, b.password, b.nickname);
     limiter.signedUp(ip);
-    log(`[api] signup ${r.profile.name}`);
+    log(`[api] signup ${r.username} (${r.profile.name})`);
     return r;
   }
   if (method === 'POST' && path === '/api/login') {
@@ -132,14 +139,54 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log }
       limiter.loginOk(ip);
       return r;
     } catch (err) {
-      if (err instanceof AccountError) limiter.loginFailed(ip);
+      if (err instanceof AccountError && err.code === 'bad_credentials') limiter.loginFailed(ip);
       throw err;
     }
   }
   const key = store.verify(bearer(req));
+  const me = (k: string) => ({ profile: store.profile(k), username: store.username(k) });
+  const friendList = (k: string) => ({
+    friends: store
+      .friends(k)
+      .map((f) => ({
+        nickname: store.nickname(f) ?? '',
+        online: false,
+        inRoom: false,
+        ...(presence?.(f) ?? {}),
+        rankPoints: store.profile(f)?.rankPoints ?? 0,
+      }))
+      .sort((a, b) => Number(b.online) - Number(a.online) || a.nickname.localeCompare(b.nickname)),
+  });
   if (method === 'GET' && path === '/api/me') {
     if (!key) throw new HttpError('unauthorized');
-    return { profile: store.profile(key) };
+    return me(key);
+  }
+  if (method === 'PUT' && path === '/api/nickname') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    const before = store.nickname(key);
+    store.changeNickname(key, typeof b.nickname === 'string' ? b.nickname.trim() : b.nickname);
+    log(`[api] nickname ${before} -> ${store.nickname(key)}`);
+    return me(key);
+  }
+  if (path === '/api/friends' && (method === 'GET' || method === 'POST')) {
+    if (!key) throw new HttpError('unauthorized');
+    if (method === 'POST') {
+      const b = await readJson(req);
+      store.addFriend(key, b.nickname);
+    }
+    return friendList(key);
+  }
+  if (method === 'DELETE' && path.startsWith('/api/friends/')) {
+    if (!key) throw new HttpError('unauthorized');
+    let nickname: string;
+    try {
+      nickname = decodeURIComponent(path.slice('/api/friends/'.length));
+    } catch {
+      throw new HttpError('bad_request');
+    }
+    store.removeFriend(key, nickname);
+    return friendList(key);
   }
   if (method === 'PUT' && path === '/api/profile') {
     if (!key) throw new HttpError('unauthorized');
@@ -149,7 +196,7 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log }
     if (extra.length || b.selected === undefined) throw new HttpError('bad_request');
     const profile = store.updateSelected(key, b.selected);
     if (!profile) throw new HttpError('bad_request');
-    return { profile };
+    return me(key);
   }
   if (method === 'POST' && path === '/api/logout') {
     const token = bearer(req);

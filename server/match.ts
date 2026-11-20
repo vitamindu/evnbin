@@ -168,7 +168,13 @@ export class Match {
 
   /** 지금 상태를 사람들에게 보낸다(공통 본문은 한 번만 문자열로 + 클라이언트별 ack) */
   broadcastSnap() {
-    const state = { units: this.sim.units, projectiles: this.sim.projectiles, lobs: this.sim.lobs, match: this.sim.match };
+    const state = {
+      units: this.sim.units,
+      projectiles: this.sim.projectiles,
+      lobs: this.sim.lobs,
+      crystals: this.sim.crystals ?? [],
+      match: this.sim.match,
+    };
     const body = JSON.stringify({ ...state, events: this.events }, roundReplacer).slice(1);
     this.lastSnapBytes = body.length + 40;
     this.snapsSent++;
