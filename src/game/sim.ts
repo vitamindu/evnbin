@@ -28,6 +28,15 @@ import {
   SUPER_PROJECTILE_RADIUS,
   TEAMFIGHT_TARGET_SCORE,
   TEAMFIGHT_TICKS,
+  CRYSTAL_COUNTDOWN_TICKS,
+  CRYSTAL_DROP_SPREAD,
+  CRYSTAL_FIRST_SPAWN_TICKS,
+  CRYSTAL_MATCH_TICKS,
+  CRYSTAL_MAX_ON_FLOOR,
+  CRYSTAL_RADIUS,
+  CRYSTAL_SPAWN_INTERVAL_TICKS,
+  CRYSTAL_SPAWN_SCATTER,
+  CRYSTAL_WIN_COUNT,
   TURRET_DAMAGE,
   TURRET_INTERVAL_TICKS,
   TURRET_RANGE,
@@ -222,6 +231,17 @@ export class Sim implements SimView {
     this.rng = new Rng(opts.seed);
     if ((opts.mode ?? 'training') === 'teamfight') {
       this.match = { mode: 'teamfight', score: [0, 0], targetScore: TEAMFIGHT_TARGET_SCORE, ticksLeft: TEAMFIGHT_TICKS, winner: null };
+    } else if (opts.mode === 'crystal') {
+      this.match = {
+        mode: 'crystal',
+        score: [0, 0],
+        targetScore: CRYSTAL_WIN_COUNT,
+        ticksLeft: CRYSTAL_MATCH_TICKS,
+        winner: null,
+        crystals: [0, 0],
+        countdownTicks: -1,
+        countdownTeam: null,
+      };
     }
     for (const spec of opts.fighters) {
       const spawns = this.grid.teamSpawns[spec.team];
@@ -250,6 +270,7 @@ export class Sim implements SimView {
         moving: false,
         action: null,
       };
+      if (this.match.mode === 'crystal') f.crystals = 0;
       this.addUnit(f);
     }
     if (opts.dummies) {
@@ -300,6 +321,7 @@ export class Sim implements SimView {
     if (!over) for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
     this.stepProjectiles();
     this.stepLobs();
+    if (!over && this.match.mode === 'crystal') this.stepCrystals();
     if (!over) for (const u of this.units) if (u.alive) this.regen(u);
     if (this.broken.length) this.events.push({ type: 'wallsBroken', tiles: dedupeTiles(this.broken) });
     if (!this.over) this.stepMatchClock();
@@ -330,6 +352,100 @@ export class Sim implements SimView {
     m.score[killer.team]++;
     this.events.push({ type: 'score', team: killer.team, score: [m.score[0], m.score[1]], killerId: killer.id, victimId: u.id });
     if (m.targetScore > 0 && m.score[killer.team] >= m.targetScore) this.endMatch(killer.team);
+  }
+
+  // ───────────── 크리스탈 러시 ─────────────
+
+  /** 다음 크리스탈 생성 틱 */
+  private nextCrystalTick = CRYSTAL_FIRST_SPAWN_TICKS;
+  private nextSpawnPoint = 0;
+
+  /**
+   * 한 틱: 생성(CRYSTAL_FIRST_SPAWN_TICKS 뒤 CRYSTAL_SPAWN_INTERVAL_TICKS마다, 바닥에 CRYSTAL_MAX_ON_FLOOR개까지),
+   * 줍기(닿으면), 팀 합계(match.crystals = match.score), 카운트다운(합계 CRYSTAL_WIN_COUNT 이상이고 상대보다 많으면).
+   */
+  private stepCrystals() {
+    const m = this.match;
+    if (this.tick >= this.nextCrystalTick) {
+      this.nextCrystalTick += CRYSTAL_SPAWN_INTERVAL_TICKS;
+      const points = this.grid.crystalSpawns;
+      if (points.length && this.crystals.length < CRYSTAL_MAX_ON_FLOOR) {
+        const base = points[this.nextSpawnPoint++ % points.length]!;
+        this.placeCrystal(base, CRYSTAL_SPAWN_SCATTER, true);
+      }
+    }
+
+    for (const u of this.units) {
+      if (u.type !== 'fighter' || !isHittable(u) || !this.crystals.length) continue;
+      const r = u.radius + CRYSTAL_RADIUS;
+      const keep: Crystal[] = [];
+      for (const c of this.crystals) {
+        const dx = c.pos.x - u.pos.x;
+        const dy = c.pos.y - u.pos.y;
+        if (dx * dx + dy * dy <= r * r) {
+          u.crystals = (u.crystals ?? 0) + 1;
+          this.events.push({ type: 'crystalPickup', unitId: u.id, crystalId: c.id, carried: u.crystals });
+        } else keep.push(c);
+      }
+      this.crystals = keep;
+    }
+
+    this.updateCrystalTotals();
+    const t = m.crystals!;
+    const leader: Team | null = t[0] >= CRYSTAL_WIN_COUNT && t[0] > t[1] ? 0 : t[1] >= CRYSTAL_WIN_COUNT && t[1] > t[0] ? 1 : null;
+    if (leader === null) {
+      if (m.countdownTeam != null) {
+        m.countdownTeam = null;
+        m.countdownTicks = -1;
+        this.events.push({ type: 'countdown', team: null, ticks: -1 });
+      }
+    } else if (m.countdownTeam !== leader) {
+      m.countdownTeam = leader;
+      m.countdownTicks = CRYSTAL_COUNTDOWN_TICKS;
+      this.events.push({ type: 'countdown', team: leader, ticks: CRYSTAL_COUNTDOWN_TICKS });
+    } else {
+      m.countdownTicks = (m.countdownTicks ?? CRYSTAL_COUNTDOWN_TICKS) - 1;
+      if (m.countdownTicks <= 0) {
+        m.countdownTicks = 0;
+        this.endMatch(leader);
+      }
+    }
+  }
+
+  /** 팀별 들고 있는 크리스탈 합계. score에도 같은 값(점수판·시간 끝 판정용) */
+  private updateCrystalTotals() {
+    const t: [number, number] = [0, 0];
+    for (const u of this.units) if (u.type === 'fighter') t[u.team] += u.crystals ?? 0;
+    this.match.crystals = t;
+    this.match.score = [t[0], t[1]];
+  }
+
+  /** around에서 spread 안의 걸을 수 있는 곳에 크리스탈 하나(못 찾으면 around 그대로) */
+  private placeCrystal(around: Vec2, spread: number, announce: boolean) {
+    let pos = { ...around };
+    for (let i = 0; i < 12; i++) {
+      const a = this.rng.next() * Math.PI * 2;
+      const r = Math.sqrt(this.rng.next()) * spread;
+      const p = { x: around.x + Math.cos(a) * r, y: around.y + Math.sin(a) * r };
+      if (!circleBlocked(this.grid, p.x, p.y, CRYSTAL_RADIUS)) {
+        pos = p;
+        break;
+      }
+    }
+    const c: Crystal = { id: this.nextId++, type: 'crystal', pos };
+    this.crystals.push(c);
+    if (announce) this.events.push({ type: 'crystalSpawn', id: c.id, pos: { ...pos } });
+    return c;
+  }
+
+  /** 쓰러진 파이터가 들고 있던 크리스탈을 그 자리 주변에 흩뿌린다 */
+  private dropCrystals(f: Fighter) {
+    const n = f.crystals ?? 0;
+    if (this.match.mode !== 'crystal' || n <= 0) return;
+    f.crystals = 0;
+    for (let i = 0; i < n; i++) this.placeCrystal(f.pos, CRYSTAL_DROP_SPREAD, false);
+    this.events.push({ type: 'crystalDrop', unitId: f.id, pos: { ...f.pos }, count: n });
+    this.updateCrystalTotals();
   }
 
   private endMatch(winner: Team | -1) {
@@ -887,6 +1003,7 @@ export class Sim implements SimView {
       (u as SimDummy).knock = null;
     }
     this.events.push({ type: 'death', unitId: u.id, pos: { ...u.pos } });
+    if (u.type === 'fighter') this.dropCrystals(u);
     this.scoreKo(u, sourceId);
   }
 
