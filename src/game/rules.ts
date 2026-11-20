@@ -87,5 +87,24 @@ export const TEAMFIGHT_TARGET_SCORE = 10;
 /** 경기 시간. 끝나면 점수가 높은 팀 승리, 같으면 무승부 */
 export const TEAMFIGHT_TICKS = secToTicks(150);
 
+// ── CRYSTAL RUSH ──
+/** 경기 시작 뒤 첫 크리스탈이 생기기까지 */
+export const CRYSTAL_FIRST_SPAWN_TICKS = secToTicks(3);
+/** 그 뒤 크리스탈 생성 간격 */
+export const CRYSTAL_SPAWN_INTERVAL_TICKS = secToTicks(7);
+/** 바닥에 놓일 수 있는 최대 개수(넘으면 생성을 건너뛴다. 떨어뜨린 크리스탈은 제한 없음) */
+export const CRYSTAL_MAX_ON_FLOOR = 10;
+/** 생성 지점 주변에 흩어 놓는 반경(같은 자리에 겹치지 않게) */
+export const CRYSTAL_SPAWN_SCATTER = 0.6;
+/** 크리스탈 몸 반지름: 파이터 원과 이 원이 닿으면 줍는다 */
+export const CRYSTAL_RADIUS = 0.3;
+/** 쓰러진 자리 주변에 흩뿌리는 반경 */
+export const CRYSTAL_DROP_SPREAD = 1.2;
+/** 팀 합계가 이 이상이고 상대보다 많으면 카운트다운 */
+export const CRYSTAL_WIN_COUNT = 10;
+export const CRYSTAL_COUNTDOWN_TICKS = secToTicks(12);
+/** 경기 시간. 끝나면 크리스탈이 많은 팀 승리, 같으면 무승부 */
+export const CRYSTAL_MATCH_TICKS = secToTicks(180);
+
 /** 부동소수 누적 오차 허용치(탄창·게이지 비교) */
 export const EPS = 1e-9;

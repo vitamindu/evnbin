@@ -1,5 +1,7 @@
 import { getFighter } from '../data/fighters';
 import { nearestVisibleEnemy } from './aim';
+import { isHittable } from './status';
+import { isVisibleTo } from './visibility';
 import type { Sim } from './sim';
 import { TICK_DT, type Aim, type EntityId, type Fighter, type FighterInput, type Unit, type Vec2 } from './types';
 import { circleBlocked, hasLineOfSight } from './world';
@@ -55,6 +57,17 @@ export const SIDESTEP_TICKS = 15;
  */
 const PROBE = 0.6;
 const STEER_OFFSETS = [0.5, 1.0, 1.5, 2.0, 2.6];
+// ── 크리스탈 러시 ──
+/** 이 수 이상 들고 체력이 CAREFUL_HP 미만이면 출발 지점으로 물러난다 */
+export const CAREFUL_CARRY = 3;
+export const CAREFUL_HP = 0.6;
+/** 이 거리 안의 보이는 적 운반자는 가장 가까운 적보다 먼저 노린다 */
+export const CHASE_CARRIER_DIST = 12;
+/** 표적이 사거리 + 이만큼보다 멀면 싸우러 가지 않고 바닥 크리스탈을 주우러 간다 */
+export const ENGAGE_MARGIN = 2;
+/** 우리 팀 카운트다운 중 운반자가 아닌 봇은 가장 가까운 우리 운반자 이 거리 안에 머문다 */
+export const ESCORT_DIST = 2.5;
+
 /** 웨이포인트에 이만큼 가까우면 다음으로 */
 const WAYPOINT_REACHED = 1.5;
 
@@ -152,6 +165,57 @@ function roamGoal(sim: Sim, f: Fighter, m: BotMemory): Vec2 {
   return goal;
 }
 
+/** 크리스탈 러시: 보이는 적 운반자 중 가장 많이 든(같으면 가까운) 유닛(CHASE_CARRIER_DIST 안) */
+function enemyCarrier(sim: Sim, f: Fighter): Fighter | null {
+  let best: Fighter | null = null;
+  let bestN = 0;
+  let bestD = Infinity;
+  for (const u of sim.units) {
+    if (u.type !== 'fighter' || u.team === f.team || !isHittable(u) || !(u.crystals! > 0)) continue;
+    const d = dist(f.pos, u.pos);
+    if (d > CHASE_CARRIER_DIST || !isVisibleTo(sim, u, f.team)) continue;
+    if (u.crystals! > bestN || (u.crystals === bestN && d < bestD)) {
+      best = u;
+      bestN = u.crystals!;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * 크리스탈 러시에서 싸울 상대가 가깝지 않을 때 갈 곳:
+ * 우리 카운트다운 중이면 가장 가까운 우리 운반자 곁, 아니면 가장 가까운 바닥 크리스탈, 없으면 생성 지점.
+ * 갈 곳이 없으면 null(평소 행동).
+ */
+function crystalErrand(sim: Sim, f: Fighter, ourCountdown: boolean): Vec2 | null {
+  if (ourCountdown) {
+    let best: Fighter | null = null;
+    let bd = Infinity;
+    for (const u of sim.units) {
+      if (u.type !== 'fighter' || u.id === f.id || u.team !== f.team || !u.alive || !(u.crystals! > 0)) continue;
+      const d = dist(f.pos, u.pos);
+      if (d < bd) {
+        best = u;
+        bd = d;
+      }
+    }
+    if (best) return bd > ESCORT_DIST ? best.pos : null;
+  }
+  let near: Vec2 | null = null;
+  let nd = Infinity;
+  for (const c of sim.crystals) {
+    const d = dist(f.pos, c.pos);
+    if (d < nd) {
+      near = c.pos;
+      nd = d;
+    }
+  }
+  if (near) return near;
+  const spawn = sim.grid.crystalSpawns[0];
+  return spawn && dist(f.pos, spawn) > WAYPOINT_REACHED ? spawn : null;
+}
+
 /** 가려는 방향 앞이 막혔으면 조금씩 꺾어 본다. 다 막혔으면 원래 방향 */
 function steer(sim: Sim, f: Fighter, want: Vec2, m: BotMemory): Vec2 {
   const l = Math.sqrt(want.x * want.x + want.y * want.y);
@@ -219,7 +283,12 @@ export function botInput(sim: Sim, id: EntityId): FighterInput {
     m.strafeUntil = tick + randInt(sim, STRAFE_MIN_TICKS, STRAFE_MAX_TICKS);
   }
 
-  const target = nearestVisibleEnemy(sim, f);
+  const crystalMode = sim.match.mode === 'crystal';
+  const carried = f.crystals ?? 0;
+  const ourCountdown = crystalMode && sim.match.countdownTeam === f.team;
+  if (crystalMode && ((carried >= CAREFUL_CARRY && hp < CAREFUL_HP) || (ourCountdown && carried > 0))) m.retreating = true;
+
+  const target = (crystalMode ? enemyCarrier(sim, f) : null) ?? nearestVisibleEnemy(sim, f);
   if ((target?.id ?? null) !== m.targetId) {
     m.targetId = target?.id ?? null;
     if (target) m.reactTick = tick + randInt(sim, REACT_MIN_TICKS, REACT_MAX_TICKS);
@@ -229,8 +298,11 @@ export function botInput(sim: Sim, id: EntityId): FighterInput {
 
   // ── 이동 ──
   let want: Vec2 = { x: 0, y: 0 };
+  const crystalGoal = crystalMode && !m.retreating && (!target || d > range + ENGAGE_MARGIN) ? crystalErrand(sim, f, ourCountdown) : null;
   if (m.retreating) {
     if (dist(f.pos, f.spawn) > 1) want = dirTo(f.pos, f.spawn);
+  } else if (crystalGoal) {
+    want = dirTo(f.pos, crystalGoal);
   } else if (target) {
     const to = dirTo(f.pos, target.pos);
     const keep = range * KEEP_RANGE;
