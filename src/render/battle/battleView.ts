@@ -143,6 +143,12 @@ export class BattleView {
   private readonly shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', map: this.dotTex, transparent: true, opacity: 0.32, depthWrite: false });
   private readonly glowMats = new Map<string, { halo: THREE.MeshBasicMaterial; trail: THREE.MeshBasicMaterial }>();
   private dustTimer = 0;
+  /** 크리스탈 러시: 바닥의 크리스탈(오리지널 디자인: 깎인 보석 + 바닥 빛 고리) */
+  private readonly crystals = new Map<EntityId, THREE.Group>();
+  private readonly crystalGeo = new THREE.OctahedronGeometry(0.32, 0).scale(0.8, 1.25, 0.8);
+  private readonly crystalMat = new THREE.MeshToonMaterial({ color: '#b46cff', emissive: new THREE.Color('#5a1fa8'), emissiveIntensity: 0.5 });
+  private readonly crystalRingGeo = new THREE.RingGeometry(0.28, 0.4, 28).rotateX(-Math.PI / 2);
+  private readonly crystalRingMat = new THREE.MeshBasicMaterial({ color: '#e2c6ff', transparent: true, opacity: 0.6, depthWrite: false });
   private readonly camTarget = new THREE.Vector3();
   private camInit = false;
   private w = 1;
@@ -222,6 +228,31 @@ export class BattleView {
       if (!shotSeen.has(id)) {
         s.obj.removeFromParent();
         this.shots.delete(id);
+      }
+    }
+
+    const crySeen = new Set<EntityId>();
+    for (const c of sim.crystals ?? []) {
+      crySeen.add(c.id);
+      if (!this.crystals.has(c.id)) {
+        const g = new THREE.Group();
+        const gem = new THREE.Mesh(this.crystalGeo, this.crystalMat);
+        gem.name = 'gem';
+        const ring = new THREE.Mesh(this.crystalRingGeo, this.crystalRingMat);
+        ring.position.y = 0.03;
+        g.add(gem, ring);
+        g.position.set(c.pos.x, 0, c.pos.y);
+        g.userData.phase = (c.id * 0.7) % (Math.PI * 2);
+        this.scene.add(g);
+        this.crystals.set(c.id, g);
+      } else {
+        this.crystals.get(c.id)!.position.set(c.pos.x, 0, c.pos.y);
+      }
+    }
+    for (const [id, g] of this.crystals) {
+      if (!crySeen.has(id)) {
+        g.removeFromParent();
+        this.crystals.delete(id);
       }
     }
 
@@ -353,6 +384,14 @@ export class BattleView {
         case 'death':
           this.puff(e.pos);
           break;
+        case 'crystalPickup': {
+          const v = this.units.get(e.unitId);
+          if (v) this.spark({ x: v.model.root.position.x, y: v.model.root.position.z }, '#d9a8ff', 0.6);
+          break;
+        }
+        case 'crystalDrop':
+          this.ring(e.pos, 1.2, '#c48bff');
+          break;
         case 'explode':
           this.ring(e.pos, e.radius, e.isSuper ? '#ffe14d' : '#ff9a3c');
           break;
@@ -410,6 +449,12 @@ export class BattleView {
         (l.shell.material as THREE.MeshToonMaterial).color.set(on ? '#ffffff' : this.shotColorFromMarker(l));
         l.shell.scale.setScalar(1.1 + (on ? 0.15 : 0));
       }
+    }
+    for (const g of this.crystals.values()) {
+      const gem = g.getObjectByName('gem')!;
+      const ph = g.userData.phase as number;
+      gem.position.y = 0.6 + Math.sin(t * 2.4 + ph) * 0.1;
+      gem.rotation.y = t * 1.6 + ph;
     }
     // 돌진 중이면 발밑에서 먼지
     this.dustTimer -= dt;
@@ -682,6 +727,10 @@ export class BattleView {
     for (const k of this.shotKits.values()) for (const g of [k.core, k.halo, k.trail, k.shadow]) g.dispose();
     for (const g of this.glowMats.values()) (g.halo.dispose(), g.trail.dispose());
     this.trailTex.dispose();
+    this.crystalGeo.dispose();
+    this.crystalMat.dispose();
+    this.crystalRingGeo.dispose();
+    this.crystalRingMat.dispose();
     this.dotTex.dispose();
     this.shadowMat.dispose();
     this.scene.clear();
