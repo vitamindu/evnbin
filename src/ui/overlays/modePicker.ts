@@ -36,6 +36,15 @@ export const MODES: Record<MatchMode, ModeInfo> = {
     blurb: '방 코드로 친구들과 한판 붙어요',
     facts: ['3 대 3', '10 KO 선승', '2:30'],
   },
+  crystal: {
+    id: 'crystal',
+    name: '크리스탈 러시',
+    map: 'BLOSSOM ARENA',
+    icon: 'modeTeamfight',
+    online: true,
+    blurb: '가운데 크리스탈을 모아 끝까지 지켜요',
+    facts: ['3 대 3', '10개 + 12초 버티기'],
+  },
 };
 
 /** 모드 선택 팝업: 두 장의 큰 카드. 고르면 설정에 저장하고 닫는다 */

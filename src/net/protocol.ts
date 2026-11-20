@@ -6,7 +6,7 @@
  *       → 클라이언트 input(매 틱) / 서버 snap(일정 간격) → end → 다시 room
  */
 import type { FighterId } from '../data/fighters';
-import type { Lob, MatchMode, MatchState, Projectile, SimEvent, Team, Unit, Vec2 } from '../game/types';
+import type { Crystal, Lob, MatchMode, MatchState, Projectile, SimEvent, Team, Unit, Vec2 } from '../game/types';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -64,6 +64,7 @@ export interface Snapshot {
   units: Unit[];
   projectiles: Projectile[];
   lobs: Lob[];
+  crystals: Crystal[];
   match: MatchState;
   /** 직전 snap 이후 생긴 사건(효과·피해 숫자·벽 파괴 등) */
   events: SimEvent[];
@@ -100,6 +101,8 @@ export type ClientMsg =
   | { t: 'setFighter'; fighterId: FighterId }
   | { t: 'setTeam'; team: Team }
   | { t: 'setBots'; fillBots: boolean }
+  /** 방장만: 경기 방식(teamfight | crystal) */
+  | { t: 'setMode'; mode: MatchMode }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
   | { t: 'input'; seq: number; move: Vec2; attack?: WireAim; super?: WireAim }

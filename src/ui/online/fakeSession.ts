@@ -83,6 +83,9 @@ export class FakeOnlineSession implements BattleLike {
       get match() {
         return self.match;
       },
+      get crystals() {
+        return sim.crystals;
+      },
       get tick() {
         return sim.tick;
       },

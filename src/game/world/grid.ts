@@ -31,6 +31,7 @@ export enum Ground {
  * 맵 정의. rows의 각 글자가 타일 하나. 모든 줄은 같은 길이로 쓴다(짧으면 나머지는 단단한 벽).
  *  .  바닥(흙 마당)   ,  바닥(풀밭)   =  바닥(사격장 레인)  — 셋 다 로직에서는 같은 바닥
  *  #  벽(부서짐)      X  단단한 벽    B  수풀              W  물
+ *  C  크리스탈 생성 지점(바닥, 크리스탈 러시)
  *  A  팀0 출발 지점(바닥)       Z  팀1 출발 지점(바닥)
  *  d  더미(가만히)  p  더미(왕복)  t  더미(마주 쏨)   — 모두 바닥 위
  * 출발 지점·더미 칸의 바닥 무늬는 왼쪽 칸의 바닥 무늬를 따른다.
@@ -55,6 +56,7 @@ const CHAR_TILE: Record<string, Tile> = {
   B: Tile.Bush,
   W: Tile.Water,
   A: Tile.Floor,
+  C: Tile.Floor,
   Z: Tile.Floor,
   d: Tile.Floor,
   p: Tile.Floor,
@@ -76,6 +78,8 @@ export class Grid {
   private readonly grounds: Uint8Array;
   readonly teamSpawns: [Vec2[], Vec2[]] = [[], []];
   readonly dummySpawns: DummySpawn[] = [];
+  /** 크리스탈 러시: 크리스탈이 생기는 곳('C') */
+  readonly crystalSpawns: Vec2[] = [];
   /** 타일이 바뀔 때마다 1씩 증가(렌더러가 다시 그릴지 판단) */
   version = 0;
 
@@ -98,6 +102,7 @@ export class Grid {
         if (ch === 'Z') this.teamSpawns[1].push(center);
         const b = DUMMY_CHAR[ch];
         if (b) this.dummySpawns.push({ pos: center, behavior: b });
+        if (ch === 'C') this.crystalSpawns.push(center);
       }
     });
   }

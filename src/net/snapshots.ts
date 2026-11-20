@@ -7,7 +7,7 @@
  *  - lob: startTick ≤ 틱 < endTick 인 것.
  *  - 가장 최근 snap보다 뒤를 물으면 조금만(maxExtrapolate 틱) 앞질러 그린다.
  */
-import type { EntityId, Lob, MatchState, Projectile, SimEvent, SimView, Unit, Vec2 } from '../game/types';
+import type { EntityId, Lob, MatchState, Projectile, SimEvent, SimView, Unit, Vec2 , Crystal } from '../game/types';
 import { TICK_DT } from '../game/types';
 
 export interface BufferedSnap {
@@ -29,6 +29,7 @@ export class NetSimView implements SimView {
     readonly projectiles: Projectile[],
     readonly lobs: Lob[],
     readonly match: MatchState,
+    readonly crystals: Crystal[] = [],
   ) {
     for (const u of units) this.byId.set(u.id, u);
   }

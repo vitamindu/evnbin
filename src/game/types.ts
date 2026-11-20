@@ -56,6 +56,8 @@ export interface Fighter extends UnitBase {
   inBush: boolean;
   /** 이 틱까지는 수풀 안이어도 적에게 보인다(공격하면 잠깐 노출) */
   revealedUntil: number;
+  /** crystal: 들고 있는 크리스탈 수 */
+  crystals?: number;
   /** 이번 틱에 이동했는가(걷기 애니메이션용) */
   moving: boolean;
   /**
@@ -155,7 +157,11 @@ export type SimEvent =
   | { type: 'superReady'; unitId: EntityId }
   | { type: 'noAmmo'; unitId: EntityId }
   | { type: 'score'; team: Team; score: [number, number]; killerId: EntityId; victimId: EntityId }
-  | { type: 'matchEnd'; winner: Team | -1; score: [number, number] };
+  | { type: 'matchEnd'; winner: Team | -1; score: [number, number] }
+  | { type: 'crystalSpawn'; id: EntityId; pos: Vec2 }
+  | { type: 'crystalPickup'; unitId: EntityId; crystalId: EntityId; carried: number }
+  | { type: 'crystalDrop'; unitId: EntityId; pos: Vec2; count: number }
+  | { type: 'countdown'; team: Team | null; ticks: number };
 
 /** 시뮬레이션 시작 설정 */
 export interface SpawnFighter {
@@ -167,7 +173,14 @@ export interface SpawnFighter {
 }
 
 /** 경기 방식. training: 연습장(끝 없음), teamfight: 3대3 쓰러뜨리기 대결 */
-export type MatchMode = 'training' | 'teamfight';
+export type MatchMode = 'training' | 'teamfight' | 'crystal';
+
+/** 크리스탈 러시: 바닥에 놓인 크리스탈 */
+export interface Crystal {
+  id: EntityId;
+  type: 'crystal';
+  pos: Vec2;
+}
 
 /** 경기 진행 상태(점수판·타이머용) */
 export interface MatchState {
@@ -180,6 +193,11 @@ export interface MatchState {
   ticksLeft: number;
   /** 진행 중이면 null, 끝나면 이긴 팀(무승부 -1) */
   winner: Team | -1 | null;
+  /** crystal: 팀별로 들고 있는 크리스탈 합계 */
+  crystals?: [number, number];
+  /** crystal: 승리 카운트다운 남은 틱(-1이면 진행 안 함)과 그 팀 */
+  countdownTicks?: number;
+  countdownTeam?: Team | null;
 }
 
 /** 시뮬레이션 상태 조회(렌더러·UI는 이 인터페이스만 쓴다) */
@@ -189,5 +207,7 @@ export interface SimView {
   readonly units: readonly Unit[];
   readonly projectiles: readonly Projectile[];
   readonly lobs: readonly Lob[];
+  /** 크리스탈 러시가 아니면 빈 배열 */
+  readonly crystals: readonly Crystal[];
   getUnit(id: EntityId): Unit | undefined;
 }
