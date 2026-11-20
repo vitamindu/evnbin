@@ -288,7 +288,7 @@ export function createFakeOnlineClient(): FakeOnlineClient {
 
     setMode(mode) {
       const p = me();
-      if (!room || !p) return;
+      if (!room || !p || room.phase !== 'lobby') return;
       if (!p.host) return emit('error', { code: 'not_host', message: 'only the host can change the mode' });
       if (mode !== 'teamfight' && mode !== 'crystal') return;
       room.mode = mode;

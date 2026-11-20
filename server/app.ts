@@ -128,7 +128,18 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   const allowed = (opts.allowedOrigins ?? []).filter(Boolean);
   const accounts = opts.accounts ?? new AccountStore(opts.dataDir ?? defaultDataDir(), Date.now, log);
   const limiter = opts.rateLimiter ?? new RateLimiter();
-  const apiDeps = { store: accounts, limiter, allowedOrigins: opts.apiOrigins ?? DEFAULT_API_ORIGINS, log };
+  /** 친구 목록용: 계정이 지금 연결돼 있는가, 방에 있는가 */
+  const presence = (account: string) => {
+    let online = false;
+    let inRoom = false;
+    for (const c of conns) {
+      if (c.account !== account || !c.open) continue;
+      online = true;
+      if (c.room) inRoom = true;
+    }
+    return { online, inRoom };
+  };
+  const apiDeps = { store: accounts, limiter, allowedOrigins: opts.apiOrigins ?? DEFAULT_API_ORIGINS, log, presence };
   log(`accounts: ${accounts.size} in ${accounts.dir}`);
 
   const health = () => {
@@ -313,7 +324,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         // 토큰이 맞으면 계정 이름, 아니면(없음·만료) 게스트
         const key = msg.token ? accounts.verify(msg.token) : null;
         c.account = key;
-        c.name = key ? (accounts.username(key) ?? sanitizeName(msg.name)) : sanitizeName(msg.name);
+        c.name = key ? (accounts.nickname(key) ?? sanitizeName(msg.name)) : sanitizeName(msg.name);
       }
       if (!c.id) {
         c.id = newPlayerId();
@@ -400,6 +411,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         return;
       case 'setBots':
         if (!sendErr(c, room.setFillBots(c.id, msg.fillBots))) broadcastRoom(room);
+        return;
+      case 'setMode':
+        if (!sendErr(c, room.setMode(c.id, msg.mode))) broadcastRoom(room);
         return;
       case 'ready':
         if (!sendErr(c, room.setReady(c.id, msg.ready))) broadcastRoom(room);

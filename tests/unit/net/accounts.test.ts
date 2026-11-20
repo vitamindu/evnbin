@@ -28,8 +28,9 @@ describe('AccountStore', () => {
   it('signs up and logs in; the file stores only hashes', async () => {
     const dir = tempDir();
     const s = new AccountStore(dir, Date.now, quiet);
-    const a = await s.signup('Mina_01', 'secret1');
-    expect(a.profile.name).toBe('Mina_01');
+    const a = await s.signup('Mina_01', 'secret1', 'Mina');
+    expect(a.profile.name).toBe('Mina');
+    expect(a.username).toBe('Mina_01');
     expect(a.profile.tag).toMatch(/^[0-9A-Z]{8}$/);
     expect(a.profile.coins).toBe(0);
     expect(s.verify(a.token)).toBe('mina_01');
@@ -47,24 +48,24 @@ describe('AccountStore', () => {
 
   it('rejects bad passwords, unknown users, duplicates (case-insensitive) and invalid input', async () => {
     const s = new AccountStore(tempDir(), Date.now, quiet);
-    await s.signup('하늘Sky', 'password');
+    await s.signup('하늘Sky', 'password', '하늘');
     await expect(s.login('하늘sky', 'wrongpass')).rejects.toMatchObject({ code: 'bad_credentials' });
     await expect(s.login('nobody', 'password')).rejects.toMatchObject({ code: 'bad_credentials' });
-    await expect(s.signup('하늘SKY', 'another1')).rejects.toMatchObject({ code: 'username_taken' });
-    await expect(s.signup('ab', 'password')).rejects.toMatchObject({ code: 'invalid_username' });
-    await expect(s.signup('thirteen_char', 'password')).rejects.toMatchObject({ code: 'invalid_username' });
-    await expect(s.signup('bad name', 'password')).rejects.toMatchObject({ code: 'invalid_username' });
-    await expect(s.signup('okname', '12345')).rejects.toMatchObject({ code: 'weak_password' });
-    await expect(s.signup(42, 'password')).rejects.toMatchObject({ code: 'invalid_username' });
+    await expect(s.signup('하늘SKY', 'another1', 'other')).rejects.toMatchObject({ code: 'username_taken' });
+    await expect(s.signup('ab', 'password', 'nick')).rejects.toMatchObject({ code: 'invalid_username' });
+    await expect(s.signup('thirteen_char', 'password', 'nick')).rejects.toMatchObject({ code: 'invalid_username' });
+    await expect(s.signup('bad name', 'password', 'nick')).rejects.toMatchObject({ code: 'invalid_username' });
+    await expect(s.signup('okname', '12345', 'okname')).rejects.toMatchObject({ code: 'weak_password' });
+    await expect(s.signup(42, 'password', 'nick')).rejects.toMatchObject({ code: 'invalid_username' });
     // 동시에 같은 아이디로 가입해도 하나만
-    const r = await Promise.allSettled([s.signup('Twin', 'password'), s.signup('twin', 'password')]);
+    const r = await Promise.allSettled([s.signup('Twin', 'password', 'Twin1'), s.signup('twin', 'password', 'Twin2')]);
     expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
   });
 
   it('tokens expire after 30 days and logout revokes them', async () => {
     let now = 1_000_000;
     const s = new AccountStore(tempDir(), () => now, quiet);
-    const { token } = await s.signup('timer', 'password');
+    const { token } = await s.signup('timer', 'password', 'timer');
     now += TOKEN_TTL_MS - 1000;
     expect(s.verify(token)).toBe('timer');
     now += 2000;
@@ -77,7 +78,7 @@ describe('AccountStore', () => {
 
   it('client can change only the selected fighter; match results move trophies and coins', async () => {
     const s = new AccountStore(tempDir(), Date.now, quiet);
-    await s.signup('player1', 'password');
+    await s.signup('player1', 'password', 'player1');
     expect(s.updateSelected('player1', 'boulder')!.selected).toBe('boulder');
     expect(s.updateSelected('player1', 'nobody')).toBeNull();
     s.applyMatchResults([{ account: 'player1', fighterId: 'boulder', outcome: 'win' }]);
@@ -134,12 +135,12 @@ describe('account HTTP API', () => {
     expect(apiBase(`ws://127.0.0.1:${server!.port}`)).toBe(base);
     expect(apiBase('wss://game.example.com/')).toBe('https://game.example.com');
 
-    let res = await post(base, '/api/signup', { username: 'Alpha', password: 'password1' });
+    let res = await post(base, '/api/signup', { username: 'Alpha', password: 'password1', nickname: 'Alpha' });
     expect(res.status).toBe(200);
     const { token, profile } = (await res.json()) as { token: string; profile: { name: string } };
     expect(profile.name).toBe('Alpha');
 
-    res = await post(base, '/api/signup', { username: 'ALPHA', password: 'password1' });
+    res = await post(base, '/api/signup', { username: 'ALPHA', password: 'password1', nickname: 'Other' });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'username_taken' });
 
@@ -184,7 +185,7 @@ describe('account HTTP API', () => {
 
   it('rate-limits repeated failed logins from one IP', async () => {
     const base = await boot();
-    await post(base, '/api/signup', { username: 'victim', password: 'password1' });
+    await post(base, '/api/signup', { username: 'victim', password: 'password1', nickname: 'victim' });
     for (let i = 0; i < 5; i++) expect((await post(base, '/api/login', { username: 'victim', password: 'wrong' + i })).status).toBe(401);
     const res = await post(base, '/api/login', { username: 'victim', password: 'password1' });
     expect(res.status).toBe(429);
@@ -193,7 +194,7 @@ describe('account HTTP API', () => {
 
   it('hello with a token uses the account name and the match result is applied to that account only', async () => {
     const base = await boot();
-    const { token } = (await (await post(base, '/api/signup', { username: 'Hero', password: 'password1' })).json()) as { token: string };
+    const { token } = (await (await post(base, '/api/signup', { username: 'hero_id', password: 'password1', nickname: 'Hero' })).json()) as { token: string };
     const ws = (name: string, tok?: string) =>
       new Promise<{ ws: WebSocket; msgs: ServerMsg[] }>((resolve) => {
         const w = new WebSocket(base.replace('http', 'ws'));

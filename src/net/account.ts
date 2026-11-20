@@ -8,6 +8,7 @@
  * - restore(): 저장된 토큰으로 /api/me. 토큰이 틀리거나 만료면 지우고 null. 서버에 닿지 않으면 'network'로 reject
  *   (토큰은 남겨 두어 다음에 다시 시도할 수 있다).
  * - 로그인한 상태면 온라인 클라이언트(client.ts)가 hello에 토큰을 실어 보낸다.
+ * - profile.name = 닉네임(화면·방 이름). 로그인 아이디는 AccountState.username으로 따로 준다.
  */
 import type { FighterId } from '../data/fighters';
 import type { Profile } from '../state/profile';
@@ -30,9 +31,9 @@ export class AccountError extends Error {
 }
 
 export interface AccountState {
-  /** 로그인했으면 계정 프로필, 아니면 null(게스트·오프라인) */
+  /** 로그인했으면 계정 프로필, 아니면 null(게스트·오프라인). profile.name = 닉네임 */
   profile: Profile | null;
-  /** 계정 이름(= profile.name) */
+  /** 로그인 아이디(닉네임과 다를 수 있다) */
   username: string | null;
 }
 
@@ -95,8 +96,8 @@ export function onAccountChange(cb: Listener): () => void {
   };
 }
 
-function setProfile(profile: Profile | null) {
-  state = { profile, username: profile?.name ?? null };
+function setProfile(profile: Profile | null, username: string | null = profile ? state.username : null) {
+  state = { profile, username: profile ? (username ?? state.username) : null };
   for (const l of [...listeners]) {
     try {
       l(state);
@@ -106,7 +107,8 @@ function setProfile(profile: Profile | null) {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown, token?: string | null): Promise<T> {
+/** 계정 API 호출(friends.ts도 쓴다). 실패하면 AccountError */
+export async function call<T>(method: string, path: string, body?: unknown, token?: string | null): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
@@ -138,19 +140,43 @@ async function call<T>(method: string, path: string, body?: unknown, token?: str
   return data as T;
 }
 
-/** 가입. 성공하면 바로 로그인 상태 */
-export async function signup(username: string, password: string): Promise<Profile> {
-  const r = await call<AuthResponse>('POST', '/api/signup', { username: username.trim(), password });
+/** 가입(아이디·비밀번호·닉네임). 성공하면 바로 로그인 상태 */
+export async function signup(username: string, password: string, nickname?: string): Promise<Profile> {
+  // 닉네임 칸이 없는 화면에서 부르면 아이디를 닉네임으로 쓴다
+  const nick = (nickname ?? username).trim();
+  const r = await call<AuthResponse>('POST', '/api/signup', { username: username.trim(), password, nickname: nick });
   setToken(r.token);
-  setProfile(r.profile);
+  setProfile(r.profile, r.username);
   return r.profile;
 }
 
 export async function login(username: string, password: string): Promise<Profile> {
   const r = await call<AuthResponse>('POST', '/api/login', { username: username.trim(), password });
   setToken(r.token);
-  setProfile(r.profile);
+  setProfile(r.profile, r.username);
   return r.profile;
+}
+
+/** 닉네임 바꾸기(2~10자, 겹치면 nickname_taken). 이미 들어가 있는 방의 이름은 다음에 들어갈 때 바뀐다 */
+export async function changeNickname(nickname: string): Promise<Profile> {
+  const r = await authed<ProfileResponse>('PUT', '/api/nickname', { nickname: nickname.trim() });
+  setProfile(r.profile, r.username);
+  return r.profile;
+}
+
+/** 토큰이 필요한 호출. 토큰이 틀리면 로그아웃 상태로 */
+export async function authed<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = getToken();
+  if (!token) throw new AccountError('unauthorized');
+  try {
+    return await call<T>(method, path, body, token);
+  } catch (err) {
+    if (err instanceof AccountError && err.code === 'unauthorized') {
+      setToken(null);
+      setProfile(null);
+    }
+    throw err;
+  }
 }
 
 /** 로그아웃. 서버에 닿지 않아도 기기에서는 로그아웃한다 */
@@ -175,7 +201,7 @@ export async function restore(): Promise<Profile | null> {
   }
   try {
     const r = await call<ProfileResponse>('GET', '/api/me', undefined, token);
-    setProfile(r.profile);
+    setProfile(r.profile, r.username);
     return r.profile;
   } catch (err) {
     if (err instanceof AccountError && err.code === 'unauthorized') {
@@ -195,17 +221,7 @@ export async function refresh(): Promise<Profile | null> {
 
 /** 선택 캐릭터 저장(클라이언트가 바꿀 수 있는 유일한 값) */
 export async function updateSelected(selected: FighterId): Promise<Profile> {
-  const token = getToken();
-  if (!token) throw new AccountError('unauthorized');
-  try {
-    const r = await call<ProfileResponse>('PUT', '/api/profile', { selected }, token);
-    setProfile(r.profile);
-    return r.profile;
-  } catch (err) {
-    if (err instanceof AccountError && err.code === 'unauthorized') {
-      setToken(null);
-      setProfile(null);
-    }
-    throw err;
-  }
+  const r = await authed<ProfileResponse>('PUT', '/api/profile', { selected });
+  setProfile(r.profile, r.username);
+  return r.profile;
 }

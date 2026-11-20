@@ -100,7 +100,7 @@ export function cleanCode(raw: string): string {
     .slice(0, 4);
 }
 
-/** 방장: 방의 경기 방식 바꾸기(OnlineClient.setMode가 아직 계약에 없을 수 있어 선택적으로 부른다) */
+/** 방장: 방의 경기 방식 바꾸기 */
 export function setRoomMode(client: OnlineClient, mode: MatchMode) {
-  (client as OnlineClient & { setMode?: (m: MatchMode) => void }).setMode?.(mode);
+  client.setMode(mode);
 }

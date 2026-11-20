@@ -1,5 +1,5 @@
 import type { FighterId } from '../data/fighters';
-import type { Team } from '../game/types';
+import type { MatchMode, Team } from '../game/types';
 import { getToken } from './account';
 import type { OnlineClient, OnlineEvents, OnlineStatus } from './api';
 import { OnlineSession, type OnlineSessionOptions, type SessionTransport } from './onlineSession';
@@ -360,6 +360,11 @@ export class OnlineClientImpl implements OnlineClient {
     this.sendIfConnected({ t: 'setTeam', team });
   }
 
+  /** 방장만: 경기 방식(teamfight | crystal). api.ts의 OnlineClient에는 아직 없다(Lead에게 보고) */
+  setMode(mode: MatchMode) {
+    this.sendIfConnected({ t: 'setMode', mode });
+  }
+
   setFillBots(fill: boolean) {
     this.sendIfConnected({ t: 'setBots', fillBots: fill });
   }
@@ -479,7 +484,10 @@ function sameMatch(a: MatchStartInfo, b: MatchStartInfo): boolean {
   return a.seed === b.seed && a.mapId === b.mapId && a.roster.length === b.roster.length;
 }
 
+/** api.ts의 OnlineClient + 아직 계약에 없는 기능(방장: 경기 방식 바꾸기) */
+export type OnlineClientWithMode = OnlineClient & { setMode(mode: MatchMode): void };
+
 /** UI가 쓰는 온라인 클라이언트를 만든다 */
-export function createOnlineClient(opts: OnlineClientOptions = {}): OnlineClient {
+export function createOnlineClient(opts: OnlineClientOptions = {}): OnlineClientWithMode {
   return new OnlineClientImpl(opts);
 }

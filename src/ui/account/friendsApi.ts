@@ -1,10 +1,9 @@
+import * as real from '../../net/friends';
 import { fakeNet, getAccount, isFakeAccounts } from './accountApi';
 
 /**
- * 친구 목록 UI 입구. 진짜는 Network 담당의 src/net/friends.ts(list/add/remove).
- * 이 파일을 만든 작업 공간에는 아직 없어서 import.meta.glob으로 "있으면" 쓴다.
- * Lead: 병합 뒤에는 `import * as real from '../../net/friends'`로 바꿔도 된다.
- * 주소에 ?fakeonline이면(또는 진짜가 없으면) localStorage 가짜.
+ * 친구 목록 UI 입구. 진짜는 Network 담당의 src/net/friends.ts(listFriends/addFriend/removeFriend).
+ * 주소에 ?fakeonline이면 localStorage 가짜(화면 확인·E2E용).
  */
 export interface Friend {
   nickname: string;
@@ -20,7 +19,6 @@ interface FriendsModule {
   remove(nickname: string): Promise<unknown>;
 }
 
-const realModules = import.meta.glob<FriendsModule>('../../net/friends.ts', { eager: true });
 
 const KEY = 'fg.fakefriends.v1';
 const SEED: Friend[] = [
@@ -77,8 +75,9 @@ function fakeModule(): FriendsModule {
   };
 }
 
-const real = Object.values(realModules)[0];
-const api: FriendsModule = !isFakeAccounts() && real ? real : fakeModule();
+const api: FriendsModule = isFakeAccounts()
+  ? fakeModule()
+  : { list: () => real.listFriends(), add: (n) => real.addFriend(n), remove: (n) => real.removeFriend(n) };
 
 export const listFriends = () => api.list();
 export const addFriend = (nickname: string) => api.add(nickname);

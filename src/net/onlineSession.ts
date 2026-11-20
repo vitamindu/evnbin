@@ -114,7 +114,14 @@ export class OnlineSession implements BattleLike {
 
     // 첫 snap 전에 보여줄 상태: 같은 시드·명단으로 만든 시뮬레이션의 0틱(서버와 출발 위치가 같다)
     const sim = new Sim({ map, seed: info.seed, mode: info.mode, fighters: rosterSpawns(info.roster), dummies: false });
-    this.current = new NetSimView(0, sim.units.map((u) => ({ ...u, pos: { ...u.pos } })), [], [], { ...sim.match });
+    this.current = new NetSimView(
+      0,
+      sim.units.map((u) => ({ ...u, pos: { ...u.pos } })),
+      [],
+      [],
+      { ...sim.match },
+      sim.crystals.map((c) => ({ ...c })),
+    );
     const meUnit = me ? sim.getUnit(me.entityId) : undefined;
     this.predictor = meUnit?.type === 'fighter' ? new Predictor(this.grid, meUnit.fighterId, meUnit.radius) : null;
 
@@ -185,7 +192,16 @@ export class OnlineSession implements BattleLike {
   receiveSnap(snap: Snapshot) {
     if (this.disposed) return;
     const now = this.now();
-    if (!this.buffer.push({ tick: snap.tick, units: snap.units, projectiles: snap.projectiles, lobs: snap.lobs, match: snap.match, events: snap.events })) {
+    const buffered = {
+      tick: snap.tick,
+      units: snap.units,
+      projectiles: snap.projectiles,
+      lobs: snap.lobs,
+      crystals: snap.crystals ?? [],
+      match: snap.match,
+      events: snap.events,
+    };
+    if (!this.buffer.push(buffered)) {
       return;
     }
     this.clock.observe(snap.tick, now);

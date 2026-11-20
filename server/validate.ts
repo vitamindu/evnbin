@@ -47,6 +47,9 @@ export function parseClientMsg(raw: string): ClientMsg | null {
     case 'setBots':
       if (typeof m.fillBots !== 'boolean') return null;
       return { t: 'setBots', fillBots: m.fillBots };
+    case 'setMode':
+      if (m.mode !== 'teamfight' && m.mode !== 'crystal') return null;
+      return { t: 'setMode', mode: m.mode };
     case 'ready':
       if (typeof m.ready !== 'boolean') return null;
       return { t: 'ready', ready: m.ready };

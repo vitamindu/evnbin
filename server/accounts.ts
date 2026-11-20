@@ -5,16 +5,26 @@ import { rankDelta } from '../src/data/ranks';
  * - 저장: dataDir/accounts.json 하나(원자적 쓰기: 임시 파일 → rename). Fly에서는 볼륨 /data, 로컬은 ./.data.
  * - 비밀번호: scrypt(N=16384, r=8, p=1, 64바이트) + 사용자별 16바이트 salt, 비교는 timingSafeEqual.
  * - 토큰: 무작위 32바이트(base64url). 파일에는 SHA-256 해시만 저장, 30일 만료, 계정당 최대 10개.
- * - 아이디: 3~12자(영문·숫자·한글·밑줄), 대소문자 구분 없이 하나만. 비밀번호 6자 이상.
+ * - 아이디(로그인): 3~12자(영문·숫자·한글·밑줄), 대소문자 구분 없이 하나만. 비밀번호 6자 이상.
+ * - 닉네임(profile.name, 화면·방 이름): 2~10자, 대소문자 구분 없이 하나만. 바꿀 수 있다.
+ *   닉네임이 없던 예전 계정은 읽을 때 닉네임 = 아이디(10자로 자르고, 겹치면 뒤에 숫자)로 옮긴다.
+ * - 친구: 계정마다 친구 계정 키 목록. 추가·삭제는 항상 양쪽에.
  * - 트로피·코인은 서버만 바꾼다(경기 결과). 클라이언트는 선택 캐릭터만.
  */
 import { createHash, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIGHTERS, type FighterId } from '../src/data/fighters';
-import { isValidPassword, isValidUsername, type AccountProfile as Profile } from '../src/net/accountApi';
+import {
+  NICKNAME_MAX,
+  isValidNickname,
+  isValidPassword,
+  isValidUsername,
+  type AccountApiError,
+  type AccountProfile as Profile,
+} from '../src/net/accountApi';
 
-export type AccountErrorCode = 'bad_credentials' | 'username_taken' | 'invalid_username' | 'weak_password' | 'unauthorized';
+export type AccountErrorCode = Exclude<AccountApiError, 'rate_limited' | 'bad_request'>;
 
 export class AccountError extends Error {
   constructor(readonly code: AccountErrorCode) {
@@ -41,6 +51,10 @@ interface StoredToken {
 
 interface StoredUser {
   username: string;
+  /** 닉네임(= profile.name). 예전 파일에는 없을 수 있다(읽을 때 채움) */
+  nickname: string;
+  /** 친구 계정 키 */
+  friends: string[];
   salt: string;
   hash: string;
   createdAt: number;
@@ -78,11 +92,11 @@ function scrypt(password: string, salt: Buffer): Promise<Buffer> {
   );
 }
 
-export function defaultProfile(username: string): Profile {
+export function defaultProfile(nickname: string): Profile {
   const fighters = {} as Profile['fighters'];
   for (const f of FIGHTERS) fighters[f.id] = { trophies: 0, power: 1 };
   const tag = Array.from({ length: 8 }, () => TAG_ALPHABET[randomInt(TAG_ALPHABET.length)]).join('');
-  return { name: username, tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters, rankPoints: 0 };
+  return { name: nickname, tag, level: 1, coins: 0, crystals: 0, selected: 'rivet', fighters, rankPoints: 0 };
 }
 
 /** 데이터 폴더: DATA_DIR → /data(있으면) → ./.data */
@@ -97,8 +111,11 @@ export class AccountStore {
   /** 토큰 해시 → 계정 키 */
   private readonly byToken = new Map<string, string>();
   private readonly file: string;
-  /** 같은 아이디로 동시에 가입하는 경우를 막는다 */
+  /** 같은 아이디·닉네임으로 동시에 가입하는 경우를 막는다 */
   private readonly signingUp = new Set<string>();
+  private readonly reservedNicks = new Set<string>();
+  /** 소문자 닉네임 → 계정 키 */
+  private readonly byNick = new Map<string, string>();
 
   constructor(
     readonly dir: string,
@@ -128,11 +145,49 @@ export class AccountStore {
       this.data = { version: 1, users: {} };
     }
     const t = this.now();
-    for (const [key, u] of Object.entries(this.data.users)) {
+    let migrated = 0;
+    // 닉네임이 있는 계정을 먼저 등록하고, 없는 계정(예전 파일)은 아이디로 만든다
+    const entries = Object.entries(this.data.users);
+    for (const [key, u] of entries) {
+      if (u.nickname && isValidNickname(u.nickname) && !this.byNick.has(u.nickname.toLowerCase())) this.byNick.set(u.nickname.toLowerCase(), key);
+      else u.nickname = '';
+    }
+    for (const [key, u] of entries) {
       u.tokens = (u.tokens ?? []).filter((tok) => tok.expiresAt > t);
       for (const tok of u.tokens) this.byToken.set(tok.hash, key);
-      u.profile = normalizeProfile(u.profile, u.username);
+      u.friends = Array.isArray(u.friends) ? u.friends.filter((f) => typeof f === 'string') : [];
+      if (!u.nickname) {
+        u.nickname = this.freeNickname(u.username);
+        this.byNick.set(u.nickname.toLowerCase(), key);
+        migrated++;
+      }
+      u.profile = normalizeProfile(u.profile, u.nickname);
     }
+    // 없어진 계정을 가리키는 친구 정리
+    for (const u of Object.values(this.data.users)) u.friends = u.friends.filter((f) => this.data.users[f]);
+    if (migrated) {
+      this.log(`[accounts] gave nicknames to ${migrated} older account(s)`);
+      this.save();
+    }
+  }
+
+  /** 아이디에서 쓸 수 있는 닉네임: 10자로 자르고, 겹치면 뒤에 숫자 */
+  private freeNickname(username: string): string {
+    let base = Array.from(username.replace(/[^A-Za-z0-9_가-힣]/gu, '')).join('');
+    if (Array.from(base).length < 2) base = (base + '__').slice(0, 2);
+    const fit = (b: string, suffix: string) => Array.from(b).slice(0, NICKNAME_MAX - suffix.length).join('') + suffix;
+    const first = fit(base, '');
+    if (!this.nickTaken(first)) return first;
+    for (let i = 2; ; i++) {
+      const n = fit(base, String(i));
+      if (!this.nickTaken(n)) return n;
+    }
+  }
+
+  private nickTaken(nickname: string, exceptKey?: string): boolean {
+    const k = nickname.toLowerCase();
+    const owner = this.byNick.get(k);
+    return (owner !== undefined && owner !== exceptKey) || this.reservedNicks.has(k);
   }
 
   /** 원자적 저장: 임시 파일에 쓰고 rename */
@@ -142,34 +197,42 @@ export class AccountStore {
     renameSync(tmp, this.file);
   }
 
-  async signup(username: unknown, password: unknown): Promise<{ token: string; profile: Profile }> {
+  async signup(username: unknown, password: unknown, nickname: unknown): Promise<{ token: string; profile: Profile; username: string }> {
     if (!validUsername(username)) throw new AccountError('invalid_username');
+    if (!isValidNickname(nickname)) throw new AccountError('invalid_nickname');
     if (!validPassword(password)) throw new AccountError('weak_password');
     const key = accountKey(username);
+    const nick = nickname.toLowerCase();
     if (this.data.users[key] || this.signingUp.has(key)) throw new AccountError('username_taken');
+    if (this.nickTaken(nickname)) throw new AccountError('nickname_taken');
     this.signingUp.add(key);
+    this.reservedNicks.add(nick);
     try {
       const salt = randomBytes(16);
       const hash = await scrypt(password, salt);
       if (this.data.users[key]) throw new AccountError('username_taken');
       const user: StoredUser = {
         username,
+        nickname,
+        friends: [],
         salt: salt.toString('base64'),
         hash: hash.toString('base64'),
         createdAt: this.now(),
-        profile: defaultProfile(username),
+        profile: defaultProfile(nickname),
         tokens: [],
       };
       this.data.users[key] = user;
+      this.byNick.set(nick, key);
       const token = this.issueToken(key, user);
       this.save();
-      return { token, profile: clone(user.profile) };
+      return { token, profile: clone(user.profile), username };
     } finally {
       this.signingUp.delete(key);
+      this.reservedNicks.delete(nick);
     }
   }
 
-  async login(username: unknown, password: unknown): Promise<{ token: string; profile: Profile }> {
+  async login(username: unknown, password: unknown): Promise<{ token: string; profile: Profile; username: string }> {
     const key = typeof username === 'string' ? accountKey(username) : '';
     const user = key ? this.data.users[key] : undefined;
     const pw = typeof password === 'string' ? password : '';
@@ -181,7 +244,7 @@ export class AccountStore {
     if (want.length !== got.length || !timingSafeEqual(want, got)) throw new AccountError('bad_credentials');
     const token = this.issueToken(key, user);
     this.save();
-    return { token, profile: clone(user.profile) };
+    return { token, profile: clone(user.profile), username: user.username };
   }
 
   /** 토큰 → 계정 키(없거나 만료면 null) */
@@ -221,9 +284,65 @@ export class AccountStore {
     return u ? clone(u.profile) : null;
   }
 
-  /** 계정 이름(가입할 때 쓴 대소문자 그대로) */
+  /** 로그인 아이디(가입할 때 쓴 대소문자 그대로) */
   username(key: string): string | null {
     return this.data.users[key]?.username ?? null;
+  }
+
+  /** 닉네임(화면·방에서 쓰는 이름) */
+  nickname(key: string): string | null {
+    return this.data.users[key]?.nickname ?? null;
+  }
+
+  /** 닉네임 → 계정 키(대소문자 무시) */
+  findByNickname(nickname: unknown): string | null {
+    if (typeof nickname !== 'string') return null;
+    return this.byNick.get(nickname.trim().toLowerCase()) ?? null;
+  }
+
+  /** 닉네임 바꾸기. 같은 닉네임의 대소문자만 바꾸는 것은 된다 */
+  changeNickname(key: string, nickname: unknown): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (!isValidNickname(nickname)) throw new AccountError('invalid_nickname');
+    if (this.nickTaken(nickname, key)) throw new AccountError('nickname_taken');
+    this.byNick.delete(u.nickname.toLowerCase());
+    this.byNick.set(nickname.toLowerCase(), key);
+    u.nickname = nickname;
+    u.profile.name = nickname;
+    this.save();
+    return clone(u.profile);
+  }
+
+  /** 친구 계정 키 목록 */
+  friends(key: string): string[] {
+    return [...(this.data.users[key]?.friends ?? [])];
+  }
+
+  /** 닉네임으로 친구 추가(바로 서로 친구) */
+  addFriend(key: string, nickname: unknown) {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const other = this.findByNickname(nickname);
+    if (!other) throw new AccountError('not_found');
+    if (other === key) throw new AccountError('self');
+    if (u.friends.includes(other)) throw new AccountError('already_friends');
+    const o = this.data.users[other]!;
+    u.friends.push(other);
+    if (!o.friends.includes(key)) o.friends.push(key);
+    this.save();
+  }
+
+  /** 닉네임으로 친구 삭제(서로). 그런 계정이 없거나 친구가 아니면 not_found */
+  removeFriend(key: string, nickname: unknown) {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const other = this.findByNickname(nickname);
+    if (!other || !u.friends.includes(other)) throw new AccountError('not_found');
+    const o = this.data.users[other]!;
+    u.friends = u.friends.filter((f) => f !== other);
+    o.friends = o.friends.filter((f) => f !== key);
+    this.save();
   }
 
   /** 클라이언트가 바꿀 수 있는 것은 선택 캐릭터뿐 */
@@ -274,9 +393,9 @@ function clone(p: Profile): Profile {
 }
 
 /** 새 캐릭터가 추가되거나 필드가 빠진 저장본을 지금 모양으로 */
-function normalizeProfile(p: Partial<Profile> | undefined, username: string): Profile {
-  const def = defaultProfile(username);
-  const merged: Profile = { ...def, ...(p ?? {}), name: username, fighters: { ...def.fighters, ...(p?.fighters ?? {}) } };
+function normalizeProfile(p: Partial<Profile> | undefined, nickname: string): Profile {
+  const def = defaultProfile(nickname);
+  const merged: Profile = { ...def, ...(p ?? {}), name: nickname, fighters: { ...def.fighters, ...(p?.fighters ?? {}) } };
   if (!FIGHTERS.some((f) => f.id === merged.selected)) merged.selected = def.selected;
   return merged;
 }
