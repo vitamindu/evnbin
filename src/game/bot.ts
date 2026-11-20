@@ -246,6 +246,7 @@ function superAim(sim: Sim, f: Fighter, target: Unit, d: number, los: boolean, r
     case 'dash':
       return !retreating && d <= s.range * 0.9 && los ? jitteredAim(sim, f.pos, target.pos) : undefined;
     case 'lob':
+    case 'zone':
       return d <= s.range ? jitteredAim(sim, f.pos, target.pos, d / s.range) : undefined;
     default:
       return d - target.radius <= s.range * 0.85 && (los || s.breaksWalls) ? jitteredAim(sim, f.pos, target.pos) : undefined;
@@ -345,8 +346,10 @@ export function botInput(sim: Sim, id: EntityId): FighterInput {
 
   // ── 기본 공격 ──
   const reach = m.retreating ? range * SELF_DEFENSE : range * 0.95;
-  if (f.ammo >= 1 && tick >= m.nextAttackTick && los && d - target.radius <= reach) {
-    input.attack = { aim: jitteredAim(sim, f.pos, target.pos) };
+  // lob은 벽을 넘으므로 시야가 없어도 되고, 조준 길이 = 거리 비율
+  const lob = def.attack.kind === 'lob';
+  if (f.ammo >= 1 && tick >= m.nextAttackTick && (los || lob) && d - target.radius <= reach) {
+    input.attack = { aim: jitteredAim(sim, f.pos, target.pos, lob ? d / range : 1) };
     m.nextAttackTick = tick + randInt(sim, ATTACK_GAP_MIN_TICKS, ATTACK_GAP_MAX_TICKS);
   }
   return input;

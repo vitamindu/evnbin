@@ -108,3 +108,15 @@ export const CRYSTAL_MATCH_TICKS = secToTicks(180);
 
 /** 부동소수 누적 오차 허용치(탄창·게이지 비교) */
 export const EPS = 1e-9;
+
+// ── lob · 파편 · 지대 ──
+/** 데이터에 탄속이 없는(0) lob의 비행 시간 */
+export const LOB_FLIGHT_TICKS = secToTicks(0.5);
+/** lob 최소 던지는 거리(조준을 짧게 해도 이만큼) */
+export const LOB_MIN_DIST = 1;
+/** lob 여러 개를 던질 때 조준 방향과 수직으로 벌리는 간격 */
+export const LOB_SPACING = 0.7;
+/** 지대 최소 거리 */
+export const ZONE_MIN_DIST = 1;
+/** 지대 피해를 모아서 주는 간격(틱). 30틱/초 기준 초당 5번 */
+export const ZONE_HIT_TICKS = 6;
