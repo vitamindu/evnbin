@@ -439,12 +439,110 @@ function buildShard(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
+// ───────────────────────── GRIZZLE: 곰 탈 씨름꾼(오리지널) ─────────────────────────
+function buildGrizzle(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.78, torsoH: 0.62, torsoD: 0.56, headR: 0.36, headLift: 0.86,
+    legR: 0.15, legLen: 0.18, legX: 0.2, armR: 0.14, armLen: 0.3, shoeH: 0.12,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.skin, legs: c.secondary, shoes: c.dark, skin: c.skin, hands: c.primary });
+  const r = p.headR;
+  // 곰 탈: 머리를 덮는 갈색 반구 + 둥근 귀 + 주둥이
+  const hood = part(g.add(new THREE.SphereGeometry(r * 1.06, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.55)), toon(c.primary));
+  hood.position.y = r * 0.2;
+  rig.head.add(hood);
+  const earGeo = g.add(new THREE.SphereGeometry(r * 0.3, 14, 10));
+  for (const sx of [-1, 1]) {
+    const ear = part(earGeo, toon(c.primary));
+    ear.position.set(sx * r * 0.72, r * 0.8, -r * 0.05);
+    ear.scale.set(1, 1, 0.6);
+    rig.head.add(ear);
+    const inner = part(g.add(new THREE.SphereGeometry(r * 0.16, 10, 8)), toon(c.secondary), { outline: false });
+    inner.position.set(sx * r * 0.72, r * 0.8, r * 0.1);
+    inner.scale.set(1, 1, 0.4);
+    rig.head.add(inner);
+  }
+  const snout = part(g.add(new THREE.SphereGeometry(r * 0.32, 14, 10)), toon('#c99566'));
+  snout.position.set(0, r * 0.62, r * 0.78);
+  snout.scale.set(1, 0.7, 0.8);
+  rig.head.add(snout);
+  const nose = part(g.add(new THREE.SphereGeometry(r * 0.1, 10, 8)), toon(c.dark), { outline: false });
+  nose.position.set(0, r * 0.68, r * 1.02);
+  rig.head.add(nose);
+  addEyes(rig.head, g, r, { size: 0.2, spread: 0.3, y: -0.05 });
+  // 씨름 샅바(허리띠)
+  const belt = part(g.add(new THREE.TorusGeometry(p.torsoW * 0.5, 0.07, 8, 24)), toon(c.secondary));
+  belt.rotation.x = Math.PI / 2;
+  belt.scale.set(1, p.torsoD / p.torsoW, 1);
+  belt.position.y = rig.torso.position.y - p.torsoH * 0.38;
+  rig.body.add(belt);
+  // 큰 곰 장갑(발톱 3개씩)
+  const clawGeo = g.add(new THREE.ConeGeometry(0.035, 0.11, 6));
+  for (const arm of [rig.armL, rig.armR]) {
+    const hand = arm === rig.armL ? rig.handL : rig.handR;
+    hand.scale.setScalar(1.35);
+    [-0.06, 0, 0.06].forEach((x) => {
+      const claw = part(clawGeo, toon(c.accent), { outline: false });
+      claw.position.copy(hand.position).add(new THREE.Vector3(x, -0.02, 0.15));
+      claw.rotation.x = Math.PI / 2;
+      arm.add(claw);
+    });
+  }
+  return rig;
+}
+
+// ───────────────────────── PRISM: 거울 갑옷 빛 곡예사(오리지널) ─────────────────────────
+function buildPrism(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.5, torsoH: 0.5, torsoD: 0.38, headR: 0.36, headLift: 0.84,
+    legR: 0.1, legLen: 0.2, legX: 0.13, armR: 0.085, armLen: 0.27, shoeH: 0.12,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.secondary, legs: c.dark, shoes: c.primary, skin: c.skin, hands: c.secondary });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.21, spread: 0.3, y: 0.0 });
+  // 보라색 단발 + 이마의 작은 프리즘
+  const hair = part(g.add(new THREE.SphereGeometry(r * 1.04, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.5)), toon(c.primary));
+  hair.position.y = r * 0.12;
+  hair.rotation.x = -0.2;
+  rig.head.add(hair);
+  const gem = new THREE.Mesh(g.add(new THREE.OctahedronGeometry(r * 0.16, 0)), new THREE.MeshBasicMaterial({ color: c.accent }));
+  gem.position.set(0, r * 0.62, r * 0.86);
+  gem.scale.set(0.8, 1.2, 0.6);
+  rig.head.add(gem);
+  // 가슴·어깨의 거울 판(각진 판)
+  const plateGeo = g.add(new THREE.BoxGeometry(0.2, 0.04, 0.2));
+  for (const sx of [-1, 1]) {
+    const plate = part(plateGeo, toon('#e3ecff'));
+    plate.position.set(sx * (p.torsoW / 2 + 0.02), rig.torso.position.y + p.torsoH * 0.45, 0);
+    plate.rotation.z = sx * -0.45;
+    rig.body.add(plate);
+  }
+  const chest = part(g.add(new THREE.OctahedronGeometry(0.11, 0)), toon(c.accent));
+  chest.position.set(0, rig.torso.position.y + 0.04, p.torsoD / 2 + 0.03);
+  chest.scale.set(1, 1.3, 0.5);
+  rig.body.add(chest);
+  // 손에 든 거울 원반(빛 구슬을 튕겨 쏜다)
+  rig.armR.rotation.set(-0.75, 0, 0.2);
+  const disc = part(g.add(new THREE.CylinderGeometry(0.15, 0.15, 0.04, 6)), toon('#e3ecff'));
+  disc.position.copy(rig.handR.position).add(new THREE.Vector3(0, 0, 0.14));
+  disc.rotation.x = Math.PI / 2;
+  rig.armR.add(disc);
+  const orb = new THREE.Mesh(g.add(new THREE.SphereGeometry(0.06, 10, 8)), new THREE.MeshBasicMaterial({ color: c.accent }));
+  orb.position.copy(disc.position).add(new THREE.Vector3(0, 0, 0.05));
+  rig.armR.add(orb);
+  return rig;
+}
+
 const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
   boulder: buildBoulder,
   fuse: buildFuse,
   shard: buildShard,
+  grizzle: buildGrizzle,
+  prism: buildPrism,
 };
 
 /** 캐릭터마다 다른 대기 동작 속도 */
@@ -461,7 +559,7 @@ export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = 
   const g = new GeoBag();
   const builder = BUILDERS[def.id] ?? buildRivet;
   const rig = builder(def, root, g);
-  if (opts.shadow !== false) root.add(blobShadow(def.id === 'boulder' ? 0.85 : 0.65));
+  if (opts.shadow !== false) root.add(blobShadow(def.id === 'boulder' || def.id === 'grizzle' ? 0.85 : 0.65));
 
   const baseArmL = rig.armL.rotation.x;
   const baseArmR = rig.armR.rotation.x;

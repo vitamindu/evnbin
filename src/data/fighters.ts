@@ -4,8 +4,8 @@
  * 거리 단위는 타일(1타일 = 월드 1유닛), 시간 단위는 초.
  */
 
-export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard';
-export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control';
+export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard' | 'grizzle' | 'prism';
+export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control' | 'brawler' | 'bouncer';
 
 /** 기본 공격 형태. 새 캐릭터는 가능하면 이 조합으로 표현하고, 부족할 때만 종류를 추가한다. */
 export type AttackKind =
@@ -51,6 +51,8 @@ export interface AttackDef {
   split?: { count: number; damage: number; range: number; speed: number };
   /** burst: 탄이 좌우로 번갈아 나가는 옆 간격(타일). 0이면 한 줄 */
   lateralOffset?: number;
+  /** 벽에 닿으면 튕겨 나가는 횟수(튕겨도 남은 사거리만큼만 날아간다). 0이면 벽에서 사라짐 */
+  bounces?: number;
   /** lob: 착탄 범위 반지름(타일) */
   aoeRadius?: number;
   /** 거리 비례 피해: 사거리 끝까지 날아갔을 때의 피해량(가까울수록 damage에 가깝다) */
@@ -84,6 +86,10 @@ export interface SuperDef {
   pierce?: boolean;
   /** zone: 지대 반지름(타일), 유지 시간(초), 이동 속도 감소 비율(0~1), 초당 피해 */
   zone?: { radius: number; duration: number; slow: number; dps: number };
+  /** 벽에 닿으면 튕겨 나가는 횟수 */
+  bounces?: number;
+  /** leap: true면 폭탄 대신 착지 지점 둘레(aoeRadius)에 damage 피해 + 넉백(내려찍기) */
+  slam?: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime?: number;
   /** leap: 폭탄이 떨어져 터지기까지의 시간(초) */
@@ -354,7 +360,91 @@ export const FIGHTERS: readonly FighterDef[] = [
       zone: { radius: 2.2, duration: 4, slow: 0.4, dps: 420 },
     },
   },
-];export function getFighter(id: FighterId): FighterDef {
+  {
+    id: 'grizzle',
+    model: { type: 'primitive' },
+    name: 'GRIZZLE',
+    role: 'brawler',
+    roleLabel: '근접형',
+    tagline: '곰 탈을 쓴 산골 씨름꾼. 일단 붙으면 놓아주지 않아요.',
+    palette: { primary: '#8a5a32', secondary: '#e8483a', accent: '#ffd23f', skin: '#e9a777', dark: '#3e2414' },
+    hp: 5800,
+    moveSpeed: 2.45,
+    attack: {
+      name: 'Paw Flurry',
+      description: '앞발로 4번 빠르게 후려쳐요. 아주 가까이 있어야 맞아요.',
+      kind: 'burst',
+      damage: 360,
+      count: 4,
+      spreadDeg: 0,
+      burstInterval: 0.08,
+      range: 2.2,
+      projectileSpeed: 9,
+      ammo: 3,
+      reload: 1.3,
+      superChargePerHit: 0.05,
+      lateralOffset: 0.25,
+    },
+    super: {
+      name: 'Mountain Drop',
+      description: '높이 뛰어올라 조준한 곳을 내려찍어요. 둘레의 적에게 피해를 주고 밀어내며 벽을 부숴요.',
+      kind: 'leap',
+      damage: 1200,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 0,
+      range: 5.5,
+      breaksWalls: true,
+      knockback: 1.5,
+      aoeRadius: 1.6,
+      slam: true,
+      leapTime: 0.8,
+    },
+  },
+  {
+    id: 'prism',
+    model: { type: 'primitive' },
+    name: 'PRISM',
+    role: 'bouncer',
+    roleLabel: '반사형',
+    tagline: '거울 갑옷을 입은 빛의 곡예사. 벽 뒤도 안전하지 않아요.',
+    palette: { primary: '#b38cff', secondary: '#f4f1ff', accent: '#5ff0d0', skin: '#f3c9a6', dark: '#3a2670' },
+    hp: 2500,
+    moveSpeed: 2.35,
+    attack: {
+      name: 'Bounce Beam',
+      description: '빛 구슬 5발을 연사해요. 벽에 닿으면 튕겨 나가요.',
+      kind: 'burst',
+      damage: 240,
+      count: 5,
+      spreadDeg: 0,
+      burstInterval: 0.08,
+      range: 6.3,
+      projectileSpeed: 10,
+      ammo: 3,
+      reload: 1.6,
+      superChargePerHit: 0.035,
+      bounces: 3,
+    },
+    super: {
+      name: 'Mirror Storm',
+      description: '빛 구슬 12발을 길게 쏟아내요. 벽마다 튕기며 멀리 날아가요.',
+      kind: 'burst',
+      damage: 260,
+      count: 12,
+      spreadDeg: 0,
+      burstInterval: 0.07,
+      projectileSpeed: 11,
+      range: 8.4,
+      breaksWalls: false,
+      knockback: 0,
+      bounces: 3,
+    },
+  },
+];
+
+export function getFighter(id: FighterId): FighterDef {
   const f = FIGHTERS.find((x) => x.id === id);
   if (!f) throw new Error(`Unknown fighter: ${id}`);
   return f;

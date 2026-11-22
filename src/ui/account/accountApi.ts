@@ -125,6 +125,8 @@ function fakeModule(): AccountModule {
         hinako: { trophies: 4, power: 1 },
         fuse: { trophies: 0, power: 1 },
         shard: { trophies: 0, power: 1 },
+        grizzle: { trophies: 0, power: 1 },
+        prism: { trophies: 0, power: 1 },
       },
     };
   };

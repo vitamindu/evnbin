@@ -42,7 +42,7 @@ export function createFightersScreen(ctx: AppContext): Screen {
     comingSoon,
   );
 
-  const render = () => grid.replaceChildren(...FIGHTERS.map(card), soonCard);
+  const render = () => grid.replaceChildren(...FIGHTERS.map(card), ...(FIGHTERS.length % 4 ? [soonCard] : []));
   render();
   onProfileChange(render);
 
