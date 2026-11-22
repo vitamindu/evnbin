@@ -18,7 +18,7 @@ import { circleBlocked, hasLineOfSight } from './world';
  * - 거리: 기본 공격 사거리의 KEEP_RANGE배를 유지(근거리 캐릭터는 붙고, 저격수는 떨어진다). 좌우로 조금씩 옆걸음.
  *   시야가 막혔으면 다가가며 각을 찾는다. 보이는 적이 없으면 맵 가운데 ↔ 상대 출발 지점을 오간다.
  * - 공격: 사거리 안 + 시야가 트였으면, 표적 방향(조준 흔들림 포함)으로. 공격 사이에 잠깐 쉰다.
- * - 궁극기: 게이지가 차면 쓸모 있을 때 쓴다. leap은 체력이 낮고 적이 가까울 때 적 반대쪽으로,
+ * - 궁극기: 게이지가 차면 쓸모 있을 때 쓴다. leap은 체력이 낮고 적이 가까울 때 적 반대쪽으로(내려찍기 leap은 사거리 안의 표적 위로),
  *   dash는 표적 쪽으로, 나머지(산탄·연사 등)는 궁극기 사거리 안의 표적 쪽으로.
  * - 후퇴: 체력이 RETREAT_HP 미만이면 출발 지점으로 돌아가 회복(RECOVERED_HP까지). 그동안은 가까운 적만 쏜다.
  * - 벽: 가려는 방향 앞이 막혔으면 조금씩 꺾어 본다. 그래도 몇 틱 동안 못 움직이면 옆으로 비켜 간다.
@@ -241,6 +241,8 @@ function superAim(sim: Sim, f: Fighter, target: Unit, d: number, los: boolean, r
   const s = def.super;
   switch (s.kind) {
     case 'leap':
+      // 내려찍기: 궁극기 사거리 안의 표적 위로 뛰어든다(벽을 넘으므로 시야 무관)
+      if (s.slam) return !retreating && d <= s.range ? jitteredAim(sim, f.pos, target.pos, d / s.range) : undefined;
       // 체력이 낮고 적이 가까우면 적 반대쪽으로 끝까지(자동 조준이 그렇게 뛴다)
       return f.hp / f.maxHp < LEAP_HP && d <= def.attack.range ? null : undefined;
     case 'dash':

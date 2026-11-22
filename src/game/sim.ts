@@ -129,6 +129,10 @@ export interface ShotSpec {
   damageFar?: number;
   /** 모든 대상 관통 */
   pierce: boolean;
+  /** 벽에 닿으면 튕기는 횟수(0이면 벽에서 사라짐) */
+  bounces: number;
+  /** leap: true면 폭탄 대신 착지 지점 내려찍기 */
+  slam: boolean;
   /** spread: 탄마다 속도 ±비율 */
   speedJitter: number;
   /** 데이터에 탄속이 있었는가(lob은 0이면 고정 비행 시간) */
@@ -159,6 +163,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       knockback: s.knockback,
       lateralOffset: s.lateralOffset ?? 0,
       pierce: s.pierce ?? false,
+      bounces: s.bounces ?? 0,
+      slam: s.slam ?? false,
       speedJitter: s.speedJitter ?? 0,
       speedGiven: s.projectileSpeed > 0,
       zone: s.zone,
@@ -181,6 +187,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     knockback: 0,
     lateralOffset: a.lateralOffset ?? 0,
     pierce: a.pierce ?? false,
+    bounces: a.bounces ?? 0,
+    slam: false,
     speedJitter: a.speedJitter ?? 0,
     speedGiven: a.projectileSpeed > 0,
     split: a.split,
@@ -532,7 +540,7 @@ export class Sim implements SimView {
 
   private startAttack(f: Fighter, def: FighterDef, isSuper: boolean, aim: Aim) {
     const spec = shotSpec(def, isSuper);
-    const { dir, ratio } = spec.kind === 'leap' ? resolveLeapAim(this, f, aim) : resolveAim(this, f, aim, spec.range);
+    const { dir, ratio } = spec.kind === 'leap' ? resolveLeapAim(this, f, aim, spec.slam ? spec.range : undefined) : resolveAim(this, f, aim, spec.range);
     if (isSuper) f.superCharge = 0;
     else f.ammo = Math.max(0, f.ammo - 1);
     f.facing = dir;
@@ -632,6 +640,7 @@ export class Sim implements SimView {
       knockback: spec.knockback,
       ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
       pierce: spec.pierce,
+      ...(spec.bounces > 0 ? { bounces: spec.bounces } : {}),
       ...(groupId !== undefined ? { groupId } : {}),
       hitIds: [],
     });
@@ -754,6 +763,7 @@ export class Sim implements SimView {
     f.moving = false;
     f.inBush = false;
 
+    if (spec.slam) return; // 내려찍기: 폭탄 없이 착지할 때 피해(stepLeap → slamLand)
     const fuse = Math.max(1, secToTicks(spec.fuse));
     for (let i = 0; i < spec.count; i++) {
       const a = dir + Math.PI + (i * Math.PI * 2) / spec.count;
@@ -818,6 +828,25 @@ export class Sim implements SimView {
       f.pos = { ...act.to };
       if (f.action === act) f.action = null;
       f.inBush = isInBush(this.grid, f.pos);
+      const spec = shotSpec(getFighter(f.fighterId), true);
+      if (spec.slam) this.slamLand(f, spec, act);
+    }
+  }
+
+  /**
+   * 내려찍기 착지: 'explode' 사건(착지 지점, aoeRadius), breaksWalls면 둘레 벽 파괴,
+   * 둘레(aoeRadius + 대상 반지름) 안의 적에게 damage 한 번 + 착지 지점 반대쪽으로 넉백 한 번.
+   */
+  private slamLand(f: Fighter, spec: ShotSpec, act: Extract<FighterAction, { kind: 'leap' }>) {
+    const at = act.to;
+    const leapDir = Math.atan2(act.to.y - act.from.y, act.to.x - act.from.x);
+    this.events.push({ type: 'explode', pos: { ...at }, radius: spec.aoeRadius, isSuper: true });
+    if (spec.breaksWalls) this.broken.push(...breakWallsInCircle(this.grid, at, spec.aoeRadius));
+    for (const u of this.units) {
+      if (!isHittable(u) || u.team === f.team) continue;
+      if (dist(u.pos, at) > spec.aoeRadius + u.radius) continue;
+      this.damage(u, spec.damage, f.id, true);
+      if (u.alive && spec.knockback > 0) this.applyKnockback(u, u.pos.x - at.x, u.pos.y - at.y, spec.knockback, leapDir);
     }
   }
 
@@ -1009,59 +1038,70 @@ export class Sim implements SimView {
    * breaksWalls면 지나가는 부서지는 벽을 부수며 계속 간다(단단한 벽에서만 멈춤).
    */
   private stepProjectile(p: Projectile): boolean {
-    const speed = len(p.vel);
-    const stepLen = Math.min(speed * TICK_DT, p.remaining);
-    if (speed < 1e-9 || stepLen <= 0) {
-      this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'range' });
-      return false;
-    }
-    const to = { x: p.pos.x + (p.vel.x / speed) * stepLen, y: p.pos.y + (p.vel.y / speed) * stepLen };
-
-    /** 이번 틱 전까지 날아간 거리(range가 있는 투사체만 의미 있음) */
-    const flown = p.range !== undefined ? p.range - p.remaining : 0;
-    const hits: { u: Unit; t: number }[] = [];
-    for (const u of this.units) {
-      // 점프 중인 유닛은 투사체가 그대로 지나간다
-      if (!isHittable(u) || u.team === p.team || p.hitIds.includes(u.id)) continue;
-      const t = segmentCircleT(p.pos, to, u.pos, u.radius + p.radius);
-      if (t >= 0) hits.push({ u, t });
-    }
-    hits.sort((a, b) => a.t - b.t || a.u.id - b.u.id);
-
-    const first = hits[0];
-    const reach = !p.pierce && first ? lerpVec(p.pos, to, first.t) : to;
-    const sweep = sweepCircle(this.grid, p.pos, reach, p.radius, p.breaksWalls ? { breakWalls: true } : {});
-    if (sweep.broken.length) this.broken.push(...sweep.broken);
-    const traveled = sweep.hit ? dist(p.pos, sweep.point) : dist(p.pos, reach);
-
-    if (p.pierce) {
-      for (const h of hits) {
-        if (sweep.hit && h.t * stepLen > traveled + 1e-9) break;
-        p.hitIds.push(h.u.id);
-        this.projectileHit(p, h.u, flown + h.t * stepLen);
+    let budget = Math.min(len(p.vel) * TICK_DT, p.remaining);
+    // 튕길 때마다 이번 틱의 남은 이동 거리로 다시 스윕한다(튕김 횟수가 유한하므로 끝난다)
+    for (;;) {
+      const speed = len(p.vel);
+      const stepLen = Math.min(budget, p.remaining);
+      if (speed < 1e-9 || stepLen <= 0) {
+        this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'range' });
+        return false;
       }
-    } else if (first && !sweep.hit) {
-      const at = { ...reach };
-      const traveled = flown + dist(p.pos, reach);
-      p.pos = at;
-      this.projectileHit(p, first.u, traveled);
-      this.events.push({ type: 'projectileEnd', id: p.id, pos: at, reason: 'hit' });
-      return false;
-    }
+      const to = { x: p.pos.x + (p.vel.x / speed) * stepLen, y: p.pos.y + (p.vel.y / speed) * stepLen };
 
-    if (sweep.hit) {
-      p.pos = { ...sweep.point };
-      p.remaining -= traveled;
-      this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'wall' });
-      return false;
+      /** 이번 구간 전까지 날아간 거리(range가 있는 투사체만 의미 있음) */
+      const flown = p.range !== undefined ? p.range - p.remaining : 0;
+      const hits: { u: Unit; t: number }[] = [];
+      for (const u of this.units) {
+        // 점프 중인 유닛은 투사체가 그대로 지나간다
+        if (!isHittable(u) || u.team === p.team || p.hitIds.includes(u.id)) continue;
+        const t = segmentCircleT(p.pos, to, u.pos, u.radius + p.radius);
+        if (t >= 0) hits.push({ u, t });
+      }
+      hits.sort((a, b) => a.t - b.t || a.u.id - b.u.id);
+
+      const first = hits[0];
+      const reach = !p.pierce && first ? lerpVec(p.pos, to, first.t) : to;
+      const sweep = sweepCircle(this.grid, p.pos, reach, p.radius, p.breaksWalls ? { breakWalls: true } : {});
+      if (sweep.broken.length) this.broken.push(...sweep.broken);
+      const traveled = sweep.hit ? dist(p.pos, sweep.point) : dist(p.pos, reach);
+
+      if (p.pierce) {
+        for (const h of hits) {
+          if (sweep.hit && h.t * stepLen > traveled + 1e-9) break;
+          p.hitIds.push(h.u.id);
+          this.projectileHit(p, h.u, flown + h.t * stepLen);
+        }
+      } else if (first && !sweep.hit) {
+        const at = { ...reach };
+        const hitAt = flown + dist(p.pos, reach);
+        p.pos = at;
+        this.projectileHit(p, first.u, hitAt);
+        this.events.push({ type: 'projectileEnd', id: p.id, pos: at, reason: 'hit' });
+        return false;
+      }
+
+      if (sweep.hit) {
+        p.pos = { ...sweep.point };
+        p.remaining -= traveled;
+        budget -= traveled;
+        if ((p.bounces ?? 0) > 0 && p.remaining > 1e-3) {
+          p.vel = reflectOffWalls(this.grid, p.pos, p.vel, p.radius);
+          p.bounces = p.bounces! - 1;
+          if (budget <= 1e-9) return true;
+          continue;
+        }
+        this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'wall' });
+        return false;
+      }
+      p.pos = to;
+      p.remaining -= stepLen;
+      if (p.remaining <= 1e-3) {
+        this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'range' });
+        return false;
+      }
+      return true;
     }
-    p.pos = to;
-    p.remaining -= stepLen;
-    if (p.remaining <= 1e-3) {
-      this.events.push({ type: 'projectileEnd', id: p.id, pos: { ...p.pos }, reason: 'range' });
-      return false;
-    }
-    return true;
   }
 
   /** traveled: 발사 지점부터 맞은 지점까지 날아간 거리(거리 비례 피해용) */
@@ -1249,4 +1289,32 @@ function dedupeTiles(tiles: Vec2[]): Vec2[] {
     out.push(t);
   }
   return out;
+}
+
+/** 튕김 판정용: 반지름 r 원이 투사체를 막는 타일(벽·단단한 벽·맵 밖)과 겹치는가 */
+function circleHitsProjectileWall(grid: Grid, x: number, y: number, r: number): boolean {
+  for (let ty = Math.floor(y - r); ty <= Math.floor(y + r); ty++) {
+    for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++) {
+      if (!grid.blocksProjectile(tx, ty)) continue;
+      const ox = x - Math.max(tx, Math.min(tx + 1, x));
+      const oy = y - Math.max(ty, Math.min(ty + 1, y));
+      if (ox * ox + oy * oy < r * r) return true;
+    }
+  }
+  return false;
+}
+
+/** 튕김 탐침 거리(타일). 스윕이 벽 앞 SKIN(1e-4)에서 멈추므로 그보다 충분히 크게 */
+const BOUNCE_PROBE = 0.02;
+
+/**
+ * 벽에 닿은 투사체의 반사 속도. 진행 방향의 x 성분만 더 가 봐서 막히면 세로 벽(x 반전),
+ * y 성분만 더 가 봐서 막히면 가로 벽(y 반전). 둘 다 막히거나(안쪽 모서리) 둘 다 안 막히면(바깥 모서리) 둘 다 반전.
+ */
+export function reflectOffWalls(grid: Grid, pos: Vec2, vel: Vec2, r: number): Vec2 {
+  const bx = vel.x !== 0 && circleHitsProjectileWall(grid, pos.x + Math.sign(vel.x) * BOUNCE_PROBE, pos.y, r);
+  const by = vel.y !== 0 && circleHitsProjectileWall(grid, pos.x, pos.y + Math.sign(vel.y) * BOUNCE_PROBE, r);
+  if (bx && !by) return { x: -vel.x, y: vel.y };
+  if (by && !bx) return { x: vel.x, y: -vel.y };
+  return { x: -vel.x, y: -vel.y };
 }

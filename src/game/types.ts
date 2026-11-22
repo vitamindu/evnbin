@@ -114,6 +114,8 @@ export interface Projectile {
   range?: number;
   /** 관통 여부. true면 hitIds에 있는 대상은 다시 맞히지 않는다 */
   pierce: boolean;
+  /** 남은 튕김 횟수. 있고 0보다 크면 벽(부서지지 않은 벽·단단한 벽·맵 끝)에서 반사되어 남은 사거리만큼 더 간다 */
+  bounces?: number;
   hitIds: EntityId[];
 }
 

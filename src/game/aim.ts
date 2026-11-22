@@ -83,14 +83,23 @@ export function nearestVisibleEnemy(sim: SimView, shooter: Unit): Unit | null {
 /**
  * leap 궁극기 조준: aim이 있으면 그 방향·길이 비율. null(또는 길이 0)이면 가장 가까운 보이는 적에게서
  * 정반대 방향으로 끝까지(비율 1), 적이 없으면 바라보는 방향으로 끝까지.
+ * towardRange(내려찍기)가 있으면 반대로 가장 가까운 보이는 적 쪽으로, 거리 비율 min(1, 거리 / towardRange).
  */
-export function resolveLeapAim(sim: SimView, shooter: Unit, aim: Aim): ResolvedAim {
+export function resolveLeapAim(sim: SimView, shooter: Unit, aim: Aim, towardRange?: number): ResolvedAim {
   if (aim && len(aim) > MIN_AIM_LEN) return { dir: angleOf(aim), ratio: Math.min(1, len(aim)), target: null };
   const enemy = nearestVisibleEnemy(sim, shooter);
   if (enemy) {
     const dx = shooter.pos.x - enemy.pos.x;
     const dy = shooter.pos.y - enemy.pos.y;
-    if (dx * dx + dy * dy > 1e-12) return { dir: Math.atan2(dy, dx), ratio: 1, target: enemy };
+    const d2 = dx * dx + dy * dy;
+    if (towardRange !== undefined) {
+      if (d2 > 1e-12) {
+        const ratio = towardRange > 0 ? Math.min(1, Math.sqrt(d2) / towardRange) : 1;
+        return { dir: Math.atan2(-dy, -dx), ratio, target: enemy };
+      }
+      return { dir: shooter.facing, ratio: 0, target: enemy };
+    }
+    if (d2 > 1e-12) return { dir: Math.atan2(dy, dx), ratio: 1, target: enemy };
   }
   return { dir: shooter.facing, ratio: 1, target: enemy };
 }
