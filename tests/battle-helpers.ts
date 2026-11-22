@@ -1,6 +1,6 @@
 import type { CDPSession, Page } from '@playwright/test';
 import type { BattleSession } from '../src/battle/session';
-import type { FighterId } from '../src/data/fighters';
+import { FIGHTERS, type FighterId } from '../src/data/fighters';
 import type { SimEvent, Vec2 } from '../src/game/types';
 import { TRAINING_YARD } from '../src/data/maps/training';
 import { Grid, Tile, circleBlocked, hasLineOfSight } from '../src/game/world';
@@ -15,7 +15,7 @@ import { PROFILE_KEY, expect, tapToLobby } from './fixtures';
  * slower than real time (~10-17 ticks/s instead of 30). Always wait on sim state/ticks, never on wall time.
  */
 
-export const NAMES: Record<FighterId, string> = { rivet: 'RIVET', volley: 'VOLLEY', boulder: 'BOULDER', hinako: 'HINAKO' };
+export const NAMES = Object.fromEntries(FIGHTERS.map((f) => [f.id, f.name])) as Record<FighterId, string>;
 export const MAX_HP: Record<FighterId, number> = { rivet: 3800, volley: 2800, boulder: 5600, hinako: 2400 };
 export const FIGHTER_IDS: FighterId[] = ['rivet', 'volley', 'boulder', 'hinako'];
 
