@@ -65,6 +65,8 @@ export type AccountApiError =
   /** 스킨 상점이 아직 닫혀 있음 */
   | 'shop_closed'
   | 'not_enough_coins'
+  /** 스킨: 다이아 부족 */
+  | 'not_enough_gems'
   /** 이미 최대 레벨 */
   | 'max_level';
 

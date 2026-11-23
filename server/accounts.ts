@@ -398,7 +398,7 @@ export class AccountStore {
     return present(u);
   }
 
-  /** 코인으로 스킨 사기(상점이 열려 있을 때만) */
+  /** 다이아로 스킨 사기(상점이 열려 있을 때만) */
   buySkin(key: string, skinId: unknown): Profile {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
@@ -407,8 +407,8 @@ export class AccountStore {
     if (owns(u, skin.id)) throw new AccountError('already_owned');
     if (!SKIN_SHOP_OPEN) throw new AccountError('shop_closed');
     if (!isAdmin(u)) {
-      if (u.profile.coins < skin.price) throw new AccountError('not_enough_coins');
-      u.profile.coins -= skin.price;
+      if (u.profile.crystals < skin.price) throw new AccountError('not_enough_gems');
+      u.profile.crystals -= skin.price;
     }
     u.profile.skins = [...(u.profile.skins ?? []), skin.id];
     this.save();

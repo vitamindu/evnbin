@@ -47,6 +47,7 @@ const STATUS: Record<AccountApiError, number> = {
   already_owned: 409,
   shop_closed: 403,
   not_enough_coins: 409,
+  not_enough_gems: 409,
   max_level: 409,
   self: 400,
 };

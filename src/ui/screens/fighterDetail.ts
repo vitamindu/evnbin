@@ -80,7 +80,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
     if (equippedSkin(p, current) === id) return '착용 중';
     if (!id || ownsSkin(p, id)) return '착용';
     const def = skinsOf(current).find((k) => k.id === id)!;
-    return SKIN_SHOP_OPEN ? `${def.price} 코인` : '관리자 전용';
+    return SKIN_SHOP_OPEN ? `${def.price} 다이아` : '관리자 전용';
   };
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     if (!getAccount()) {

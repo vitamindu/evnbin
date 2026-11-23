@@ -36,6 +36,7 @@ export type AccountErrorCode =
   | 'already_owned'
   | 'shop_closed'
   | 'not_enough_coins'
+  | 'not_enough_gems'
   | 'max_level'
   | 'server_error'
   | 'network';
@@ -258,9 +259,9 @@ function fakeModule(): AccountModule {
       if (!skin) fail('server_error');
       if (account!.profile.admin || account!.profile.skins?.includes(skinId)) fail('already_owned');
       if (!SKIN_SHOP_OPEN) fail('shop_closed');
-      if (account!.profile.coins < skin!.price) fail('not_enough_coins');
+      if (account!.profile.crystals < skin!.price) fail('not_enough_gems');
       save((row) => {
-        row.profile.coins -= skin!.price;
+        row.profile.crystals -= skin!.price;
         row.profile.skins = [...(row.profile.skins ?? []), skinId];
       });
     },
@@ -349,6 +350,8 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '스킨 상점은 아직 준비 중이에요';
     case 'not_enough_coins':
       return '코인이 부족해요';
+    case 'not_enough_gems':
+      return '다이아가 부족해요';
     case 'max_level':
       return '이미 최대 레벨이에요';
     case 'server_error':

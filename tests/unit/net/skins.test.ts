@@ -43,7 +43,7 @@ describe('skins and admin', () => {
     const r = await s.signup('normal1', 'secret1', '보통');
     expect(r.profile.admin).toBeUndefined();
     expect(code(() => s.equipSkin('normal1', 'hinako', 'hinako_sakura'))).toBe('not_owned');
-    expect(code(() => s.buySkin('normal1', 'hinako_sakura'))).toBe(SKIN_SHOP_OPEN ? 'not_enough_coins' : 'shop_closed');
+    expect(code(() => s.buySkin('normal1', 'hinako_sakura'))).toBe(SKIN_SHOP_OPEN ? 'not_enough_gems' : 'shop_closed');
     expect(s.skinFor('normal1', 'hinako')).toBeUndefined();
   });
 
@@ -56,12 +56,14 @@ describe('skins and admin', () => {
 });
 
 describe('buying skins', () => {
-  it.runIf(SKIN_SHOP_OPEN)('buys with coins once, then can wear it', async () => {
+  it.runIf(SKIN_SHOP_OPEN)('buys with diamonds once (coins untouched), then can wear it', async () => {
     const s = store();
     await s.signup('buyer1', 'secret1', '구매자');
-    (s as unknown as { data: { users: Record<string, { profile: { coins: number } }> } }).data.users['buyer1']!.profile.coins = 650;
+    (s as unknown as { data: { users: Record<string, { profile: { crystals: number } }> } }).data.users['buyer1']!.profile.crystals = 130;
+    const coins = s.profile('buyer1')!.coins;
     const p = s.buySkin('buyer1', 'hinako_sakura');
-    expect(p.coins).toBe(150);
+    expect(p.crystals).toBe(30);
+    expect(p.coins).toBe(coins);
     expect(p.skins).toEqual(['hinako_sakura']);
     expect(code(() => s.buySkin('buyer1', 'hinako_sakura'))).toBe('already_owned');
     expect(s.equipSkin('buyer1', 'hinako', 'hinako_sakura').skinSel?.hinako).toBe('hinako_sakura');
