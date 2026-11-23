@@ -5,6 +5,8 @@ import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
+import { openProfile } from '../overlays/profile';
+import { fillAvatar } from '../avatar';
 import { equippedSkin, getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import { getSettings, onSettingsChange } from '../../state/settings';
 import type { AppContext } from '../context';
@@ -46,8 +48,8 @@ export function createLobbyScreen(ctx: AppContext): Screen {
   // ── 왼쪽 위: 프로필 + 트로피
   const pName = txt('', 'pc-name');
   const pTag = el('span', 'pc-sub', ['']);
-  const avatar = el('span', 'avatar t-outline', ['']);
-  const profileCard = button('profile-card', [avatar, el('span', 'pc-text', [pName, pTag])], comingSoon);
+  const avatar = el('span', 'avatar');
+  const profileCard = button('profile-card', [avatar, el('span', 'pc-text', [pName, pTag])], () => openProfile(ctx));
   const rankIco = el('span', 'ico tc-ico');
   const trophyNum = txt('0', 'tc-num');
   const trophyFill = el('i');
@@ -147,7 +149,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     const f = getFighter(p.selected);
     pName.textContent = p.name;
     pTag.textContent = `#${p.tag}`;
-    avatar.textContent = p.name.charAt(0);
+    fillAvatar(avatar, p.name, p.avatar);
     avatar.style.setProperty('--c', f.palette.primary);
     const total = totalTrophies(p);
     void trophyMilestone(total);

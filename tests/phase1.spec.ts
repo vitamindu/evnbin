@@ -189,8 +189,7 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
     ['SEASON PASS', page.locator('.pass-card')],
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],
-    // Also "준비 중" per docs/02 §2 lobby table:
-    ['profile card', page.locator('.profile-card')],
+    // Also "준비 중" per docs/02 §2 lobby table (the profile card now opens the profile window, tests/profile.spec.ts):
     ['coins', page.locator('.lb-top-right .currency').nth(0)],
     ['crystals', page.locator('.lb-top-right .currency').nth(1)],
   ];

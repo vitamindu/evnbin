@@ -1332,3 +1332,166 @@ img {
   --o: 2px;
   color: #c9f7ff;
 }
+
+/* 프로필 사진(사진이 있으면 꽉 채운다) */
+.avatar > span {
+  line-height: 1;
+}
+.avatar.has-photo {
+  overflow: hidden;
+  background: #1a1440;
+}
+.avatar > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 프로필 창 */
+.pf-panel {
+  width: 860px;
+  padding: 22px 30px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pf-body {
+  display: flex;
+  gap: 24px;
+}
+.pf-label {
+  font-size: 17px;
+  --o: 2px;
+  color: var(--muted);
+}
+.pf-left {
+  width: 330px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px 18px;
+  border-radius: 20px;
+  border: 3px solid var(--ink);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 75%, white), var(--c) 70%);
+}
+.pf-fighter-img {
+  width: 250px;
+  height: 250px;
+  object-fit: contain;
+}
+.pf-fighter-name {
+  font-size: 36px;
+}
+.pf-fighter-games {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+}
+.pf-fighter-games .ico {
+  width: 24px;
+  height: 24px;
+}
+.pf-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.pf-id {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.pf-photo {
+  position: relative;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+.pf-avatar {
+  width: 132px;
+  height: 132px;
+  border-radius: 22px;
+  border-width: 4px;
+  font-size: 70px;
+}
+.pf-photo-edit {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #ffc04d;
+  border: 3px solid var(--ink);
+}
+.pf-photo-edit .ico {
+  width: 24px;
+  height: 24px;
+}
+.pf-id-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pf-name {
+  font-size: 40px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf-tag {
+  font-size: 18px;
+  color: var(--muted);
+}
+.pf-btns {
+  display: flex;
+  gap: 10px;
+}
+.pf-btn {
+  height: 52px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 20px;
+  background: linear-gradient(#ffc04d, #ff8a1f 55%, #f0620a);
+}
+.pf-btn-sub {
+  background: linear-gradient(#5d6bd0, #3a46a8);
+}
+.pf-rank {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+}
+.pf-emblem {
+  width: 110px;
+  height: 110px;
+}
+.pf-rank-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pf-rank-name {
+  font-size: 34px;
+}
+.pf-rank-pts {
+  font-size: 24px;
+  color: #ffd23f;
+}
+.fr-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  font-size: 24px;
+  --c: #5d6bd0;
+}

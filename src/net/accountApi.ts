@@ -8,6 +8,7 @@
  *   GET    /api/me      (Authorization: Bearer)         → { profile, username }
  *   PUT    /api/profile (Bearer) {selected}             → { profile, username }
  *   PUT    /api/nickname (Bearer) {nickname}            → { profile, username }
+ *   PUT    /api/avatar  (Bearer) {avatar: dataURL|null}  → { profile, username }  (jpeg/webp/png, 6만 자 이하)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -23,6 +24,7 @@ import type { FighterId } from '../data/fighters';
 export interface AccountFighterProgress {
   trophies: number;
   power: number;
+  games?: number;
 }
 
 export interface AccountProfile {
@@ -34,6 +36,7 @@ export interface AccountProfile {
   selected: FighterId;
   fighters: Record<FighterId, AccountFighterProgress>;
   rankPoints: number;
+  avatar?: string;
   admin?: boolean;
   skins?: string[];
   skinSel?: Partial<Record<FighterId, string>>;
@@ -81,6 +84,8 @@ export interface FriendInfo {
   rankPoints: number;
   /** 지금 방(로비 또는 경기)에 있는가 */
   inRoom: boolean;
+  /** 프로필 사진(data URL) */
+  avatar?: string;
 }
 
 export interface FriendsResponse {

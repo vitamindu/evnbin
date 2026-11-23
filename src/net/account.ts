@@ -239,3 +239,10 @@ export async function buySkin(skinId: string): Promise<Profile> {
   setProfile(r.profile, r.username);
   return r.profile;
 }
+
+/** 프로필 사진 저장(null = 지우기) */
+export async function setAvatar(avatar: string | null): Promise<Profile> {
+  const r = await authed<ProfileResponse>('PUT', '/api/avatar', { avatar });
+  setProfile(r.profile, r.username);
+  return r.profile;
+}

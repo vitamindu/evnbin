@@ -11,6 +11,8 @@ export interface Friend {
   rankPoints: number;
   /** 지금 게임 방(또는 경기)에 있는가 */
   inRoom: boolean;
+  /** 프로필 사진(data URL) */
+  avatar?: string;
 }
 
 interface FriendsModule {

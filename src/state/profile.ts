@@ -4,6 +4,8 @@ import { FIGHTERS, type FighterId } from '../data/fighters';
 export interface FighterProgress {
   trophies: number;
   power: number;
+  /** 온라인 경기 수(서버가 센다) */
+  games?: number;
 }
 
 export interface Profile {
@@ -16,6 +18,8 @@ export interface Profile {
   fighters: Record<FighterId, FighterProgress>;
   /** 랭크 점수(TEAM FIGHT 온라인 경기로만 바뀐다, src/data/ranks.ts) */
   rankPoints: number;
+  /** 프로필 사진(작은 이미지 data URL). 없으면 닉네임 첫 글자 */
+  avatar?: string;
   /** 관리자 계정(서버가 정한다). 관리자는 모든 스킨을 쓸 수 있다 */
   admin?: boolean;
   /** 가진 스킨 id(관리자는 서버가 전부 넣어 준다) */
@@ -118,4 +122,19 @@ export function ownsSkin(p: Readonly<Profile>, skinId: string): boolean {
 export function equippedSkin(p: Readonly<Profile>, fighterId: FighterId): string | undefined {
   const id = p.skinSel?.[fighterId];
   return id && ownsSkin(p, id) ? id : undefined;
+}
+
+/** 가장 많이 쓴 캐릭터: 경기 수 → 트로피 → 지금 선택한 캐릭터 순 */
+export function mostPlayedFighter(p: Readonly<Profile>): FighterId {
+  let best: FighterId = p.selected;
+  let score = [-1, -1];
+  for (const f of FIGHTERS) {
+    const prog = p.fighters[f.id];
+    const s = [prog?.games ?? 0, prog?.trophies ?? 0];
+    if (s[0]! > score[0]! || (s[0] === score[0] && s[1]! > score[1]!)) {
+      best = f.id;
+      score = s;
+    }
+  }
+  return score[0] === 0 && score[1] === 0 ? p.selected : best;
 }

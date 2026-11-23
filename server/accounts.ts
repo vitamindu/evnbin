@@ -364,6 +364,21 @@ export class AccountStore {
     return present(u);
   }
 
+  /** 프로필 사진: 작은 이미지 data URL(jpeg/webp/png, 6만 자 이하). null이면 지운다 */
+  setAvatar(key: string, avatar: unknown): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (avatar === null) delete u.profile.avatar;
+    else {
+      if (typeof avatar !== 'string' || avatar.length > 60_000 || !/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/]+=*$/.test(avatar)) {
+        throw new AccountError('bad_request');
+      }
+      u.profile.avatar = avatar;
+    }
+    this.save();
+    return present(u);
+  }
+
   /** 캐릭터에 스킨 입히기(skinId=null이면 기본). 가진 스킨만 */
   equipSkin(key: string, fighterId: unknown, skinId: unknown): Profile {
     const u = this.data.users[key];
@@ -415,6 +430,7 @@ export class AccountStore {
       const fp = (u.profile.fighters[r.fighterId] ??= { trophies: 0, power: 1 });
       const delta = r.outcome === 'win' ? TROPHY_WIN : r.outcome === 'loss' ? TROPHY_LOSS : 0;
       fp.trophies = Math.max(0, fp.trophies + delta);
+      fp.games = (fp.games ?? 0) + 1;
       u.profile.coins += r.outcome === 'win' ? COINS_WIN : COINS_OTHER;
       const before = u.profile.rankPoints ?? 0;
       u.profile.rankPoints = Math.max(0, before + (ranked ? rankDelta(r.outcome, r.place ?? 0, r.teamSize ?? 1) : 0));

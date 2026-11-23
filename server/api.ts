@@ -9,6 +9,8 @@ import { AccountError, type AccountStore, type RateLimiter } from './accounts';
 export const DEFAULT_API_ORIGINS = ['https://vitamindu.github.io'];
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 const MAX_BODY = 4096;
+/** 프로필 사진(data URL) 최대 길이 */
+export const AVATAR_MAX_BYTES = 60_000;
 
 export function originAllowed(origin: string | undefined, allowed: readonly string[]): boolean {
   if (!origin) return false;
@@ -54,13 +56,13 @@ class HttpError extends Error {
   }
 }
 
-function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
+function readJson(req: IncomingMessage, maxBody = MAX_BODY): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > maxBody) {
         reject(new HttpError('bad_request'));
         req.destroy();
         return;
@@ -158,6 +160,7 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
         inRoom: false,
         ...(presence?.(f) ?? {}),
         rankPoints: store.profile(f)?.rankPoints ?? 0,
+        ...(store.profile(f)?.avatar ? { avatar: store.profile(f)!.avatar } : {}),
       }))
       .sort((a, b) => Number(b.online) - Number(a.online) || a.nickname.localeCompare(b.nickname)),
   });
@@ -200,6 +203,12 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (extra.length || b.selected === undefined) throw new HttpError('bad_request');
     const profile = store.updateSelected(key, b.selected);
     if (!profile) throw new HttpError('bad_request');
+    return me(key);
+  }
+  if (method === 'PUT' && path === '/api/avatar') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req, AVATAR_MAX_BYTES + 512);
+    store.setAvatar(key, b.avatar ?? null);
     return me(key);
   }
   if (method === 'PUT' && path === '/api/skin') {

@@ -4,6 +4,7 @@ import type { Screen } from '../../core/screens';
 import { rankLabel, rankOf } from '../../data/ranks';
 import type { AppContext } from '../context';
 import { accountErrorCode, accountErrorText, getAccount } from '../account/accountApi';
+import { avatarEl } from '../avatar';
 import { addFriend, listFriends, removeFriend, type Friend } from '../account/friendsApi';
 import { toast } from '../overlays/toast';
 import { rankEmblemSvg } from '../rankEmblem';
@@ -76,6 +77,7 @@ export function createFriendsScreen(ctx: AppContext): Screen {
     const del = button('fr-del', [iconEl('close')], () => confirmRemove(f.nickname), 'back');
     const rowEl = el('div', `fr-row is-${status}`, [
       el('i', 'fr-dot'),
+      avatarEl(f.nickname, f.avatar, 'fr-avatar'),
       icon(rankEmblemSvg(r.tier.id), 'ico fr-emblem'),
       el('span', 'fr-names', [txt(f.nickname, 'fr-name'), txt(`${rankLabel(r)} · ${f.rankPoints} RP`, 'fr-rank')]),
       txt(statusText, 'fr-status'),

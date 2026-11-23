@@ -47,6 +47,7 @@ interface AccountModule {
   changeNickname(nickname: string): Promise<unknown>;
   equipSkin(fighterId: FighterId, skinId: string | null): Promise<unknown>;
   buySkin(skinId: string): Promise<unknown>;
+  setAvatar(avatar: string | null): Promise<unknown>;
   getAccount(): Account | null;
   onAccountChange(cb: (a: Account | null) => void): () => void;
 }
@@ -66,6 +67,7 @@ type RealModule = {
   changeNickname?: (n: string) => Promise<unknown>;
   equipSkin(f: FighterId, s: string | null): Promise<unknown>;
   buySkin(s: string): Promise<unknown>;
+  setAvatar(a: string | null): Promise<unknown>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -81,6 +83,7 @@ function realAdapter(m: RealModule): AccountModule {
     changeNickname: (n) => (m.changeNickname ? m.changeNickname(n) : Promise.reject(Object.assign(new Error('server_error'), { code: 'server_error' }))),
     equipSkin: (f, id) => m.equipSkin(f, id),
     buySkin: (id) => m.buySkin(id),
+    setAvatar: (a) => m.setAvatar(a),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -256,6 +259,14 @@ function fakeModule(): AccountModule {
         row.profile.skins = [...(row.profile.skins ?? []), skinId];
       });
     },
+    async setAvatar(avatar) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      save((row) => {
+        if (avatar) row.profile.avatar = avatar;
+        else delete row.profile.avatar;
+      });
+    },
     getAccount: () => account,
     onAccountChange(cb) {
       listeners.add(cb);
@@ -275,6 +286,7 @@ export const updateSelected = (fighterId: FighterId) => api.updateSelected(fight
 export const changeNickname = (nickname: string) => api.changeNickname(nickname);
 export const equipSkin = (fighterId: FighterId, skinId: string | null) => api.equipSkin(fighterId, skinId);
 export const buySkin = (skinId: string) => api.buySkin(skinId);
+export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
 export const getAccount = () => api.getAccount();
 export const onAccountChange = (cb: (a: Account | null) => void) => api.onAccountChange(cb);
 

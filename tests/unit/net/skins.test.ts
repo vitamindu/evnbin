@@ -53,3 +53,22 @@ describe('skins and admin', () => {
     expect(code(() => s.equipSkin('mineack991', 'hinako', 'nope'))).toBe('bad_request');
   });
 });
+
+describe('profile photo', () => {
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  it('stores a small image data URL and clears it with null', async () => {
+    const s = store();
+    await s.signup('photo1', 'secret1', '사진');
+    expect(s.setAvatar('photo1', PNG).avatar).toBe(PNG);
+    expect(s.profile('photo1')?.avatar).toBe(PNG);
+    expect(s.setAvatar('photo1', null).avatar).toBeUndefined();
+  });
+  it('rejects non-images, other schemes and oversized data', async () => {
+    const s = store();
+    await s.signup('photo2', 'secret1', '사진둘');
+    expect(code(() => s.setAvatar('photo2', 'https://example.com/a.png'))).toBe('bad_request');
+    expect(code(() => s.setAvatar('photo2', 'data:image/svg+xml;base64,PHN2Zz4='))).toBe('bad_request');
+    expect(code(() => s.setAvatar('photo2', 'data:image/png;base64,' + 'A'.repeat(70_000)))).toBe('bad_request');
+    expect(code(() => s.setAvatar('photo2', 42))).toBe('bad_request');
+  });
+});
