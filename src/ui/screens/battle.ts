@@ -157,7 +157,7 @@ export function createBattleScreen(ctx: AppContext) {
 
   function setup() {
     const m = pending;
-    const s: BattleLike = m ? m.session : new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD, playerName: getProfile().name, skin: equippedSkin(getProfile(), getProfile().selected) });
+    const s: BattleLike = m ? m.session : new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD, playerName: getProfile().name, skin: equippedSkin(getProfile(), getProfile().selected), power: getProfile().fighters[getProfile().selected]?.power ?? 1 });
     session = s;
     online = m;
     ended = false;

@@ -47,6 +47,7 @@ const STATUS: Record<AccountApiError, number> = {
   already_owned: 409,
   shop_closed: 403,
   not_enough_coins: 409,
+  max_level: 409,
   self: 400,
 };
 
@@ -209,6 +210,12 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (!key) throw new HttpError('unauthorized');
     const b = await readJson(req, AVATAR_MAX_BYTES + 512);
     store.setAvatar(key, b.avatar ?? null);
+    return me(key);
+  }
+  if (method === 'POST' && path === '/api/upgrade') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.upgradeFighter(key, b.fighterId);
     return me(key);
   }
   if (method === 'PUT' && path === '/api/skin') {

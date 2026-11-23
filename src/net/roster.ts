@@ -7,12 +7,13 @@
 import type { SpawnFighter } from '../game/types';
 import type { MatchRosterEntry } from './protocol';
 
-export function rosterSpawns(roster: readonly Pick<MatchRosterEntry, 'team' | 'fighterId' | 'bot'>[]): SpawnFighter[] {
+export function rosterSpawns(roster: readonly (Pick<MatchRosterEntry, 'team' | 'fighterId' | 'bot'> & { power?: number })[]): SpawnFighter[] {
   const perTeam = [0, 0];
   return roster.map((r) => ({
     fighterId: r.fighterId,
     team: r.team,
     controller: r.bot ? 'bot' : 'player',
     spawnIndex: perTeam[r.team]!++,
+    ...(r.power && r.power > 1 ? { power: r.power } : {}),
   }));
 }

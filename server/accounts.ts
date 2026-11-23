@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path';
 import { FIGHTERS, type FighterId } from '../src/data/fighters';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../src/data/skins';
+import { MAX_POWER, upgradeCost } from '../src/data/power';
 
 /** 관리자 로그인 아이디(대소문자 무시). FG_ADMINS 환경 변수(쉼표 구분)로 바꿀 수 있다 */
 export const ADMIN_USERNAMES = new Set(
@@ -405,9 +406,28 @@ export class AccountStore {
     if (!skin) throw new AccountError('bad_request');
     if (owns(u, skin.id)) throw new AccountError('already_owned');
     if (!SKIN_SHOP_OPEN) throw new AccountError('shop_closed');
-    if (u.profile.coins < skin.price) throw new AccountError('not_enough_coins');
-    u.profile.coins -= skin.price;
+    if (!isAdmin(u)) {
+      if (u.profile.coins < skin.price) throw new AccountError('not_enough_coins');
+      u.profile.coins -= skin.price;
+    }
     u.profile.skins = [...(u.profile.skins ?? []), skin.id];
+    this.save();
+    return present(u);
+  }
+
+  /** 캐릭터 레벨 업(최대 MAX_POWER). 코인이 든다. 관리자는 무료(무한 코인) */
+  upgradeFighter(key: string, fighterId: unknown): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (typeof fighterId !== 'string' || !FIGHTERS.some((f) => f.id === fighterId)) throw new AccountError('bad_request');
+    const fp = (u.profile.fighters[fighterId as FighterId] ??= { trophies: 0, power: 1 });
+    const cost = upgradeCost(fp.power);
+    if (cost === null || fp.power >= MAX_POWER) throw new AccountError('max_level');
+    if (!isAdmin(u)) {
+      if (u.profile.coins < cost) throw new AccountError('not_enough_coins');
+      u.profile.coins -= cost;
+    }
+    fp.power += 1;
     this.save();
     return present(u);
   }
@@ -465,8 +485,12 @@ function present(u: StoredUser): Profile {
   return p;
 }
 
+function isAdmin(u: StoredUser): boolean {
+  return ADMIN_USERNAMES.has(u.username.toLowerCase());
+}
+
 function owns(u: StoredUser, skinId: string): boolean {
-  return ADMIN_USERNAMES.has(u.username.toLowerCase()) || !!u.profile.skins?.includes(skinId);
+  return isAdmin(u) || !!u.profile.skins?.includes(skinId);
 }
 
 function clone(p: Profile): Profile {

@@ -1,3 +1,4 @@
+import { powerMult } from '../data/power';
 import { getFighter, type FighterDef, type SuperKind } from '../data/fighters';
 import { resolveAim, resolveLeapAim } from './aim';
 import { angleDiff, lerpVec, segmentCircle, segmentCircleT } from './geom';
@@ -281,6 +282,7 @@ export class Sim implements SimView {
       const spawns = this.grid.teamSpawns[spec.team];
       const spawn = spawns[spec.spawnIndex % Math.max(1, spawns.length)] ?? { x: 2, y: 2 };
       const def = getFighter(spec.fighterId);
+      const hp = Math.round(def.hp * powerMult(spec.power));
       const f: Fighter = {
         id: this.nextId++,
         type: 'fighter',
@@ -290,8 +292,9 @@ export class Sim implements SimView {
         pos: { ...spawn },
         spawn: { ...spawn },
         radius: fighterRadius(spec.fighterId),
-        hp: def.hp,
-        maxHp: def.hp,
+        hp,
+        maxHp: hp,
+        ...(spec.power && spec.power > 1 ? { power: spec.power } : {}),
         alive: true,
         respawnTick: 0,
         facing: defaultFacing(spec.team),
@@ -1168,6 +1171,9 @@ export class Sim implements SimView {
 
   private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean) {
     if (!isHittable(u) || amount <= 0 || this.over) return;
+    // 캐릭터 레벨: 모든 피해(공격·궁극기·폭탄·지대)에 같은 배율
+    const src = this.getUnit(sourceId);
+    if (src?.type === 'fighter' && src.power && src.power > 1) amount = Math.round(amount * powerMult(src.power));
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;
     const killed = u.hp <= 0;

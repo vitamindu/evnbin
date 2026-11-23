@@ -3,6 +3,7 @@ import * as realAccount from '../../net/account';
 import { getServerUrl } from '../../net/config';
 import type { Profile } from '../../state/profile';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
+import { upgradeCost } from '../../data/power';
 
 /**
  * 계정 기능의 UI 쪽 입구(어댑터). 진짜는 Network 담당의 src/net/account.ts.
@@ -35,6 +36,7 @@ export type AccountErrorCode =
   | 'already_owned'
   | 'shop_closed'
   | 'not_enough_coins'
+  | 'max_level'
   | 'server_error'
   | 'network';
 
@@ -48,6 +50,7 @@ interface AccountModule {
   equipSkin(fighterId: FighterId, skinId: string | null): Promise<unknown>;
   buySkin(skinId: string): Promise<unknown>;
   setAvatar(avatar: string | null): Promise<unknown>;
+  upgradeFighter(fighterId: FighterId): Promise<unknown>;
   getAccount(): Account | null;
   onAccountChange(cb: (a: Account | null) => void): () => void;
 }
@@ -68,6 +71,7 @@ type RealModule = {
   equipSkin(f: FighterId, s: string | null): Promise<unknown>;
   buySkin(s: string): Promise<unknown>;
   setAvatar(a: string | null): Promise<unknown>;
+  upgradeFighter(f: FighterId): Promise<unknown>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -84,6 +88,7 @@ function realAdapter(m: RealModule): AccountModule {
     equipSkin: (f, id) => m.equipSkin(f, id),
     buySkin: (id) => m.buySkin(id),
     setAvatar: (a) => m.setAvatar(a),
+    upgradeFighter: (f) => m.upgradeFighter(f),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -267,6 +272,20 @@ function fakeModule(): AccountModule {
         else delete row.profile.avatar;
       });
     },
+    async upgradeFighter(fighterId) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const lv = account!.profile.fighters[fighterId]?.power ?? 1;
+      const cost = upgradeCost(lv);
+      if (cost === null) fail('max_level');
+      const admin = !!account!.profile.admin;
+      if (!admin && account!.profile.coins < cost!) fail('not_enough_coins');
+      save((row) => {
+        const fp = (row.profile.fighters[fighterId] ??= { trophies: 0, power: 1 });
+        fp.power = lv + 1;
+        if (!admin) row.profile.coins -= cost!;
+      });
+    },
     getAccount: () => account,
     onAccountChange(cb) {
       listeners.add(cb);
@@ -287,6 +306,7 @@ export const changeNickname = (nickname: string) => api.changeNickname(nickname)
 export const equipSkin = (fighterId: FighterId, skinId: string | null) => api.equipSkin(fighterId, skinId);
 export const buySkin = (skinId: string) => api.buySkin(skinId);
 export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
+export const upgradeFighter = (fighterId: FighterId) => api.upgradeFighter(fighterId);
 export const getAccount = () => api.getAccount();
 export const onAccountChange = (cb: (a: Account | null) => void) => api.onAccountChange(cb);
 
@@ -329,6 +349,8 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '스킨 상점은 아직 준비 중이에요';
     case 'not_enough_coins':
       return '코인이 부족해요';
+    case 'max_level':
+      return '이미 최대 레벨이에요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

@@ -48,6 +48,7 @@ export interface RosterSeed {
   /** 경기 결과를 반영할 계정(게스트·봇은 없음) */
   account?: string | null;
   skin?: string;
+  power?: number;
 }
 
 /** 이름 다듬기: 제어 문자 제거, 공백 정리, 최대 16글자. 비면 '플레이어' */

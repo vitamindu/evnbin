@@ -9,6 +9,7 @@
  *   PUT    /api/profile (Bearer) {selected}             → { profile, username }
  *   PUT    /api/nickname (Bearer) {nickname}            → { profile, username }
  *   PUT    /api/avatar  (Bearer) {avatar: dataURL|null}  → { profile, username }  (jpeg/webp/png, 6만 자 이하)
+ *   POST   /api/upgrade (Bearer) {fighterId}          → { profile, username }  (레벨 +1, 코인 차감. 관리자는 무료)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -63,7 +64,9 @@ export type AccountApiError =
   | 'already_owned'
   /** 스킨 상점이 아직 닫혀 있음 */
   | 'shop_closed'
-  | 'not_enough_coins';
+  | 'not_enough_coins'
+  /** 이미 최대 레벨 */
+  | 'max_level';
 
 export interface AuthResponse {
   token: string;

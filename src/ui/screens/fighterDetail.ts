@@ -4,7 +4,8 @@ import { FIGHTERS, STAT_MAX, getFighter, type FighterDef, type FighterId } from 
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { equippedSkin, getProfile, onProfileChange, ownsSkin, updateProfile } from '../../state/profile';
 import { SKIN_SHOP_OPEN, skinsOf } from '../../data/skins';
-import { accountErrorCode, accountErrorText, buySkin, equipSkin, getAccount } from '../account/accountApi';
+import { accountErrorCode, accountErrorText, buySkin, equipSkin, getAccount, upgradeFighter } from '../account/accountApi';
+import { MAX_POWER, powerMult, upgradeCost } from '../../data/power';
 import { sfx } from '../../audio/sfx';
 import type { AppContext } from '../context';
 import { toast } from '../overlays/toast';
@@ -38,6 +39,17 @@ export function createFighterDetailScreen(ctx: AppContext) {
   const titleRole = el('span', 'detail-role');
   const tagline = el('p', 'detail-tagline');
   const stats = el('div', 'stats panel');
+  // 레벨(파워) 줄: 지금 레벨 + 레벨 업 버튼(코인)
+  const lvNum = txt('1', 'lv-num');
+  const lvCost = txt('', 'lv-cost');
+  const lvBtn = button('btn-upgrade', [txt('레벨 업', 'lv-btn-label'), el('span', 'lv-cost-row', [iconEl('coin'), lvCost])], () => {
+    const p = getProfile();
+    const lv = p.fighters[current]?.power ?? 1;
+    if (lv >= MAX_POWER) return;
+    const id = current;
+    void run(() => upgradeFighter(id), `${getFighter(id).name} 레벨 ${lv + 1}!`);
+  });
+  const lvRow = el('div', 'lv-row panel', [el('span', 'lv-badge', [txt('레벨', 'lv-label'), lvNum, txt(`/ ${MAX_POWER}`, 'lv-max')]), lvBtn]);
   const abilities = el('div', 'abilities');
 
   const statRow = (label: string, value: number, max: number, text: string) => {
@@ -72,7 +84,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
   };
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     if (!getAccount()) {
-      toast('로그인하면 스킨을 쓸 수 있어요');
+      toast('로그인하면 쓸 수 있어요');
       return;
     }
     if (busy) return;
@@ -130,7 +142,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
     hit,
     header('', () => ctx.go.fighters()),
     el('div', 'detail-title', [titleName, titleRole]),
-    el('div', 'detail-panel', [tagline, stats, abilities]),
+    el('div', 'detail-panel', [tagline, lvRow, stats, abilities]),
     button('btn-arrow arrow-prev', [iconEl('prev')], () => step(-1)),
     button('btn-arrow arrow-next', [iconEl('next')], () => step(1)),
     skinBar,
@@ -150,13 +162,18 @@ export function createFighterDetailScreen(ctx: AppContext) {
     titleRole.replaceChildren(roleChip(f.id));
     tagline.textContent = f.tagline;
     const a = f.attack;
+    // 지금 레벨을 반영한 체력·피해량(막대 길이는 기본값 기준)
+    const m = powerMult(getProfile().fighters[f.id]?.power);
+    const hp = Math.round(f.hp * m);
+    const d = Math.round(a.damage * m);
+    const dFar = a.damageFar ? Math.round(a.damageFar * m) : 0;
     stats.replaceChildren(
-      statRow('체력', f.hp, STAT_MAX.hp, String(f.hp)),
+      statRow('체력', f.hp, STAT_MAX.hp, String(hp)),
       statRow(
         '피해량',
         (a.damageFar ?? a.damage) * a.count,
         STAT_MAX.damage,
-        a.damageFar ? `${a.damage}–${a.damageFar}` : a.count > 1 ? `${a.damage} × ${a.count}` : String(a.damage),
+        dFar ? `${d}–${dFar}` : a.count > 1 ? `${d} × ${a.count}` : String(d),
       ),
       statRow('사거리', a.range, STAT_MAX.range, rangeLabel(a.range)),
       statRow('이동 속도', f.moveSpeed, STAT_MAX.speed, speedLabel(f.moveSpeed)),
@@ -166,7 +183,18 @@ export function createFighterDetailScreen(ctx: AppContext) {
       abilityCard('궁극기', f.super.name, f.super.description, 'ab-super'),
     );
     renderSelect();
+    renderLevel();
   };
+
+  function renderLevel() {
+    const p = getProfile();
+    const lv = p.fighters[current]?.power ?? 1;
+    lvNum.textContent = String(lv);
+    const cost = upgradeCost(lv);
+    lvBtn.hidden = cost === null;
+    lvCost.textContent = p.admin ? '무료' : String(cost ?? '');
+    lvBtn.classList.toggle('is-poor', !p.admin && cost !== null && p.coins < cost);
+  }
 
   const setFighter = (id: FighterId) => {
     current = id;
@@ -177,7 +205,7 @@ export function createFighterDetailScreen(ctx: AppContext) {
   };
 
   onProfileChange(() => {
-    renderSelect();
+    render(getFighter(current));
     renderSkins();
   });
 

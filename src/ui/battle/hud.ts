@@ -192,9 +192,10 @@ export class BattleHud {
     const gemNum = txt('0', 'ub-gem-num');
     const gems = el('div', 'ub-gems', [iconEl('rushGem', 'ico ub-gem'), gemNum]);
     gems.hidden = true;
+    // 위에서부터: 크리스탈 → 닉네임 → 체력 막대(체력 숫자는 막대 안)
     const children: HTMLElement[] = [gems];
     if (name) children.push(txt(name, 'ub-name'));
-    children.push(num, el('div', 'ub-bar', [lag, fill]));
+    children.push(el('div', 'ub-bar', [lag, fill, num]));
     let ammo: UnitBar['ammo'] = null;
     if (isMe && u.type === 'fighter') {
       const segs: HTMLElement[] = [];

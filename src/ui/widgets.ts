@@ -39,7 +39,8 @@ export function currencyBar(onTapAny: () => void) {
   const crystals = txt('0');
   const render = () => {
     const p = getProfile();
-    coins.textContent = p.coins.toLocaleString('en-US');
+    // 관리자 계정은 코인이 무한(레벨 업·스킨에 코인이 들지 않는다)
+    coins.textContent = p.admin ? '∞' : p.coins.toLocaleString('en-US');
     crystals.textContent = p.crystals.toLocaleString('en-US');
   };
   render();

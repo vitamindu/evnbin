@@ -81,6 +81,7 @@ export class Match {
       fighterId: r.fighterId,
       bot: r.bot,
       ...(r.skin ? { skin: r.skin } : {}),
+      ...(r.power && r.power > 1 ? { power: r.power } : {}),
     }));
     this.humans = this.roster.filter((r) => !r.bot);
     for (const r of cfg.roster) if (!r.bot && r.account) this.accounts.set(r.playerId, r.account);

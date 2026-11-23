@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AccountStore } from '../../../server/accounts';
 import { SKINS, SKIN_SHOP_OPEN } from '../../../src/data/skins';
+import { MAX_POWER, upgradeCost } from '../../../src/data/power';
 
 const dirs: string[] = [];
 const store = () => {
@@ -83,5 +84,39 @@ describe('profile photo', () => {
     expect(code(() => s.setAvatar('photo2', 'data:image/svg+xml;base64,PHN2Zz4='))).toBe('bad_request');
     expect(code(() => s.setAvatar('photo2', 'data:image/png;base64,' + 'A'.repeat(70_000)))).toBe('bad_request');
     expect(code(() => s.setAvatar('photo2', 42))).toBe('bad_request');
+  });
+});
+
+describe('upgrades', () => {
+  const coinsOf = (s: AccountStore, k: string) => s.profile(k)!.coins;
+  const setCoins = (s: AccountStore, k: string, c: number) => {
+    (s as unknown as { data: { users: Record<string, { profile: { coins: number } }> } }).data.users[k]!.profile.coins = c;
+  };
+  it('costs coins, +1 level, stops at max', async () => {
+    const s = store();
+    await s.signup('lvl1', 'secret1', '레벨');
+    setCoins(s, 'lvl1', 100_000);
+    let total = 0;
+    for (let lv = 1; lv < MAX_POWER; lv++) {
+      total += upgradeCost(lv)!;
+      expect(s.upgradeFighter('lvl1', 'rivet').fighters.rivet.power).toBe(lv + 1);
+    }
+    expect(coinsOf(s, 'lvl1')).toBe(100_000 - total);
+    expect(code(() => s.upgradeFighter('lvl1', 'rivet'))).toBe('max_level');
+  });
+  it('not enough coins', async () => {
+    const s = store();
+    await s.signup('lvl2', 'secret1', '레벨둘');
+    setCoins(s, 'lvl2', upgradeCost(1)! - 1);
+    expect(code(() => s.upgradeFighter('lvl2', 'rivet'))).toBe('not_enough_coins');
+    expect(code(() => s.upgradeFighter('lvl2', 'nobody'))).toBe('bad_request');
+  });
+  it('admin upgrades for free (unlimited coins)', async () => {
+    const s = store();
+    await s.signup('mineack991', 'secret1', '관리자');
+    const before = coinsOf(s, 'mineack991');
+    for (let lv = 1; lv < MAX_POWER; lv++) s.upgradeFighter('mineack991', 'hinako');
+    expect(s.profile('mineack991')!.fighters.hinako.power).toBe(MAX_POWER);
+    expect(coinsOf(s, 'mineack991')).toBe(before);
   });
 });

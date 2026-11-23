@@ -47,6 +47,8 @@ export interface Fighter extends UnitBase {
   type: 'fighter';
   fighterId: FighterId;
   controller: ControllerKind;
+  /** 캐릭터 레벨(1~11). 체력·피해량 배율은 powerMult */
+  power?: number;
   /** 0..maxAmmo. 소수 부분 = 다음 칸 재장전 진행도 */
   ammo: number;
   maxAmmo: number;
@@ -174,6 +176,8 @@ export interface SpawnFighter {
   controller: ControllerKind;
   /** 맵의 팀 출발 지점 번호 */
   spawnIndex: number;
+  /** 캐릭터 레벨 1~11(src/data/power.ts). 체력·피해량 배율. 없으면 1 */
+  power?: number;
 }
 
 /** 경기 방식. training: 연습장(끝 없음), teamfight: 3대3 쓰러뜨리기 대결 */

@@ -20,6 +20,8 @@ export interface BattleOptions {
   playerName?: string;
   /** 내가 입은 스킨 */
   skin?: string;
+  /** 내 캐릭터 레벨(1~11) */
+  power?: number;
 }
 
 export class BattleSession implements BattleLike {
@@ -45,7 +47,7 @@ export class BattleSession implements BattleLike {
       seed: opts.seed ?? 1,
       mode: opts.mode,
       dummies: (opts.mode ?? 'training') === 'training',
-      fighters: [{ fighterId: opts.fighterId, team: 0, controller: 'player', spawnIndex: 0 }],
+      fighters: [{ fighterId: opts.fighterId, team: 0, controller: 'player', spawnIndex: 0, power: opts.power }],
     });
     this.playerId = this.sim.units[0]!.id;
     this.playerName = opts.playerName;

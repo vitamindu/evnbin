@@ -246,3 +246,10 @@ export async function setAvatar(avatar: string | null): Promise<Profile> {
   setProfile(r.profile, r.username);
   return r.profile;
 }
+
+/** 캐릭터 레벨 업(코인 차감) */
+export async function upgradeFighter(fighterId: FighterId): Promise<Profile> {
+  const r = await authed<ProfileResponse>('POST', '/api/upgrade', { fighterId });
+  setProfile(r.profile, r.username);
+  return r.profile;
+}

@@ -47,6 +47,8 @@ export interface MatchRosterEntry {
   bot: boolean;
   /** 입힌 스킨 id(src/data/skins.ts). 없으면 기본 외형 */
   skin?: string;
+  /** 캐릭터 레벨 1~11(src/data/power.ts). 없으면 1 */
+  power?: number;
 }
 
 export interface MatchStartInfo {

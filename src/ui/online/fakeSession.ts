@@ -67,6 +67,7 @@ export class FakeOnlineSession implements BattleLike {
         team: r.team,
         controller: r.entityId === myEntityId ? ('player' as const) : ('bot' as const),
         spawnIndex: perTeam[r.team]++,
+        power: r.power,
       })),
     });
     this.playerId = myEntityId;

@@ -70,16 +70,20 @@
   gap: 1px;
 }
 .ub-num {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  --o: 1.5px;
+  z-index: 1;
+}
+.ub-name {
   font-size: 17px;
   line-height: 1;
   --o: 2px;
-  margin-bottom: 4px;
-}
-.ub-name {
-  font-size: 14px;
-  line-height: 1;
-  --o: 2px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
   max-width: 120px;
   overflow: hidden;
   white-space: nowrap;
@@ -94,8 +98,8 @@
 }
 .ub-bar {
   position: relative;
-  width: 72px;
-  height: 13px;
+  width: 76px;
+  height: 18px;
   border: 2.5px solid var(--ink);
   border-radius: 7px;
   background: #241c45;
@@ -122,12 +126,15 @@
   background: linear-gradient(#ffb1a1, #ff5a5a 45%, #d22b3c);
 }
 .ub.is-me .ub-num {
+  font-size: 14px;
+}
+.ub.is-me .ub-name {
   font-size: 19px;
 }
 .ub.is-me .ub-bar {
-  width: 90px;
-  height: 15px;
-  border-radius: 8px;
+  width: 92px;
+  height: 20px;
+  border-radius: 9px;
 }
 
 /* 내 탄창 칸(소수 부분 = 재장전 진행도). 체력 막대와 같은 폭을 정확히 탄창 수만큼 똑같이 나눈다 */
