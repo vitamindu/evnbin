@@ -40,6 +40,11 @@ export type AccountErrorCode =
   | 'not_enough_gems'
   | 'max_level'
   | 'no_boxes'
+  | 'already_in_guild'
+  | 'not_in_guild'
+  | 'invalid_guild_name'
+  | 'guild_taken'
+  | 'guild_full'
   | 'server_error'
   | 'network';
 
@@ -55,6 +60,8 @@ interface AccountModule {
   setAvatar(avatar: string | null): Promise<unknown>;
   upgradeFighter(fighterId: FighterId): Promise<unknown>;
   openBox(): Promise<{ items: BoxItem[] }>;
+  /** 가짜 모듈만 */
+  patch?(fn: (p: Profile) => void): void;
   getAccount(): Account | null;
   onAccountChange(cb: (a: Account | null) => void): () => void;
 }
@@ -305,6 +312,9 @@ function fakeModule(): AccountModule {
       });
       return { items };
     },
+    patch(fn: (p: Profile) => void) {
+      if (account) save((row) => fn(row.profile));
+    },
     getAccount: () => account,
     onAccountChange(cb) {
       listeners.add(cb);
@@ -327,6 +337,8 @@ export const buySkin = (skinId: string) => api.buySkin(skinId);
 export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
 export const upgradeFighter = (fighterId: FighterId) => api.upgradeFighter(fighterId);
 export const openBox = () => api.openBox();
+/** 가짜 계정(?fakeonline)일 때만: 저장된 프로필을 고친다(가짜 길드 등) */
+export const patchFakeProfile = (fn: (p: Profile) => void) => api.patch?.(fn);
 export const getAccount = () => api.getAccount();
 export const onAccountChange = (cb: (a: Account | null) => void) => api.onAccountChange(cb);
 
@@ -375,6 +387,16 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '이미 최대 레벨이에요';
     case 'no_boxes':
       return '열 수 있는 상자가 없어요';
+    case 'already_in_guild':
+      return '이미 길드에 들어가 있어요';
+    case 'not_in_guild':
+      return '길드에 들어가 있지 않아요';
+    case 'invalid_guild_name':
+      return '길드 이름은 2~12자 영문·숫자·한글·_';
+    case 'guild_taken':
+      return '이미 있는 길드 이름이에요';
+    case 'guild_full':
+      return '길드 인원이 꽉 찼어요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

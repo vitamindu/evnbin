@@ -26,6 +26,7 @@ export interface AppContext {
     fighters(): void;
     /** 친구 목록·추가(로비 친구 버튼) */
     friends(): void;
+    guild(): void;
     fighterDetail(id: FighterId): void;
     /** 인자 없으면 오프라인 연습장, 있으면 그 온라인 경기. 이미 전투 화면이면 새 세션으로 다시 붙는다 */
     battle(match?: OnlineMatch): void;

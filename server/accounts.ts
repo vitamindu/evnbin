@@ -27,7 +27,10 @@ export const ADMIN_USERNAMES = new Set(
     .filter(Boolean),
 );
 import {
+  GUILD_DESC_MAX,
+  GUILD_MAX_MEMBERS,
   NICKNAME_MAX,
+  isValidGuildName,
   isValidNickname,
   isValidPassword,
   isValidUsername,
@@ -71,12 +74,26 @@ interface StoredUser {
   createdAt: number;
   profile: Profile;
   tokens: StoredToken[];
+  /** 들어가 있는 길드 id(= 소문자 길드 이름) */
+  guild?: string;
+}
+
+interface StoredGuild {
+  name: string;
+  description: string;
+  /** 길드장 계정 키 */
+  leader: string;
+  /** 멤버 계정 키(들어온 순서, 길드장 포함) */
+  members: string[];
+  createdAt: number;
 }
 
 interface StoreFile {
   version: 1;
   /** 키 = 소문자 아이디 */
   users: Record<string, StoredUser>;
+  /** 키 = 소문자 길드 이름 */
+  guilds?: Record<string, StoredGuild>;
 }
 
 export type MatchOutcome = 'win' | 'draw' | 'loss';
@@ -147,7 +164,7 @@ export class AccountStore {
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as StoreFile;
       if (!parsed || typeof parsed.users !== 'object') throw new Error('bad format');
-      this.data = { version: 1, users: parsed.users };
+      this.data = { version: 1, users: parsed.users, guilds: parsed.guilds ?? {} };
     } catch (err) {
       // 깨진 파일은 지우지 않고 옆에 남긴다
       const backup = `${this.file}.corrupt-${this.now()}`;
@@ -236,7 +253,7 @@ export class AccountStore {
       this.byNick.set(nick, key);
       const token = this.issueToken(key, user);
       this.save();
-      return { token, profile: present(user), username };
+      return { token, profile: present(user, this.data.guilds), username };
     } finally {
       this.signingUp.delete(key);
       this.reservedNicks.delete(nick);
@@ -255,7 +272,7 @@ export class AccountStore {
     if (want.length !== got.length || !timingSafeEqual(want, got)) throw new AccountError('bad_credentials');
     const token = this.issueToken(key, user);
     this.save();
-    return { token, profile: present(user), username: user.username };
+    return { token, profile: present(user, this.data.guilds), username: user.username };
   }
 
   /** 토큰 → 계정 키(없거나 만료면 null) */
@@ -292,7 +309,7 @@ export class AccountStore {
 
   profile(key: string): Profile | null {
     const u = this.data.users[key];
-    return u ? present(u) : null;
+    return u ? present(u, this.data.guilds) : null;
   }
 
   /** 로그인 아이디(가입할 때 쓴 대소문자 그대로) */
@@ -322,7 +339,7 @@ export class AccountStore {
     u.nickname = nickname;
     u.profile.name = nickname;
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 친구 계정 키 목록 */
@@ -363,7 +380,7 @@ export class AccountStore {
     if (typeof selected !== 'string' || !FIGHTERS.some((f) => f.id === selected)) return null;
     u.profile.selected = selected as FighterId;
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 프로필 사진: 작은 이미지 data URL(jpeg/webp/png, 6만 자 이하). null이면 지운다 */
@@ -378,7 +395,7 @@ export class AccountStore {
       u.profile.avatar = avatar;
     }
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 캐릭터에 스킨 입히기(skinId=null이면 기본). 가진 스킨만 */
@@ -396,7 +413,7 @@ export class AccountStore {
     }
     u.profile.skinSel = sel;
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 다이아로 스킨 사기(상점이 열려 있을 때만) */
@@ -413,7 +430,7 @@ export class AccountStore {
     }
     u.profile.skins = [...(u.profile.skins ?? []), skin.id];
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 캐릭터 레벨 업(최대 MAX_POWER). 코인이 든다. 관리자는 무료(무한 코인) */
@@ -430,7 +447,7 @@ export class AccountStore {
     }
     fp.power += 1;
     this.save();
-    return present(u);
+    return present(u, this.data.guilds);
   }
 
   /** 파이터 상자 하나 열기(관리자도 상자는 있어야 연다). rand는 테스트용 */
@@ -444,7 +461,77 @@ export class AccountStore {
     u.profile.coins += t.coins;
     u.profile.crystals += t.gems;
     this.save();
-    return { profile: present(u), items };
+    return { profile: present(u, this.data.guilds), items };
+  }
+
+  // ───────────── 길드 ─────────────
+  private get guilds(): Record<string, StoredGuild> {
+    return (this.data.guilds ??= {});
+  }
+
+  /** 들어가 있는 길드(없으면 null). 사라진 길드를 가리키면 정리한다 */
+  guildOf(key: string): (StoredGuild & { id: string }) | null {
+    const u = this.data.users[key];
+    const id = u?.guild;
+    if (!u || !id) return null;
+    const g = this.guilds[id];
+    if (!g || !g.members.includes(key)) {
+      delete u.guild;
+      return null;
+    }
+    return { ...g, members: [...g.members], id };
+  }
+
+  /** 길드 만들기(만든 사람 = 길드장) */
+  createGuild(key: string, name: unknown, description: unknown = ''): void {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (this.guildOf(key)) throw new AccountError('already_in_guild');
+    if (!isValidGuildName(name)) throw new AccountError('invalid_guild_name');
+    const id = name.trim().toLowerCase();
+    if (this.guilds[id]) throw new AccountError('guild_taken');
+    const desc = typeof description === 'string' ? description.trim().slice(0, GUILD_DESC_MAX) : '';
+    this.guilds[id] = { name: name.trim(), description: desc, leader: key, members: [key], createdAt: this.now() };
+    u.guild = id;
+    this.save();
+  }
+
+  /** 이름으로 길드 가입(바로 들어간다) */
+  joinGuild(key: string, name: unknown): void {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (this.guildOf(key)) throw new AccountError('already_in_guild');
+    const id = typeof name === 'string' ? name.trim().toLowerCase() : '';
+    const g = this.guilds[id];
+    if (!g) throw new AccountError('not_found');
+    if (g.members.length >= GUILD_MAX_MEMBERS) throw new AccountError('guild_full');
+    g.members.push(key);
+    u.guild = id;
+    this.save();
+  }
+
+  /** 길드 나가기. 길드장이 나가면 가장 먼저 들어온 멤버가 길드장, 마지막 사람이 나가면 길드가 없어진다 */
+  leaveGuild(key: string): void {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const g = this.guildOf(key);
+    if (!g) throw new AccountError('not_in_guild');
+    const stored = this.guilds[g.id]!;
+    stored.members = stored.members.filter((m) => m !== key);
+    delete u.guild;
+    if (!stored.members.length) delete this.guilds[g.id];
+    else if (stored.leader === key) stored.leader = stored.members[0]!;
+    this.save();
+  }
+
+  /** 길드 찾기: 이름에 q가 들어간 길드(없으면 전부), 멤버 많은 순 최대 20개 */
+  searchGuilds(q: unknown): { name: string; description: string; members: number; leader: string }[] {
+    const needle = typeof q === 'string' ? q.trim().toLowerCase() : '';
+    return Object.entries(this.guilds)
+      .filter(([id]) => !needle || id.includes(needle))
+      .map(([, g]) => ({ name: g.name, description: g.description, members: g.members.length, leader: this.nickname(g.leader) ?? '' }))
+      .sort((a, b) => b.members - a.members || a.name.localeCompare(b.name))
+      .slice(0, 20);
   }
 
   /** 경기에 쓸 스킨(가진 것만) */
@@ -491,8 +578,11 @@ export class AccountStore {
 }
 
 /** 클라이언트에 보내는 프로필: 관리자 표시 + 관리자는 모든 스킨 */
-function present(u: StoredUser): Profile {
+function present(u: StoredUser, guilds?: Record<string, StoredGuild>): Profile {
   const p = clone(u.profile);
+  const g = u.guild ? guilds?.[u.guild] : undefined;
+  if (g) p.guild = g.name;
+  else delete p.guild;
   if (ADMIN_USERNAMES.has(u.username.toLowerCase())) {
     p.admin = true;
     p.skins = SKINS.map((s) => s.id);

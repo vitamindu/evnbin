@@ -185,7 +185,6 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
     ['SHOP', page.locator('.side-btn[data-btn="shop"]')],
     ['NEWS', page.locator('.side-btn[data-btn="news"]')],
     ['PARTY', page.locator('.side-btn[data-btn="party"]')],
-    ['CREW', page.locator('.side-btn[data-btn="crew"]')],
     ['SEASON PASS', page.locator('.pass-card')],
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],

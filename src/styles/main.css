@@ -1674,3 +1674,18 @@ img {
 .bx-open.is-empty {
   filter: saturate(0.3) brightness(0.8);
 }
+.pf-guild {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 20px;
+  color: #ffd34d;
+}
+.pf-guild.is-none {
+  color: var(--muted);
+}
+.pf-guild .ico {
+  width: 26px;
+  height: 26px;
+}

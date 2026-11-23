@@ -11,6 +11,11 @@
  *   PUT    /api/avatar  (Bearer) {avatar: dataURL|null}  → { profile, username }  (jpeg/webp/png, 6만 자 이하)
  *   POST   /api/upgrade (Bearer) {fighterId}          → { profile, username }  (레벨 +1, 코인 차감. 관리자는 무료)
  *   POST   /api/boxes/open (Bearer)                   → { profile, username, items: BoxItem[] }  (파이터 상자 1개, src/data/boxes.ts)
+ *   GET    /api/guild   (Bearer)                     → { guild: GuildInfo | null }
+ *   POST   /api/guild   (Bearer) {name, description?} → { guild }  (만들기, 만든 사람 = 길드장)
+ *   POST   /api/guild/join (Bearer) {name}           → { guild }
+ *   POST   /api/guild/leave (Bearer)                 → { guild: null }
+ *   GET    /api/guilds?q=이름 (Bearer)               → { guilds: GuildSummary[] }  (멤버 많은 순 20개)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -39,6 +44,8 @@ export interface AccountProfile {
   fighters: Record<FighterId, AccountFighterProgress>;
   rankPoints: number;
   avatar?: string;
+  /** 들어가 있는 길드 이름 */
+  guild?: string;
   boxes?: number;
   admin?: boolean;
   skins?: string[];
@@ -72,7 +79,13 @@ export type AccountApiError =
   /** 이미 최대 레벨 */
   | 'max_level'
   /** 열 상자가 없음 */
-  | 'no_boxes';
+  | 'no_boxes'
+  /** 길드: 이미 다른 길드에 있음 / 길드 없음 / 이름 형식 / 이름 겹침 / 꽉 참 */
+  | 'already_in_guild'
+  | 'not_in_guild'
+  | 'invalid_guild_name'
+  | 'guild_taken'
+  | 'guild_full';
 
 export interface AuthResponse {
   token: string;
@@ -120,6 +133,46 @@ export const NICKNAME_MAX = 10;
 
 export function isValidNickname(n: unknown): n is string {
   return typeof n === 'string' && NICKNAME_PATTERN.test(n);
+}
+
+/** 길드 이름: 2~12자, 영문·숫자·한글(완성형)·밑줄. 대소문자 구분 없이 하나만 */
+export const GUILD_NAME_PATTERN = /^[A-Za-z0-9_가-힣]{2,12}$/u;
+export const GUILD_NAME_MAX = 12;
+export const GUILD_DESC_MAX = 40;
+export const GUILD_MAX_MEMBERS = 30;
+
+export function isValidGuildName(n: unknown): n is string {
+  return typeof n === 'string' && GUILD_NAME_PATTERN.test(n.trim());
+}
+
+export interface GuildMember {
+  nickname: string;
+  rankPoints: number;
+  avatar?: string;
+  leader: boolean;
+  online: boolean;
+  inRoom: boolean;
+}
+
+export interface GuildInfo {
+  name: string;
+  description: string;
+  /** 길드장 닉네임 */
+  leader: string;
+  members: GuildMember[];
+  maxMembers: number;
+}
+
+export interface GuildSummary {
+  name: string;
+  description: string;
+  members: number;
+  leader: string;
+}
+
+/** GET /api/guild 등 길드 응답 */
+export interface GuildResponse {
+  guild: GuildInfo | null;
 }
 
 export function isValidPassword(p: unknown): p is string {

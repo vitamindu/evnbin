@@ -18,6 +18,7 @@ export function openProfile(ctx: AppContext) {
   const photo = avatarEl(p0.name, p0.avatar, 'pf-avatar');
   const name = txt('', 'pf-name');
   const tag = el('span', 'pf-tag');
+  const guildLine = el('span', 'pf-guild');
   const rankIco = el('span', 'pf-rank-ico');
   const rankName = txt('', 'pf-rank-name');
   const rankPts = txt('', 'pf-rank-pts');
@@ -71,7 +72,7 @@ export function openProfile(ctx: AppContext) {
   const photoBtn = button('pf-photo', [photo, el('span', 'pf-photo-edit', [iconEl('gear')])], pick);
 
   const right = el('div', 'pf-right', [
-    el('div', 'pf-id', [photoBtn, el('div', 'pf-id-text', [name, tag])]),
+    el('div', 'pf-id', [photoBtn, el('div', 'pf-id-text', [name, tag, guildLine])]),
     el('div', 'pf-btns', [changeBtn, clearBtn]),
     el('div', 'pf-rank panel', [rankIco, el('div', 'pf-rank-text', [txt('티어 점수', 'pf-label'), rankName, rankPts])]),
     file,
@@ -85,6 +86,8 @@ export function openProfile(ctx: AppContext) {
     fillAvatar(photo, p.name, p.avatar);
     name.textContent = p.name;
     tag.textContent = `#${p.tag}`;
+    guildLine.replaceChildren(iconEl('crew'), txt(p.guild ?? '길드 없음'));
+    guildLine.classList.toggle('is-none', !p.guild);
     const r = rankOf(p.rankPoints ?? 0);
     rankIco.replaceChildren(icon(rankEmblemSvg(r.tier.id), 'ico pf-emblem'));
     rankName.textContent = rankLabel(r);

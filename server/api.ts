@@ -3,7 +3,7 @@
  * CORS: 게임 페이지(https://vitamindu.github.io)와 http://localhost:*, http://127.0.0.1:* 만 허용.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { AccountApiError } from '../src/net/accountApi';
+import { GUILD_MAX_MEMBERS, type AccountApiError, type GuildResponse } from '../src/net/accountApi';
 import { AccountError, type AccountStore, type RateLimiter } from './accounts';
 
 export const DEFAULT_API_ORIGINS = ['https://vitamindu.github.io'];
@@ -50,6 +50,11 @@ const STATUS: Record<AccountApiError, number> = {
   not_enough_gems: 409,
   max_level: 409,
   no_boxes: 409,
+  already_in_guild: 409,
+  not_in_guild: 409,
+  invalid_guild_name: 400,
+  guild_taken: 409,
+  guild_full: 409,
   self: 400,
 };
 
@@ -167,6 +172,54 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
       }))
       .sort((a, b) => Number(b.online) - Number(a.online) || a.nickname.localeCompare(b.nickname)),
   });
+  const guildInfo = (k: string): GuildResponse => {
+    const g = store.guildOf(k);
+    if (!g) return { guild: null };
+    return {
+      guild: {
+        name: g.name,
+        description: g.description,
+        leader: store.nickname(g.leader) ?? '',
+        maxMembers: GUILD_MAX_MEMBERS,
+        members: g.members.map((m) => {
+          const p = store.profile(m);
+          return {
+            nickname: store.nickname(m) ?? '',
+            rankPoints: p?.rankPoints ?? 0,
+            ...(p?.avatar ? { avatar: p.avatar } : {}),
+            leader: m === g.leader,
+            online: false,
+            inRoom: false,
+            ...(presence?.(m) ?? {}),
+          };
+        }),
+      },
+    };
+  };
+  if (path === '/api/guild' && (method === 'GET' || method === 'POST')) {
+    if (!key) throw new HttpError('unauthorized');
+    if (method === 'POST') {
+      const b = await readJson(req);
+      store.createGuild(key, typeof b.name === 'string' ? b.name.trim() : b.name, b.description);
+      log(`[api] guild created ${String(b.name)}`);
+    }
+    return guildInfo(key);
+  }
+  if (method === 'POST' && path === '/api/guild/join') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.joinGuild(key, b.name);
+    return guildInfo(key);
+  }
+  if (method === 'POST' && path === '/api/guild/leave') {
+    if (!key) throw new HttpError('unauthorized');
+    store.leaveGuild(key);
+    return guildInfo(key);
+  }
+  if (method === 'GET' && path === '/api/guilds') {
+    if (!key) throw new HttpError('unauthorized');
+    return { guilds: store.searchGuilds(new URL(req.url ?? '/', 'http://x').searchParams.get('q') ?? '') };
+  }
   if (method === 'GET' && path === '/api/me') {
     if (!key) throw new HttpError('unauthorized');
     return me(key);
