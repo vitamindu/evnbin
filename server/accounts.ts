@@ -30,6 +30,9 @@ export const ADMIN_USERNAMES = new Set(
 );
 import {
   GUILD_CHAT_KEEP,
+  HISTORY_KEEP,
+  type HistoryTotals,
+  type MatchRecord,
   GUILD_COST_COINS,
   GUILD_COST_GEMS,
   GUILD_CHAT_MAX,
@@ -85,6 +88,9 @@ interface StoredUser {
   tokens: StoredToken[];
   /** 들어가 있는 길드 id(= 소문자 길드 이름) */
   guild?: string;
+  /** 전적(최근 HISTORY_KEEP판, 새 것이 앞) */
+  history?: MatchRecord[];
+  historyTotals?: HistoryTotals;
 }
 
 interface StoredGuild {
@@ -104,6 +110,8 @@ interface StoredGuild {
   chat: { id: number; from: string | null; text: string; at: number }[];
   nextChatId: number;
 }
+
+const emptyTotals = (): HistoryTotals => ({ games: 0, wins: 0, draws: 0, losses: 0, kills: 0, deaths: 0, damage: 0, mvps: 0 });
 
 /** 예전 파일(직급·채팅 없음)을 지금 모양으로 */
 function normalizeGuild(g: StoredGuild) {
@@ -805,6 +813,29 @@ export class AccountStore {
     u.profile.pass = pass;
     this.save();
     return present(u, this.data.guilds);
+  }
+
+  /** 전적 한 판 남기기 */
+  recordMatch(key: string, rec: MatchRecord): void {
+    const u = this.data.users[key];
+    if (!u) return;
+    u.history = [rec, ...(u.history ?? [])].slice(0, HISTORY_KEEP);
+    const t = (u.historyTotals ??= emptyTotals());
+    t.games++;
+    if (rec.outcome === 'win') t.wins++;
+    else if (rec.outcome === 'draw') t.draws++;
+    else t.losses++;
+    t.kills += rec.kills;
+    t.deaths += rec.deaths;
+    t.damage += rec.damage;
+    if (rec.mvp) t.mvps++;
+    this.save();
+  }
+
+  /** 전적(사본) */
+  history(key: string): { records: MatchRecord[]; totals: HistoryTotals } {
+    const u = this.data.users[key];
+    return { records: JSON.parse(JSON.stringify(u?.history ?? [])) as MatchRecord[], totals: { ...(u?.historyTotals ?? emptyTotals()) } };
   }
 
   /** 경기에 쓸 스킨(가진 것만) */

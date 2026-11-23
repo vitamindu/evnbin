@@ -31,6 +31,7 @@
  *   POST   /api/party/decline (Bearer) {from}        → PartyResponse
  *   POST   /api/party/leave (Bearer)                 → PartyResponse
  *   POST   /api/party/kick (Bearer) {nickname}       → PartyResponse  (파티장만)
+ *   GET    /api/history (Bearer)                      → HistoryResponse  (최근 30판 + 전체 합계)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -43,6 +44,7 @@
  */
 import type { FighterId } from '../data/fighters';
 import type { PassState } from '../data/pass';
+import type { MatchMode } from '../game/types';
 
 export interface AccountFighterProgress {
   trophies: number;
@@ -268,6 +270,45 @@ export interface PartyResponse {
   party: { members: PartyMember[]; leader: string; roomCode: string | null } | null;
   invites: PartyInvite[];
 }
+
+/** 전적 한 판(내 계정 기준). 최근 HISTORY_KEEP판만 서버에 남는다 */
+export interface MatchRecord {
+  at: number;
+  mode: MatchMode;
+  mapId: string;
+  outcome: 'win' | 'draw' | 'loss';
+  /** [우리 팀, 상대 팀] 점수 */
+  score: [number, number];
+  fighterId: FighterId;
+  kills: number;
+  deaths: number;
+  damage: number;
+  ranked: boolean;
+  /** 랭크 점수 변화(랭크 경기만) */
+  rankDelta?: number;
+  /** 이 판 최고 활약(KO 최다, 같으면 피해량) */
+  mvp: boolean;
+  players: { name: string; fighterId: FighterId; ally: boolean; me: boolean; bot: boolean; kills: number; deaths: number; damage: number }[];
+}
+
+/** 지금까지 전체 합계(기록 개수와 상관없이 쌓인다) */
+export interface HistoryTotals {
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  kills: number;
+  deaths: number;
+  damage: number;
+  mvps: number;
+}
+
+export interface HistoryResponse {
+  records: MatchRecord[];
+  totals: HistoryTotals;
+}
+
+export const HISTORY_KEEP = 30;
 
 export interface GuildChatResponse {
   messages: GuildChatMessage[];

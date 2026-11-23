@@ -236,6 +236,39 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         const rk = acc ? ranks.get(acc) : undefined;
         if (rk) Object.assign(s, rk);
       }
+      // 전적: 사람(계정)마다 자기 기준으로 한 판
+      const humanIds = new Set(match.humans.map((h) => h.playerId));
+      const best = [...result.stats].sort((a, b) => b.kills - a.kills || b.damage - a.damage)[0];
+      const mvpId = best && best.kills > 0 ? best.playerId : null;
+      for (const s of result.stats) {
+        const acc = accountOf.get(s.playerId);
+        if (!acc) continue;
+        const outcome = result.winner === -1 ? 'draw' : result.winner === s.team ? 'win' : 'loss';
+        accounts.recordMatch(acc, {
+          at: Date.now(),
+          mode: match.info.mode,
+          mapId: match.info.mapId,
+          outcome,
+          score: [result.score[s.team], result.score[s.team === 0 ? 1 : 0]],
+          fighterId: s.fighterId,
+          kills: s.kills,
+          deaths: s.deaths,
+          damage: s.damage,
+          ranked: !!result.ranked,
+          ...(result.ranked && typeof (s as { rankDelta?: number }).rankDelta === 'number' ? { rankDelta: (s as { rankDelta?: number }).rankDelta } : {}),
+          mvp: s.playerId === mvpId,
+          players: result.stats.map((o) => ({
+            name: o.name,
+            fighterId: o.fighterId,
+            ally: o.team === s.team,
+            me: o.playerId === s.playerId,
+            bot: !humanIds.has(o.playerId),
+            kills: o.kills,
+            deaths: o.deaths,
+            damage: o.damage,
+          })),
+        });
+      }
     } catch (err) {
       log(`apply results failed: ${(err as Error)?.stack ?? String(err)}`);
     }

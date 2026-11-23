@@ -7,6 +7,7 @@ import { AccountStore, RateLimiter, TOKEN_TTL_MS } from '../../../server/account
 import { startServer, type RunningServer } from '../../../server/app';
 import { apiBase } from '../../../src/net/account';
 import type { ServerMsg } from '../../../src/net/protocol';
+import type { HistoryResponse } from '../../../src/net/accountApi';
 
 const dirs: string[] = [];
 function tempDir(): string {
@@ -232,6 +233,17 @@ describe('account HTTP API', () => {
     expect(me.profile.coins).toBe(10);
     expect(me.profile.fighters.volley!.trophies).toBe(0);
     expect(server!.accounts.size).toBe(1); // 게스트는 계정이 생기지 않는다
+    // 전적: 계정에만 한 판이 남는다(나 + 게스트 2명)
+    const hist = (await (await fetch(base + '/api/history', { headers: { authorization: `Bearer ${token}` } })).json()) as HistoryResponse;
+    expect(hist.records).toHaveLength(1);
+    const rec = hist.records[0]!;
+    expect(rec.outcome).toBe('draw');
+    expect(rec.mode).toBe('teamfight');
+    expect(rec.fighterId).toBe('volley');
+    expect(rec.players).toHaveLength(3);
+    expect(rec.players.filter((p) => p.me).map((p) => p.name)).toEqual(['Hero']);
+    expect(rec.players.every((p) => !p.bot)).toBe(true);
+    expect(hist.totals).toMatchObject({ games: 1, draws: 1, wins: 0, losses: 0 });
     for (const c of [a, g, bad]) c.ws.close();
   });
 });

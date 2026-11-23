@@ -376,6 +376,10 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
       }),
     } satisfies PartyResponse;
   }
+  if (method === 'GET' && path === '/api/history') {
+    if (!key) throw new HttpError('unauthorized');
+    return store.history(key);
+  }
   if (method === 'POST' && path === '/api/pass/claim') {
     if (!key) throw new HttpError('unauthorized');
     const b = await readJson(req);

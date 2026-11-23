@@ -7,6 +7,8 @@ import { avatarEl, fillAvatar, imageFileToAvatar } from '../avatar';
 import type { AppContext } from '../context';
 import { rankEmblemSvg } from '../rankEmblem';
 import { toast } from './toast';
+import { openHistory, summarize } from './history';
+import { getHistory } from '../account/historyApi';
 import { button, iconEl, roleChip, txt } from '../widgets';
 
 /**
@@ -71,10 +73,13 @@ export function openProfile(ctx: AppContext) {
   const clearBtn = button('pf-btn pf-btn-sub', [txt('사진 지우기')], () => void save(null, '프로필 사진을 지웠어요'));
   const photoBtn = button('pf-photo', [photo, el('span', 'pf-photo-edit', [iconEl('gear')])], pick);
 
+  const historyLine = txt('', 'pf-history');
+  const historyBtn = button('pf-btn pf-btn-history', [iconEl('trophy'), txt('전적 보기')], () => openHistory(ctx));
   const right = el('div', 'pf-right', [
     el('div', 'pf-id', [photoBtn, el('div', 'pf-id-text', [name, tag, guildLine])]),
     el('div', 'pf-btns', [changeBtn, clearBtn]),
     el('div', 'pf-rank panel', [rankIco, el('div', 'pf-rank-text', [txt('티어 점수', 'pf-label'), rankName, rankPts])]),
+    el('div', 'pf-history-row', [historyLine, historyBtn]),
     file,
   ]);
 
@@ -102,6 +107,16 @@ export function openProfile(ctx: AppContext) {
   };
   render();
   const off = onProfileChange(render);
+  // 전적 요약 한 줄(로그인했을 때)
+  if (getAccount()) {
+    historyLine.textContent = '전적 불러오는 중…';
+    getHistory()
+      .then(({ totals }) => {
+        const s = summarize(totals);
+        historyLine.textContent = totals.games ? `${totals.games}판 · 승률 ${s.winRate}% · MVP ${totals.mvps}` : '아직 온라인 전적이 없어요';
+      })
+      .catch(() => (historyLine.textContent = ''));
+  } else historyLine.textContent = '로그인하면 전적이 남아요';
 
   const close = () => {
     off();
