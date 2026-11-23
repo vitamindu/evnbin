@@ -54,6 +54,19 @@ describe('skins and admin', () => {
   });
 });
 
+describe('buying skins', () => {
+  it.runIf(SKIN_SHOP_OPEN)('buys with coins once, then can wear it', async () => {
+    const s = store();
+    await s.signup('buyer1', 'secret1', '구매자');
+    (s as unknown as { data: { users: Record<string, { profile: { coins: number } }> } }).data.users['buyer1']!.profile.coins = 650;
+    const p = s.buySkin('buyer1', 'hinako_sakura');
+    expect(p.coins).toBe(150);
+    expect(p.skins).toEqual(['hinako_sakura']);
+    expect(code(() => s.buySkin('buyer1', 'hinako_sakura'))).toBe('already_owned');
+    expect(s.equipSkin('buyer1', 'hinako', 'hinako_sakura').skinSel?.hinako).toBe('hinako_sakura');
+  });
+});
+
 describe('profile photo', () => {
   const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
   it('stores a small image data URL and clears it with null', async () => {

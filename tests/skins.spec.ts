@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 
-/** 스킨(src/data/skins.ts): 관리자(mineack991)만 SAKURA HINAKO를 입을 수 있다. ?fakeonline 가짜 계정으로 확인 */
+/** 스킨(src/data/skins.ts): 관리자(mineack991)는 모두 가진다. 다른 계정은 코인으로 산다. ?fakeonline 가짜 계정으로 확인 */
 test.describe.configure({ timeout: 120_000 });
 
 async function signup(page: Page, id: string, nick: string) {
@@ -38,14 +38,16 @@ test('admin can wear SAKURA HINAKO', async ({ page }, info) => {
   await page.screenshot({ path: info.outputPath('skin-admin.png') });
 });
 
-test('other accounts see the skin as admin-only and cannot wear it', async ({ page }) => {
+test('other accounts see the price; without enough coins they cannot buy or wear it', async ({ page }) => {
   await signup(page, 'normal1', '보통유저');
   await openHinako(page);
   const chips = page.locator('.skin-chip');
-  await expect(chips.nth(1)).toContainText('관리자 전용');
-  await chips.nth(1).tap();
-  await chips.nth(1).tap();
+  await expect(chips.nth(1)).toContainText('500 코인');
+  await chips.nth(1).tap(); // 미리 보기
+  await chips.nth(1).tap(); // 사기 → 코인 부족(새 계정 40코인)
+  await expect(page.locator('.toast').last()).toContainText('코인이 부족해요');
   await expect(chips.nth(0)).toContainText('착용 중');
+  await expect(chips.nth(1)).toContainText('500 코인');
 });
 
 test('fighters without skins show no skin bar', async ({ page }) => {
