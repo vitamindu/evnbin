@@ -10,6 +10,7 @@
  *   PUT    /api/nickname (Bearer) {nickname}            → { profile, username }
  *   PUT    /api/avatar  (Bearer) {avatar: dataURL|null}  → { profile, username }  (jpeg/webp/png, 6만 자 이하)
  *   POST   /api/upgrade (Bearer) {fighterId}          → { profile, username }  (레벨 +1, 코인 차감. 관리자는 무료)
+ *   POST   /api/boxes/open (Bearer)                   → { profile, username, items: BoxItem[] }  (파이터 상자 1개, src/data/boxes.ts)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -38,6 +39,7 @@ export interface AccountProfile {
   fighters: Record<FighterId, AccountFighterProgress>;
   rankPoints: number;
   avatar?: string;
+  boxes?: number;
   admin?: boolean;
   skins?: string[];
   skinSel?: Partial<Record<FighterId, string>>;
@@ -68,7 +70,9 @@ export type AccountApiError =
   /** 스킨: 다이아 부족 */
   | 'not_enough_gems'
   /** 이미 최대 레벨 */
-  | 'max_level';
+  | 'max_level'
+  /** 열 상자가 없음 */
+  | 'no_boxes';
 
 export interface AuthResponse {
   token: string;

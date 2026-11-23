@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AccountStore } from '../../../server/accounts';
 import { SKINS, SKIN_SHOP_OPEN } from '../../../src/data/skins';
 import { MAX_POWER, upgradeCost } from '../../../src/data/power';
+import { boxTotals } from '../../../src/data/boxes';
 
 const dirs: string[] = [];
 const store = () => {
@@ -120,5 +121,31 @@ describe('upgrades', () => {
     for (let lv = 1; lv < MAX_POWER; lv++) s.upgradeFighter('mineack991', 'hinako');
     expect(s.profile('mineack991')!.fighters.hinako.power).toBe(MAX_POWER);
     expect(coinsOf(s, 'mineack991')).toBe(before);
+  });
+});
+
+describe('fighter boxes', () => {
+  it('a win gives +1 box; opening needs a box and adds coins/diamonds', async () => {
+    const s = store();
+    await s.signup('boxer1', 'secret1', '상자');
+    expect(code(() => s.openBox('boxer1'))).toBe('no_boxes');
+    s.applyMatchResults([{ account: 'boxer1', fighterId: 'rivet', outcome: 'loss' }]);
+    expect(s.profile('boxer1')!.boxes ?? 0).toBe(0);
+    s.applyMatchResults([{ account: 'boxer1', fighterId: 'rivet', outcome: 'win' }]);
+    const before = s.profile('boxer1')!;
+    expect(before.boxes).toBe(1);
+    const r = s.openBox('boxer1');
+    expect(r.items.length).toBeGreaterThanOrEqual(3);
+    const t = boxTotals(r.items);
+    expect(r.profile.boxes).toBe(0);
+    expect(r.profile.coins).toBe(before.coins + t.coins);
+    expect(r.profile.crystals).toBe(before.crystals + t.gems);
+    expect(code(() => s.openBox('boxer1'))).toBe('no_boxes');
+  });
+  it('admin opens without boxes (unlimited)', async () => {
+    const s = store();
+    await s.signup('mineack991', 'secret1', '관리자');
+    for (let i = 0; i < 3; i++) expect(s.openBox('mineack991').items.length).toBeGreaterThanOrEqual(3);
+    expect(s.profile('mineack991')!.boxes ?? 0).toBe(0);
   });
 });

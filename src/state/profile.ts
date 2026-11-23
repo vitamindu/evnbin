@@ -18,6 +18,8 @@ export interface Profile {
   fighters: Record<FighterId, FighterProgress>;
   /** 랭크 점수(TEAM FIGHT 온라인 경기로만 바뀐다, src/data/ranks.ts) */
   rankPoints: number;
+  /** 아직 열지 않은 파이터 상자 수(관리자는 무한) */
+  boxes?: number;
   /** 프로필 사진(작은 이미지 data URL). 없으면 닉네임 첫 글자 */
   avatar?: string;
   /** 관리자 계정(서버가 정한다). 관리자는 모든 스킨을 쓸 수 있다 */

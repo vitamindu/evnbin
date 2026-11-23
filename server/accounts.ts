@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { FIGHTERS, type FighterId } from '../src/data/fighters';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../src/data/skins';
 import { MAX_POWER, upgradeCost } from '../src/data/power';
+import { boxTotals, rollFighterBox, type BoxItem } from '../src/data/boxes';
 
 /** 관리자 로그인 아이디(대소문자 무시). FG_ADMINS 환경 변수(쉼표 구분)로 바꿀 수 있다 */
 export const ADMIN_USERNAMES = new Set(
@@ -432,6 +433,22 @@ export class AccountStore {
     return present(u);
   }
 
+  /** 파이터 상자 하나 열기(관리자는 상자 무한). rand는 테스트용 */
+  openBox(key: string, rand: () => number = () => randomInt(0, 2 ** 32) / 2 ** 32): { profile: Profile; items: BoxItem[] } {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (!isAdmin(u)) {
+      if ((u.profile.boxes ?? 0) < 1) throw new AccountError('no_boxes');
+      u.profile.boxes = (u.profile.boxes ?? 0) - 1;
+    }
+    const items = rollFighterBox(rand);
+    const t = boxTotals(items);
+    u.profile.coins += t.coins;
+    u.profile.crystals += t.gems;
+    this.save();
+    return { profile: present(u), items };
+  }
+
   /** 경기에 쓸 스킨(가진 것만) */
   skinFor(key: string, fighterId: FighterId): string | undefined {
     const u = this.data.users[key];
@@ -452,6 +469,8 @@ export class AccountStore {
       fp.trophies = Math.max(0, fp.trophies + delta);
       fp.games = (fp.games ?? 0) + 1;
       u.profile.coins += r.outcome === 'win' ? COINS_WIN : COINS_OTHER;
+      // 파이터 상자: 승리 +1
+      if (r.outcome === 'win') u.profile.boxes = (u.profile.boxes ?? 0) + 1;
       const before = u.profile.rankPoints ?? 0;
       u.profile.rankPoints = Math.max(0, before + (ranked ? rankDelta(r.outcome, r.place ?? 0, r.teamSize ?? 1) : 0));
       out.set(r.account, { rankPoints: u.profile.rankPoints, rankDelta: u.profile.rankPoints - before });

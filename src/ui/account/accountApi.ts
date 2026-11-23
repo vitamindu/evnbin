@@ -4,6 +4,7 @@ import { getServerUrl } from '../../net/config';
 import type { Profile } from '../../state/profile';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
 import { upgradeCost } from '../../data/power';
+import { boxTotals, rollFighterBox, type BoxItem } from '../../data/boxes';
 
 /**
  * 계정 기능의 UI 쪽 입구(어댑터). 진짜는 Network 담당의 src/net/account.ts.
@@ -38,6 +39,7 @@ export type AccountErrorCode =
   | 'not_enough_coins'
   | 'not_enough_gems'
   | 'max_level'
+  | 'no_boxes'
   | 'server_error'
   | 'network';
 
@@ -52,6 +54,7 @@ interface AccountModule {
   buySkin(skinId: string): Promise<unknown>;
   setAvatar(avatar: string | null): Promise<unknown>;
   upgradeFighter(fighterId: FighterId): Promise<unknown>;
+  openBox(): Promise<{ items: BoxItem[] }>;
   getAccount(): Account | null;
   onAccountChange(cb: (a: Account | null) => void): () => void;
 }
@@ -73,6 +76,7 @@ type RealModule = {
   buySkin(s: string): Promise<unknown>;
   setAvatar(a: string | null): Promise<unknown>;
   upgradeFighter(f: FighterId): Promise<unknown>;
+  openBox(): Promise<{ items: BoxItem[] }>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -90,6 +94,7 @@ function realAdapter(m: RealModule): AccountModule {
     buySkin: (id) => m.buySkin(id),
     setAvatar: (a) => m.setAvatar(a),
     upgradeFighter: (f) => m.upgradeFighter(f),
+    openBox: () => m.openBox(),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -287,6 +292,20 @@ function fakeModule(): AccountModule {
         if (!admin) row.profile.coins -= cost!;
       });
     },
+    async openBox() {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const admin = !!account!.profile.admin;
+      if (!admin && (account!.profile.boxes ?? 0) < 1) fail('no_boxes');
+      const items = rollFighterBox(Math.random);
+      const t = boxTotals(items);
+      save((row) => {
+        if (!admin) row.profile.boxes = (row.profile.boxes ?? 0) - 1;
+        row.profile.coins += t.coins;
+        row.profile.crystals += t.gems;
+      });
+      return { items };
+    },
     getAccount: () => account,
     onAccountChange(cb) {
       listeners.add(cb);
@@ -308,6 +327,7 @@ export const equipSkin = (fighterId: FighterId, skinId: string | null) => api.eq
 export const buySkin = (skinId: string) => api.buySkin(skinId);
 export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
 export const upgradeFighter = (fighterId: FighterId) => api.upgradeFighter(fighterId);
+export const openBox = () => api.openBox();
 export const getAccount = () => api.getAccount();
 export const onAccountChange = (cb: (a: Account | null) => void) => api.onAccountChange(cb);
 
@@ -354,6 +374,8 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '다이아가 부족해요';
     case 'max_level':
       return '이미 최대 레벨이에요';
+    case 'no_boxes':
+      return '열 수 있는 상자가 없어요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

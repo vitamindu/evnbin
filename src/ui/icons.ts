@@ -3,6 +3,12 @@ const S = 'stroke="var(--ink)" stroke-width="3" stroke-linejoin="round" stroke-l
 const svg = (body: string) => `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 
 export const ICONS = {
+  box: svg(
+    `<path d="M6 18l18-8 18 8v20l-18 7-18-7z" fill="#ffb347" ${S}/>` +
+      `<path d="M6 18l18 7 18-7M24 25v20" fill="none" ${S}/>` +
+      `<path d="M15 14l18 7v8" fill="none" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/>` +
+      `<path d="M15 14l18 7v8" fill="none" stroke="#ff5d73" stroke-width="3.5" stroke-linecap="round"/>`,
+  ),
   shop: svg(
     `<path d="M8 20h32v20a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3z" fill="#ffd34d" ${S}/>` +
       `<path d="M6 12l4-7h28l4 7v4a5 5 0 0 1-9 2 5 5 0 0 1-9 0 5 5 0 0 1-9 0 5 5 0 0 1-9-2z" fill="#ff5d5d" ${S}/>` +

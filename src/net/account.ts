@@ -12,6 +12,7 @@
  */
 import type { FighterId } from '../data/fighters';
 import type { Profile } from '../state/profile';
+import type { BoxItem } from '../data/boxes';
 import type { AccountApiError, AccountProfile, AuthResponse, ProfileResponse } from './accountApi';
 import { getServerUrl } from './config';
 
@@ -252,4 +253,11 @@ export async function upgradeFighter(fighterId: FighterId): Promise<Profile> {
   const r = await authed<ProfileResponse>('POST', '/api/upgrade', { fighterId });
   setProfile(r.profile, r.username);
   return r.profile;
+}
+
+/** 파이터 상자 하나 열기. 서버가 내용물을 정하고, 코인·다이아를 더한 프로필을 돌려준다 */
+export async function openBox(): Promise<{ profile: Profile; items: BoxItem[] }> {
+  const r = await authed<ProfileResponse & { items: BoxItem[] }>('POST', '/api/boxes/open');
+  setProfile(r.profile, r.username);
+  return { profile: r.profile, items: r.items };
 }

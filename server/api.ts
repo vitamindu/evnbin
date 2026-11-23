@@ -49,6 +49,7 @@ const STATUS: Record<AccountApiError, number> = {
   not_enough_coins: 409,
   not_enough_gems: 409,
   max_level: 409,
+  no_boxes: 409,
   self: 400,
 };
 
@@ -212,6 +213,11 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     const b = await readJson(req, AVATAR_MAX_BYTES + 512);
     store.setAvatar(key, b.avatar ?? null);
     return me(key);
+  }
+  if (method === 'POST' && path === '/api/boxes/open') {
+    if (!key) throw new HttpError('unauthorized');
+    const r = store.openBox(key);
+    return { ...me(key), items: r.items };
   }
   if (method === 'POST' && path === '/api/upgrade') {
     if (!key) throw new HttpError('unauthorized');

@@ -6,6 +6,7 @@ import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { openProfile } from '../overlays/profile';
+import { boxCountLabel, openBoxes } from '../overlays/box';
 import { fillAvatar } from '../avatar';
 import { equippedSkin, getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import { getSettings, onSettingsChange } from '../../state/settings';
@@ -122,6 +123,11 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     'select',
   );
 
+  // 파이터 상자: 남은 개수 배지(0이면 숨김, 관리자는 ∞)
+  const boxBadge = el('span', 'badge t-outline');
+  const boxBtn = sideBtn('상자', 'box', () => openBoxes(ctx));
+  boxBtn.append(boxBadge);
+
   const root = el('div', 'lobby', [
     hit,
     el('div', 'lb-top-left', [profileCard, trophyCard]),
@@ -135,6 +141,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
       sideBtn('친구', 'friends', () => ctx.go.friends()),
       sideBtn('파티', 'party', comingSoon),
       sideBtn('크루', 'crew', comingSoon),
+      boxBtn,
     ]),
     nameplate,
     slotL,
@@ -150,6 +157,8 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     pName.textContent = p.name;
     pTag.textContent = `#${p.tag}`;
     fillAvatar(avatar, p.name, p.avatar);
+    boxBadge.textContent = boxCountLabel();
+    boxBadge.hidden = boxBadge.textContent === '0';
     avatar.style.setProperty('--c', f.palette.primary);
     const total = totalTrophies(p);
     void trophyMilestone(total);
