@@ -55,6 +55,10 @@ export type AccountErrorCode =
   | 'tier_locked'
   | 'premium_required'
   | 'already_premium'
+  | 'not_friends'
+  | 'party_full'
+  | 'not_in_party'
+  | 'already_in_party'
   | 'server_error'
   | 'network';
 
@@ -504,6 +508,14 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '프리미엄 패스가 필요해요';
     case 'already_premium':
       return '이미 프리미엄이에요';
+    case 'not_friends':
+      return '친구만 초대할 수 있어요';
+    case 'party_full':
+      return '파티가 꽉 찼어요(3명)';
+    case 'not_in_party':
+      return '파티에 들어가 있지 않아요';
+    case 'already_in_party':
+      return '이미 같은 파티예요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

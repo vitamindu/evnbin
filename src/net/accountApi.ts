@@ -25,6 +25,12 @@
  *   POST   /api/shop/buy (Bearer) {itemId}           → { profile, username, got }  (src/data/shop.ts, 다이아 차감)
  *   POST   /api/pass/claim (Bearer) {tier, track}     → { profile, username, got }  (시즌 패스 보상)
  *   POST   /api/pass/premium (Bearer)               → { profile, username }  (프리미엄, 다이아)
+ *   GET    /api/party (Bearer)                       → PartyResponse  (내 파티 + 받은 초대)
+ *   POST   /api/party/invite (Bearer) {nickname}     → PartyResponse  (친구만, 최대 3명)
+ *   POST   /api/party/accept (Bearer) {from}         → PartyResponse
+ *   POST   /api/party/decline (Bearer) {from}        → PartyResponse
+ *   POST   /api/party/leave (Bearer)                 → PartyResponse
+ *   POST   /api/party/kick (Bearer) {nickname}       → PartyResponse  (파티장만)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -109,7 +115,12 @@ export type AccountApiError =
   /** 시즌 패스: 아직 안 열린 단계 / 프리미엄이 필요 / 이미 프리미엄 */
   | 'tier_locked'
   | 'premium_required'
-  | 'already_premium';
+  | 'already_premium'
+  /** 파티: 친구가 아님 / 꽉 참(3명) / 파티에 없음 / 이미 같은 파티 */
+  | 'not_friends'
+  | 'party_full'
+  | 'not_in_party'
+  | 'already_in_party';
 
 export interface AuthResponse {
   token: string;
@@ -235,6 +246,27 @@ export interface GuildResponse {
   guild: GuildInfo | null;
   /** 가입 요청만 남겼을 때(승인 필요 길드) */
   requested?: boolean;
+}
+
+export interface PartyMember {
+  nickname: string;
+  avatar?: string;
+  fighterId: FighterId;
+  rankPoints: number;
+  leader: boolean;
+}
+
+export interface PartyInvite {
+  /** 보낸 사람 닉네임 */
+  from: string;
+  avatar?: string;
+  at: number;
+}
+
+/** GET /api/party 등 */
+export interface PartyResponse {
+  party: { members: PartyMember[]; leader: string; roomCode: string | null } | null;
+  invites: PartyInvite[];
 }
 
 export interface GuildChatResponse {

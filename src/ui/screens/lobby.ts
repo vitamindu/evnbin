@@ -6,6 +6,7 @@ import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { openProfile } from '../overlays/profile';
+import { createLobbyParty } from '../lobbyParty';
 import { boxCountLabel, openBoxes } from '../overlays/box';
 import { passReadyCount } from './pass';
 import { SEASON_NAME, normalizePass, tierOf } from '../../data/pass';
@@ -15,7 +16,7 @@ import { getSettings, onSettingsChange } from '../../state/settings';
 import type { AppContext } from '../context';
 import { MODES, openModePicker } from '../overlays/modePicker';
 import { openSettings } from '../overlays/settings';
-import { comingSoon, toast } from '../overlays/toast';
+import { toast } from '../overlays/toast';
 import { isOfflineGuest } from '../account/session';
 import { attachDrag, button, currencyBar, iconEl, roleChip, txt } from '../widgets';
 import type { IconName } from '../icons';
@@ -81,8 +82,9 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     onEnd: () => view.setDragging(false),
     onTap: () => ctx.go.fighters(),
   });
-  const slotL = button('party-slot slot-left', [iconEl('plus')], comingSoon);
-  const slotR = button('party-slot slot-right', [iconEl('plus')], comingSoon);
+  const slotL = button('party-slot slot-left', [iconEl('plus')], () => party.openSlot(0));
+  const slotR = button('party-slot slot-right', [iconEl('plus')], () => party.openSlot(1));
+  const party = createLobbyParty(ctx, [slotL, slotR]);
 
   // ── 아래: 시즌 패스, 모드, 플레이
   const passSub = txt('', 'pass-sub');
@@ -122,6 +124,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
         toast('온라인은 로그인한 뒤에 할 수 있어요');
         return ctx.go.login();
       }
+      if (party.playOnline()) return;
       ctx.go.online();
     },
     'select',
@@ -143,7 +146,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     ]),
     el('div', 'lb-side lb-side-right', [
       sideBtn('친구', 'friends', () => ctx.go.friends()),
-      sideBtn('파티', 'party', comingSoon),
+      sideBtn('파티', 'party', () => party.invite()),
       sideBtn('길드', 'crew', () => ctx.go.guild()),
     ]),
     nameplate,
@@ -152,6 +155,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     passCard,
     modeCard,
     playBtn,
+    ...party.el,
   ]);
 
   const render = () => {
@@ -191,6 +195,10 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     onShow: () => {
       render();
       ctx.stage.setView(view);
+      party.show();
+    },
+    onHide: () => {
+      party.hide();
     },
   };
 }

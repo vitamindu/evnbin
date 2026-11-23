@@ -23,7 +23,11 @@ import { button, header, txt } from '../widgets';
  */
 type View = 'connecting' | 'failed' | 'hub' | 'room' | 'lost';
 
-export function createOnlineScreen(ctx: AppContext): Screen {
+/** 화면에 들어오자마자 할 일(파티: 파티장은 방 만들기, 파티원은 그 방으로) */
+export type OnlineAuto = { create: true } | { join: string };
+
+export function createOnlineScreen(ctx: AppContext): Screen & { setAuto(a: OnlineAuto | null): void } {
+  let auto: OnlineAuto | null = null;
   let client: OnlineClient | null = null;
   let view: View = 'connecting';
   let shown = false;
@@ -107,6 +111,7 @@ export function createOnlineScreen(ctx: AppContext): Screen {
       await c.connect(getServerUrl(), name, getProfile().selected);
       connectedAs = name;
       if (shown) setView(c.room ? 'room' : 'hub');
+      runAuto();
       return true;
     } catch {
       if (shown && !quiet) setView(wasLost ? 'lost' : 'failed');
@@ -169,6 +174,20 @@ export function createOnlineScreen(ctx: AppContext): Screen {
     }
   }
 
+  /** 파티 자동 동작: 연결된 뒤 한 번 */
+  function runAuto() {
+    const a = auto;
+    auto = null;
+    if (!a || !shown) return;
+    const c = getClient();
+    if ('join' in a) {
+      if (c.room?.code === a.join) return;
+      void join(a.join);
+    } else if (!c.room) {
+      void create();
+    }
+  }
+
   // ── 나가기
 
   function back() {
@@ -192,6 +211,9 @@ export function createOnlineScreen(ctx: AppContext): Screen {
   return {
     el: root,
     bg: 'online',
+    setAuto(a) {
+      auto = a;
+    },
     onShow() {
       shown = true;
       const c = getClient();
@@ -220,8 +242,10 @@ export function createOnlineScreen(ctx: AppContext): Screen {
           else if (!busy) toast(text);
         }),
       );
-      if (c.status === 'connected') setView(c.room ? 'room' : 'hub');
-      else if (c.status === 'connecting') setView('connecting');
+      if (c.status === 'connected') {
+        setView(c.room ? 'room' : 'hub');
+        runAuto();
+      } else if (c.status === 'connecting') setView('connecting');
       else void connect();
     },
     onHide() {

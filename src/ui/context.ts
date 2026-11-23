@@ -33,7 +33,8 @@ export interface AppContext {
     /** 인자 없으면 오프라인 연습장, 있으면 그 온라인 경기. 이미 전투 화면이면 새 세션으로 다시 붙는다 */
     battle(match?: OnlineMatch): void;
     /** 온라인 TEAM FIGHT: 연결 → 방 만들기 / 코드로 들어가기 → 방(이미 방에 있으면 바로 방) */
-    online(): void;
+    /** auto: 파티용 자동 동작(방 만들기 / 코드로 들어가기) */
+    online(auto?: { create: true } | { join: string }): void;
     /** 온라인 경기 결과 */
     results(result: MatchResult): void;
   };

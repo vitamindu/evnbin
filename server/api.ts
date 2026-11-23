@@ -3,8 +3,9 @@
  * CORS: 게임 페이지(https://vitamindu.github.io)와 http://localhost:*, http://127.0.0.1:* 만 허용.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { GUILD_MAX_MEMBERS, type AccountApiError, type GuildResponse, type GuildRole } from '../src/net/accountApi';
+import { GUILD_MAX_MEMBERS, type AccountApiError, type GuildResponse, type GuildRole, type PartyResponse } from '../src/net/accountApi';
 import { AccountError, type AccountStore, type RateLimiter } from './accounts';
+import { PartyError, type PartyStore } from './party';
 
 export const DEFAULT_API_ORIGINS = ['https://vitamindu.github.io'];
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
@@ -62,6 +63,10 @@ const STATUS: Record<AccountApiError, number> = {
   tier_locked: 409,
   premium_required: 403,
   already_premium: 409,
+  not_friends: 403,
+  party_full: 409,
+  not_in_party: 409,
+  already_in_party: 409,
   self: 400,
 };
 
@@ -104,6 +109,8 @@ export interface ApiDeps {
   log: (m: string) => void;
   /** 그 계정이 지금 웹소켓으로 연결돼 있는가, 방에 있는가(친구 목록용) */
   presence?: (account: string) => { online: boolean; inRoom: boolean };
+  /** 파티(메모리) */
+  parties?: PartyStore;
 }
 
 /** /api/*이면 처리하고 true. 아니면 false(다른 경로는 app.ts가 처리) */
@@ -131,7 +138,7 @@ export function handleApi(req: IncomingMessage, res: ServerResponse, deps: ApiDe
   void route(req, path, deps)
     .then((r) => send(200, r))
     .catch((err: unknown) => {
-      const code: AccountApiError | null = err instanceof HttpError || err instanceof AccountError ? err.code : null;
+      const code: AccountApiError | null = err instanceof HttpError || err instanceof AccountError || err instanceof PartyError ? err.code : null;
       if (code) send(STATUS[code], { error: code });
       else {
         deps.log(`[api] ${req.method} ${path} failed: ${(err as Error)?.stack ?? String(err)}`);
@@ -141,7 +148,7 @@ export function handleApi(req: IncomingMessage, res: ServerResponse, deps: ApiDe
   return true;
 }
 
-async function route(req: IncomingMessage, path: string, { store, limiter, log, presence }: ApiDeps): Promise<unknown> {
+async function route(req: IncomingMessage, path: string, { store, limiter, log, presence, parties: partyStore }: ApiDeps): Promise<unknown> {
   const ip = clientIp(req);
   const method = req.method ?? 'GET';
   if (method === 'POST' && path === '/api/signup') {
@@ -328,6 +335,46 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (!key) throw new HttpError('unauthorized');
     const r = store.openBox(key);
     return { ...me(key), items: r.items };
+  }
+  if (path === '/api/party' || path.startsWith('/api/party/')) {
+    if (!key) throw new HttpError('unauthorized');
+    const parties = partyStore;
+    if (!parties) throw new HttpError('bad_request');
+    const byNick = (n: unknown) => {
+      const k = store.findByNickname(n);
+      if (!k) throw new HttpError('not_found');
+      return k;
+    };
+    if (method === 'POST' && path === '/api/party/invite') {
+      const b = await readJson(req);
+      const to = byNick(b.nickname);
+      parties.invite(key, to, store.friends(key).includes(to));
+    } else if (method === 'POST' && path === '/api/party/accept') {
+      const b = await readJson(req);
+      parties.accept(key, byNick(b.from));
+    } else if (method === 'POST' && path === '/api/party/decline') {
+      const b = await readJson(req);
+      parties.decline(key, byNick(b.from));
+    } else if (method === 'POST' && path === '/api/party/leave') {
+      parties.leave(key);
+    } else if (method === 'POST' && path === '/api/party/kick') {
+      const b = await readJson(req);
+      parties.kick(key, byNick(b.nickname));
+    } else if (!(method === 'GET' && path === '/api/party')) {
+      throw new HttpError('bad_request');
+    }
+    const p = parties.get(key);
+    const member = (k: string) => {
+      const pr = store.profile(k);
+      return { nickname: store.nickname(k) ?? '', ...(pr?.avatar ? { avatar: pr.avatar } : {}), fighterId: pr?.selected ?? 'rivet', rankPoints: pr?.rankPoints ?? 0, leader: p?.leader === k };
+    };
+    return {
+      party: p ? { members: p.members.map(member), leader: store.nickname(p.leader) ?? '', roomCode: p.roomCode } : null,
+      invites: parties.invitesFor(key).map((i) => {
+        const pr = store.profile(i.from);
+        return { from: store.nickname(i.from) ?? '', ...(pr?.avatar ? { avatar: pr.avatar } : {}), at: i.at };
+      }),
+    } satisfies PartyResponse;
   }
   if (method === 'POST' && path === '/api/pass/claim') {
     if (!key) throw new HttpError('unauthorized');

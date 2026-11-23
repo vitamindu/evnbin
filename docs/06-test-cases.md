@@ -14,7 +14,7 @@
 | T-05 | 뒤로 두 번 | 로비 이름표가 VOLLEY |
 | T-06 | 새로고침 후 타이틀 탭 | 선택 유지(VOLLEY) |
 | T-07 | 상세 화면 좌우 화살표 | 캐릭터가 순환(RIVET→VOLLEY→BOULDER→HINAKO→RIVET), 반대 방향도 |
-| T-08 | 준비 중 버튼(파티, +) | `COMING SOON` 알림, 화면 이동 없음 |
+| T-08 | (삭제) 로비의 준비 중 버튼이 모두 동작하게 됨 — 상점·패스·파티는 tests/shop·pass·party.spec.ts | |
 | T-09 | PLAY → 뒤로 | 연습장(TRAINING YARD) 전투 화면이 바로 열림(매칭 팝업 없음), 왼쪽 위 뒤로 버튼으로 로비 복귀 |
 | T-10 | 설정 → GRAPHICS / SHOW FPS | 값 전환, FPS 표시 나타남 |
 | T-11 | 로비 캐릭터 탭 | 캐릭터 목록으로 이동 |

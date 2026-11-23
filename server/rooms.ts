@@ -99,12 +99,15 @@ export class Room {
   }
 
   /** 새 플레이어 입장. 팀은 자동 배정, 이름이 겹치면 뒤에 숫자를 붙인다 */
-  add(id: string, name: string, fighterId: FighterId, now = Date.now(), account: string | null = null): Member | RoomError {
+  /** preferTeamOf: 같은 팀으로 들어가고 싶은 계정들(파티원). 그 사람의 팀에 자리가 있으면 그 팀 */
+  add(id: string, name: string, fighterId: FighterId, now = Date.now(), account: string | null = null, preferTeamOf: readonly string[] = []): Member | RoomError {
     if (this.phase !== 'lobby') return 'in_progress';
     if (this.members.length >= MAX_PLAYERS) return 'room_full';
     const c0 = this.teamCount(0);
     const c1 = this.teamCount(1);
-    const team: Team = c0 <= c1 ? 0 : 1;
+    let team: Team = c0 <= c1 ? 0 : 1;
+    const mate = this.members.find((m) => m.account && preferTeamOf.includes(m.account));
+    if (mate && this.teamCount(mate.team) < TEAM_SIZE) team = mate.team;
     const m: Member = {
       id,
       name: this.uniqueName(sanitizeName(name)),

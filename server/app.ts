@@ -10,6 +10,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { PROTOCOL_VERSION, type ClientMsg, type MatchResult, type ServerMsg } from '../src/net/protocol';
 import type { FighterId } from '../src/data/fighters';
 import { AccountStore, RateLimiter, defaultDataDir, type AccountResult } from './accounts';
+import { PartyStore } from './party';
 import { DEFAULT_API_ORIGINS, handleApi } from './api';
 import { Match, type MatchConfig } from './match';
 import { Room, RoomManager, sanitizeName, type RoomError } from './rooms';
@@ -139,7 +140,14 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     }
     return { online, inRoom };
   };
-  const apiDeps = { store: accounts, limiter, allowedOrigins: opts.apiOrigins ?? DEFAULT_API_ORIGINS, log, presence };
+  const parties = new PartyStore();
+  /** 파티장이 방을 만들거나 들어가면 파티원이 따라올 수 있게 방 코드를 남긴다 */
+  const markPartyRoom = (c: Conn, code: string | null) => {
+    if (!c.account) return;
+    const p = parties.get(c.account);
+    if (p && p.leader === c.account) parties.setRoom(c.account, code);
+  };
+  const apiDeps = { store: accounts, limiter, allowedOrigins: opts.apiOrigins ?? DEFAULT_API_ORIGINS, log, presence, parties };
   log(`accounts: ${accounts.size} in ${accounts.dir}`);
 
   const health = () => {
@@ -281,6 +289,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
     if (!room || !c.id) return;
     c.room = null;
     room.remove(c.id);
+    markPartyRoom(c, null);
     if (room.members.length === 0) {
       deleteRoom(room, 'everyone left');
       return;
@@ -363,6 +372,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       }
       c.room = room;
       c.name = m.name;
+      markPartyRoom(c, room.code);
       log(`room ${room.code} created by ${m.name}`);
       broadcastRoom(room);
       return;
@@ -383,7 +393,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         takeOver(c, room, again.id);
         return;
       }
-      const m = room.add(c.id, c.name, c.fighterId, Date.now(), c.account);
+      const m = room.add(c.id, c.name, c.fighterId, Date.now(), c.account, c.account ? parties.mates(c.account) : []);
       if (typeof m === 'string') {
         c.error(m);
         return;
@@ -391,6 +401,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       if (c.room) leaveRoom(c);
       c.room = room;
       c.name = m.name;
+      markPartyRoom(c, room.code);
       log(`room ${room.code}: ${m.name} joined (${room.members.length})`);
       broadcastRoom(room);
       return;

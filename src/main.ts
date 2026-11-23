@@ -112,7 +112,10 @@ async function boot() {
         if (screens.active === battle) battle.restart();
         else screens.show(battle);
       },
-      online: () => screens.show(online),
+      online: (auto) => {
+        online.setAuto(auto ?? null);
+        screens.show(online);
+      },
       results: (result) => {
         results.setResult(result);
         screens.show(results);

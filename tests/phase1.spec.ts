@@ -179,26 +179,6 @@ test('T-07 detail arrows cycle through every fighter and wrap to RIVET', async (
   }
 });
 
-test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', async ({ page }) => {
-  await gotoLobby(page);
-  const targets: [string, Locator][] = [
-    ['PARTY', page.locator('.side-btn[data-btn="party"]')],
-    ['+ left', page.locator('.party-slot.slot-left')],
-    ['+ right', page.locator('.party-slot.slot-right')],
-    // Also "준비 중" per docs/02 §2 lobby table (the profile card now opens the profile window, tests/profile.spec.ts):
-  ];
-  for (const [label, loc] of targets) {
-    await test.step(label, async () => {
-      const toasts = await toastCount(page);
-      await loc.tap();
-      await expectNewToast(page, toasts, '준비 중이에요', `${label} → COMING SOON toast`);
-      await expect(page.locator('.lobby'), `${label} → still lobby`).toBeVisible();
-      await expect(page.locator('#app')).toHaveAttribute('data-bg', 'lobby');
-      await expect(page.locator('.overlay'), `${label} → no popup`).toHaveCount(0);
-    });
-  }
-});
-
 test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING switches back', async ({ page }) => {
   await gotoLobby(page);
   await expect(page.locator('.mode-card .mode-name')).toHaveText('연습장');

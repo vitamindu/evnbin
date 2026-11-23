@@ -2050,3 +2050,112 @@ img {
 .ps-cell.is-locked {
   filter: brightness(0.75);
 }
+
+/* ───────────── 파티 ───────────── */
+.party-slot.is-filled {
+  border-style: solid;
+  border-color: var(--ink);
+  background: rgba(20, 30, 90, 0.75);
+  flex-direction: column;
+  gap: 2px;
+  width: 112px;
+  height: 120px;
+  top: 318px;
+}
+.party-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  font-size: 34px;
+}
+.party-name {
+  max-width: 104px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  color: #fff;
+}
+.party-crown {
+  position: absolute;
+  top: -14px;
+  right: -10px;
+}
+.party-crown .ico {
+  width: 30px;
+  height: 30px;
+}
+.party-bar {
+  position: absolute;
+  left: 50%;
+  top: 148px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 14px;
+  border-radius: 16px;
+  background: rgba(10, 16, 60, 0.7);
+  font-size: 16px;
+  z-index: 2;
+}
+.party-bar > .ico {
+  width: 26px;
+  height: 26px;
+}
+.party-leave {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 15px;
+  background: linear-gradient(#ff7a7a, #d63a4a);
+}
+.party-invites {
+  position: absolute;
+  left: 50%;
+  top: 196px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 5;
+}
+.party-invite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  animation: fade-in 0.2s ease-out;
+}
+.pv-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+.pv-from {
+  font-size: 20px;
+}
+.pv-sub {
+  font-size: 15px;
+  color: #cfd8ff;
+}
+.pv-decline {
+  height: 52px;
+  min-width: 0;
+  padding: 0 16px;
+}
+.pi-panel {
+  width: 620px;
+  max-height: 640px;
+  padding: 22px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pi-list {
+  min-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
