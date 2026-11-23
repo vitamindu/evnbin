@@ -6,6 +6,7 @@ import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
 import { upgradeCost } from '../../data/power';
 import { boxTotals, rollFighterBox, type BoxItem } from '../../data/boxes';
 import { getShopItem, shopDay } from '../../data/shop';
+import { PASS_SKIN_REFUND, PREMIUM_PRICE, normalizePass, rewardOf, tierOf, type PassTrack } from '../../data/pass';
 import type { ShopGot } from '../../net/account';
 
 /**
@@ -51,6 +52,9 @@ export type AccountErrorCode =
   | 'already_requested'
   | 'rate_limited_chat'
   | 'already_claimed'
+  | 'tier_locked'
+  | 'premium_required'
+  | 'already_premium'
   | 'server_error'
   | 'network';
 
@@ -67,6 +71,8 @@ interface AccountModule {
   upgradeFighter(fighterId: FighterId): Promise<unknown>;
   openBox(): Promise<{ items: BoxItem[] }>;
   buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
+  claimPass(tier: number, track: PassTrack): Promise<{ got: ShopGot }>;
+  buyPremiumPass(): Promise<unknown>;
   /** 가짜 모듈만 */
   patch?(fn: (p: Profile) => void): void;
   getAccount(): Account | null;
@@ -92,6 +98,8 @@ type RealModule = {
   upgradeFighter(f: FighterId): Promise<unknown>;
   openBox(): Promise<{ items: BoxItem[] }>;
   buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
+  claimPass(tier: number, track: PassTrack): Promise<{ got: ShopGot }>;
+  buyPremiumPass(): Promise<unknown>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -111,6 +119,8 @@ function realAdapter(m: RealModule): AccountModule {
     upgradeFighter: (f) => m.upgradeFighter(f),
     openBox: () => m.openBox(),
     buyShopItem: (id) => m.buyShopItem(id),
+    claimPass: (t, k) => m.claimPass(t, k),
+    buyPremiumPass: () => m.buyPremiumPass(),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -353,6 +363,45 @@ function fakeModule(): AccountModule {
       });
       return { got };
     },
+    async claimPass(tier, track) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const pass = normalizePass(account!.profile.pass);
+      if (tier > tierOf(pass.xp)) fail('tier_locked');
+      if (track === 'premium' && !pass.premium) fail('premium_required');
+      const claimed = track === 'free' ? pass.claimedFree : pass.claimedPremium;
+      if (claimed.includes(tier)) fail('already_claimed');
+      claimed.push(tier);
+      const rw = rewardOf(track, tier);
+      const got: ShopGot = { coins: rw.coins ?? 0, gems: rw.gems ?? 0, boxes: rw.boxes ?? 0 };
+      const p = account!.profile;
+      if (rw.skin) {
+        if (p.admin || p.skins?.includes(rw.skin)) got.gems += PASS_SKIN_REFUND;
+        else got.skin = rw.skin;
+      }
+      save((row) => {
+        const q = row.profile;
+        q.pass = pass;
+        q.coins += got.coins;
+        q.crystals += got.gems;
+        q.boxes = (q.boxes ?? 0) + got.boxes;
+        if (got.skin) q.skins = [...(q.skins ?? []), got.skin];
+      });
+      return { got };
+    },
+    async buyPremiumPass() {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const p = account!.profile;
+      const pass = normalizePass(p.pass);
+      if (pass.premium) fail('already_premium');
+      if (!p.admin && p.crystals < PREMIUM_PRICE) fail('not_enough_gems');
+      pass.premium = true;
+      save((row) => {
+        row.profile.pass = pass;
+        if (!p.admin) row.profile.crystals -= PREMIUM_PRICE;
+      });
+    },
     patch(fn: (p: Profile) => void) {
       if (account) save((row) => fn(row.profile));
     },
@@ -379,6 +428,8 @@ export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
 export const upgradeFighter = (fighterId: FighterId) => api.upgradeFighter(fighterId);
 export const openBox = () => api.openBox();
 export const buyShopItem = (itemId: string) => api.buyShopItem(itemId);
+export const claimPass = (tier: number, track: PassTrack) => api.claimPass(tier, track);
+export const buyPremiumPass = () => api.buyPremiumPass();
 /** 가짜 계정(?fakeonline)일 때만: 저장된 프로필을 고친다(가짜 길드 등) */
 export const patchFakeProfile = (fn: (p: Profile) => void) => api.patch?.(fn);
 export const getAccount = () => api.getAccount();
@@ -446,7 +497,13 @@ export function accountErrorText(code: AccountErrorCode): string {
     case 'rate_limited_chat':
       return '조금 천천히 보내 주세요';
     case 'already_claimed':
-      return '오늘은 이미 받았어요. 내일 다시 와 주세요';
+      return '이미 받았어요';
+    case 'tier_locked':
+      return '아직 열리지 않은 단계예요';
+    case 'premium_required':
+      return '프리미엄 패스가 필요해요';
+    case 'already_premium':
+      return '이미 프리미엄이에요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

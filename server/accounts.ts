@@ -19,6 +19,7 @@ import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../src/data/skins';
 import { MAX_POWER, upgradeCost } from '../src/data/power';
 import { boxTotals, rollFighterBox, type BoxItem } from '../src/data/boxes';
 import { getShopItem, shopDay } from '../src/data/shop';
+import { PASS_SKIN_REFUND, PASS_TIERS, PASS_XP, PREMIUM_PRICE, normalizePass, rewardOf, tierOf, type PassTrack } from '../src/data/pass';
 
 /** 관리자 로그인 아이디(대소문자 무시). FG_ADMINS 환경 변수(쉼표 구분)로 바꿀 수 있다 */
 export const ADMIN_USERNAMES = new Set(
@@ -762,6 +763,50 @@ export class AccountStore {
     return { profile: present(u, this.data.guilds), got };
   }
 
+  /** 시즌 패스 보상 받기: 열린 단계만, 프리미엄 줄은 프리미엄이 있어야 */
+  claimPass(key: string, tier: unknown, track: unknown): { profile: Profile; got: { coins: number; gems: number; boxes: number; skin?: string } } {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (typeof tier !== 'number' || !Number.isInteger(tier) || tier < 1 || tier > PASS_TIERS) throw new AccountError('bad_request');
+    if (track !== 'free' && track !== 'premium') throw new AccountError('bad_request');
+    const pass = normalizePass(u.profile.pass);
+    if (tier > tierOf(pass.xp)) throw new AccountError('tier_locked');
+    if (track === 'premium' && !pass.premium) throw new AccountError('premium_required');
+    const claimed = track === 'free' ? pass.claimedFree : pass.claimedPremium;
+    if (claimed.includes(tier)) throw new AccountError('already_claimed');
+    claimed.push(tier);
+    const rw = rewardOf(track as PassTrack, tier);
+    const got = { coins: rw.coins ?? 0, gems: rw.gems ?? 0, boxes: rw.boxes ?? 0 } as { coins: number; gems: number; boxes: number; skin?: string };
+    if (rw.skin) {
+      if (owns(u, rw.skin)) got.gems += PASS_SKIN_REFUND;
+      else got.skin = rw.skin;
+    }
+    const p = u.profile;
+    p.pass = pass;
+    p.coins += got.coins;
+    p.crystals += got.gems;
+    p.boxes = (p.boxes ?? 0) + got.boxes;
+    if (got.skin) p.skins = [...(p.skins ?? []), got.skin];
+    this.save();
+    return { profile: present(u, this.data.guilds), got };
+  }
+
+  /** 프리미엄 패스 사기(다이아, 관리자는 무료) */
+  buyPremiumPass(key: string): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const pass = normalizePass(u.profile.pass);
+    if (pass.premium) throw new AccountError('already_premium');
+    if (!isAdmin(u)) {
+      if (u.profile.crystals < PREMIUM_PRICE) throw new AccountError('not_enough_gems');
+      u.profile.crystals -= PREMIUM_PRICE;
+    }
+    pass.premium = true;
+    u.profile.pass = pass;
+    this.save();
+    return present(u, this.data.guilds);
+  }
+
   /** 경기에 쓸 스킨(가진 것만) */
   skinFor(key: string, fighterId: FighterId): string | undefined {
     const u = this.data.users[key];
@@ -782,6 +827,10 @@ export class AccountStore {
       fp.trophies = Math.max(0, fp.trophies + delta);
       fp.games = (fp.games ?? 0) + 1;
       u.profile.coins += r.outcome === 'win' ? COINS_WIN : COINS_OTHER;
+      // 시즌 패스 경험치
+      const pass = normalizePass(u.profile.pass);
+      pass.xp += PASS_XP[r.outcome];
+      u.profile.pass = pass;
       // 파이터 상자: 승리 +1
       if (r.outcome === 'win') u.profile.boxes = (u.profile.boxes ?? 0) + 1;
       const before = u.profile.rankPoints ?? 0;

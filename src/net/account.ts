@@ -270,3 +270,17 @@ export async function buyShopItem(itemId: string): Promise<{ profile: Profile; g
   setProfile(r.profile, r.username);
   return { profile: r.profile, got: r.got };
 }
+
+/** 시즌 패스 보상 받기 */
+export async function claimPass(tier: number, track: 'free' | 'premium'): Promise<{ profile: Profile; got: ShopGot }> {
+  const r = await authed<ProfileResponse & { got: ShopGot }>('POST', '/api/pass/claim', { tier, track });
+  setProfile(r.profile, r.username);
+  return { profile: r.profile, got: r.got };
+}
+
+/** 프리미엄 패스 사기 */
+export async function buyPremiumPass(): Promise<Profile> {
+  const r = await authed<ProfileResponse>('POST', '/api/pass/premium');
+  setProfile(r.profile, r.username);
+  return r.profile;
+}

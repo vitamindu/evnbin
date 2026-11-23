@@ -7,6 +7,8 @@ import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { openProfile } from '../overlays/profile';
 import { boxCountLabel, openBoxes } from '../overlays/box';
+import { passReadyCount } from './pass';
+import { SEASON_NAME, normalizePass, tierOf } from '../../data/pass';
 import { fillAvatar } from '../avatar';
 import { equippedSkin, getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import { getSettings, onSettingsChange } from '../../state/settings';
@@ -83,10 +85,12 @@ export function createLobbyScreen(ctx: AppContext): Screen {
   const slotR = button('party-slot slot-right', [iconEl('plus')], comingSoon);
 
   // ── 아래: 시즌 패스, 모드, 플레이
+  const passSub = txt('', 'pass-sub');
+  const passBadge = el('span', 'badge t-outline pass-badge');
   const passCard = button(
     'pass-card',
-    [iconEl('pass', 'ico pass-ico'), el('span', 'pass-text', [txt('시즌 패스', 'pass-title'), txt('시즌 1', 'pass-sub')])],
-    comingSoon,
+    [iconEl('pass', 'ico pass-ico'), el('span', 'pass-text', [txt('시즌 패스', 'pass-title'), passSub]), passBadge],
+    () => ctx.go.pass(),
   );
   // 모드 카드: 지금 고른 모드(설정에 저장). 탭하면 모드 선택 팝업, PLAY는 그 모드로 시작
   const modeIco = el('span', 'mode-ico-wrap');
@@ -156,6 +160,11 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     pName.textContent = p.name;
     pTag.textContent = `#${p.tag}`;
     fillAvatar(avatar, p.name, p.avatar);
+    const pass = normalizePass(p.pass);
+    passSub.textContent = `${SEASON_NAME} · ${tierOf(pass.xp)}단계`;
+    const ready = passReadyCount();
+    passBadge.textContent = String(ready);
+    passBadge.hidden = !ready;
     boxBadge.textContent = boxCountLabel();
     boxBadge.hidden = boxBadge.textContent === '0';
     avatar.style.setProperty('--c', f.palette.primary);

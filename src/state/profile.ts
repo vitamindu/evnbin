@@ -1,4 +1,5 @@
 import { FIGHTERS, type FighterId } from '../data/fighters';
+import type { PassState } from '../data/pass';
 
 /** 플레이어 프로필. 지금은 기기 로컬 저장, 로그인 단계에서 서버 저장으로 옮긴다. */
 export interface FighterProgress {
@@ -20,6 +21,8 @@ export interface Profile {
   rankPoints: number;
   /** 오늘의 선물을 받은 날(한국 시간 YYYY-MM-DD) */
   dailyClaimed?: string;
+  /** 시즌 패스(src/data/pass.ts) */
+  pass?: PassState;
   /** 들어가 있는 길드 이름 */
   guild?: string;
   /** 아직 열지 않은 파이터 상자 수(관리자는 무한) */

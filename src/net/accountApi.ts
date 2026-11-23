@@ -23,6 +23,8 @@
  *   GET    /api/guild/chat?after=id (Bearer)         → { messages }  (after보다 새 것, 최대 100)
  *   POST   /api/guild/chat (Bearer) {text}           → { messages }  (1초에 1번, 100자)
  *   POST   /api/shop/buy (Bearer) {itemId}           → { profile, username, got }  (src/data/shop.ts, 다이아 차감)
+ *   POST   /api/pass/claim (Bearer) {tier, track}     → { profile, username, got }  (시즌 패스 보상)
+ *   POST   /api/pass/premium (Bearer)               → { profile, username }  (프리미엄, 다이아)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -34,6 +36,7 @@
  * profile.name = 닉네임(화면·방 이름). username = 로그인 아이디(응답에 따로 담는다).
  */
 import type { FighterId } from '../data/fighters';
+import type { PassState } from '../data/pass';
 
 export interface AccountFighterProgress {
   trophies: number;
@@ -53,6 +56,8 @@ export interface AccountProfile {
   avatar?: string;
   /** 오늘의 선물을 받은 날(한국 시간 YYYY-MM-DD) */
   dailyClaimed?: string;
+  /** 시즌 패스(src/data/pass.ts) */
+  pass?: PassState;
   /** 들어가 있는 길드 이름 */
   guild?: string;
   boxes?: number;
@@ -100,7 +105,11 @@ export type AccountApiError =
   | 'already_requested'
   | 'rate_limited_chat'
   /** 상점: 오늘의 선물을 이미 받음 */
-  | 'already_claimed';
+  | 'already_claimed'
+  /** 시즌 패스: 아직 안 열린 단계 / 프리미엄이 필요 / 이미 프리미엄 */
+  | 'tier_locked'
+  | 'premium_required'
+  | 'already_premium';
 
 export interface AuthResponse {
   token: string;

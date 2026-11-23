@@ -59,6 +59,9 @@ const STATUS: Record<AccountApiError, number> = {
   already_requested: 409,
   rate_limited_chat: 429,
   already_claimed: 409,
+  tier_locked: 409,
+  premium_required: 403,
+  already_premium: 409,
   self: 400,
 };
 
@@ -325,6 +328,17 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (!key) throw new HttpError('unauthorized');
     const r = store.openBox(key);
     return { ...me(key), items: r.items };
+  }
+  if (method === 'POST' && path === '/api/pass/claim') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    const r = store.claimPass(key, b.tier, b.track);
+    return { ...me(key), got: r.got };
+  }
+  if (method === 'POST' && path === '/api/pass/premium') {
+    if (!key) throw new HttpError('unauthorized');
+    store.buyPremiumPass(key);
+    return me(key);
   }
   if (method === 'POST' && path === '/api/shop/buy') {
     if (!key) throw new HttpError('unauthorized');

@@ -183,7 +183,6 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
   await gotoLobby(page);
   const targets: [string, Locator][] = [
     ['PARTY', page.locator('.side-btn[data-btn="party"]')],
-    ['SEASON PASS', page.locator('.pass-card')],
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],
     // Also "준비 중" per docs/02 §2 lobby table (the profile card now opens the profile window, tests/profile.spec.ts):
