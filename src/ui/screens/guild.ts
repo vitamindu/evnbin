@@ -2,7 +2,7 @@ import '../../styles/online.css';
 import { el, icon } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { rankLabel, rankOf } from '../../data/ranks';
-import { GUILD_CHAT_MAX, GUILD_DESC_MAX, GUILD_NAME_MAX } from '../../net/accountApi';
+import { GUILD_CHAT_MAX, GUILD_COST_COINS, GUILD_COST_GEMS, GUILD_DESC_MAX, GUILD_NAME_MAX } from '../../net/accountApi';
 import type { AppContext } from '../context';
 import { accountErrorCode, accountErrorText, getAccount } from '../account/accountApi';
 import {
@@ -65,12 +65,17 @@ export function createGuildScreen(ctx: AppContext): Screen {
   nameIn.setAttribute('aria-label', 'Guild name');
   const createErr = txt('', 'fr-err');
   const createBtn = button('fr-add gd-create', [iconEl('plus'), txt('만들기')], () => void create(), 'select');
+  const costRow = el('div', 'gd-cost', [
+    txt('비용', 'gd-cost-label'),
+    el('span', 'gd-cost-item', [iconEl('coin'), txt(GUILD_COST_COINS.toLocaleString('en-US'))]),
+    el('span', 'gd-cost-item', [iconEl('crystal'), txt(String(GUILD_COST_GEMS))]),
+  ]);
   const createPanel = el('div', 'fr-addpanel panel', [
     txt('길드 만들기', 'fr-title'),
     el('p', 'fr-desc', ['만든 사람이 길드장이 돼요']),
     el('span', 'auth-box fr-box', [nameIn]),
     el('span', 'auth-box fr-box', [descIn]),
-    el('div', 'fr-addrow', [createBtn]),
+    el('div', 'fr-addrow gd-create-row', [costRow, createBtn]),
     createErr,
   ]);
   nameIn.addEventListener('input', () => (createErr.textContent = ''));
@@ -458,6 +463,7 @@ export function createGuildScreen(ctx: AppContext): Screen {
       noGuild.hidden = true;
       inGuild.hidden = true;
       createErr.textContent = '';
+      costRow.hidden = !!acct?.profile.admin;
       lastChatId = 0;
       chatList.replaceChildren();
       tab = 'members';

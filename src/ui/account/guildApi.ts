@@ -1,6 +1,6 @@
 import * as real from '../../net/guild';
 import type { GuildChatMessage, GuildInfo, GuildJoinMode, GuildRole, GuildSummary } from '../../net/accountApi';
-import { GUILD_CHAT_KEEP, GUILD_CHAT_MAX, GUILD_DESC_MAX, GUILD_MAX_MEMBERS, isValidGuildName } from '../../net/accountApi';
+import { GUILD_COST_COINS, GUILD_COST_GEMS, GUILD_CHAT_KEEP, GUILD_CHAT_MAX, GUILD_DESC_MAX, GUILD_MAX_MEMBERS, isValidGuildName } from '../../net/accountApi';
 import { fakeNet, getAccount, isFakeAccounts, patchFakeProfile } from './accountApi';
 
 export type { GuildChatMessage, GuildInfo, GuildJoinMode, GuildMember, GuildRequest, GuildRole, GuildSummary } from '../../net/accountApi';
@@ -131,6 +131,15 @@ function fakeModule(): GuildModule {
       if (mineOf(l, nick)) err('already_in_guild');
       if (!isValidGuildName(name)) err('invalid_guild_name');
       if (l.some((g) => g.name.toLowerCase() === name.trim().toLowerCase())) err('guild_taken');
+      const p = getAccount()!.profile;
+      if (!p.admin) {
+        if (p.coins < GUILD_COST_COINS) err('not_enough_coins');
+        if (p.crystals < GUILD_COST_GEMS) err('not_enough_gems');
+        patchFakeProfile((q) => {
+          q.coins -= GUILD_COST_COINS;
+          q.crystals -= GUILD_COST_GEMS;
+        });
+      }
       const g: FakeGuild = { name: name.trim(), description: description.trim().slice(0, GUILD_DESC_MAX), leader: nick, vices: [], members: [nick], joinMode: 'approval', requests: [], chat: [], next: 1 };
       sys(g, `${nick}님이 길드를 만들었어요`);
       for (const o of l) o.requests = o.requests.filter((r) => r !== nick);

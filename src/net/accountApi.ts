@@ -12,7 +12,7 @@
  *   POST   /api/upgrade (Bearer) {fighterId}          → { profile, username }  (레벨 +1, 코인 차감. 관리자는 무료)
  *   POST   /api/boxes/open (Bearer)                   → { profile, username, items: BoxItem[] }  (파이터 상자 1개, src/data/boxes.ts)
  *   GET    /api/guild   (Bearer)                     → { guild: GuildInfo | null }
- *   POST   /api/guild   (Bearer) {name, description?} → { guild }  (만들기, 만든 사람 = 길드장)
+ *   POST   /api/guild   (Bearer) {name, description?} → { guild }  (만들기, 만든 사람 = 마스터. 코인 2000 + 다이아 100)
  *   POST   /api/guild/join (Bearer) {name}           → { guild }
  *   POST   /api/guild/leave (Bearer)                 → { guild: null }
  *   GET    /api/guilds?q=이름 (Bearer)               → { guilds: GuildSummary[] }  (멤버 많은 순 20개)
@@ -150,6 +150,9 @@ export const GUILD_NAME_PATTERN = /^[A-Za-z0-9_가-힣]{2,12}$/u;
 export const GUILD_NAME_MAX = 12;
 export const GUILD_DESC_MAX = 40;
 export const GUILD_MAX_MEMBERS = 30;
+/** 길드 만드는 비용(관리자는 무료) */
+export const GUILD_COST_COINS = 2000;
+export const GUILD_COST_GEMS = 100;
 /** 한 길드에 쌓이는 가입 요청 최대 수(넘으면 오래된 것부터 지운다) */
 export const GUILD_MAX_REQUESTS = 50;
 export const GUILD_CHAT_MAX = 100;

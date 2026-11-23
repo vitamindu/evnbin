@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AccountStore } from '../../../server/accounts';
-import { GUILD_MAX_MEMBERS } from '../../../src/net/accountApi';
+import { GUILD_COST_COINS, GUILD_COST_GEMS, GUILD_MAX_MEMBERS } from '../../../src/net/accountApi';
 
 const dirs: string[] = [];
 const mk = () => {
@@ -22,14 +22,53 @@ const code = (fn: () => unknown) => {
   }
   return 'ok';
 };
+/** 가입 + 길드 만들 돈(코인·다이아 넉넉히) */
 const users = async (s: AccountStore, n: number) => {
-  for (let i = 1; i <= n; i++) await s.signup(`user${i}`, 'secret1', `유저${i}`);
+  for (let i = 1; i <= n; i++) {
+    await s.signup(`user${i}`, 'secret1', `유저${i}`);
+    setMoney(s, `user${i}`, 100_000, 10_000);
+  }
+};
+const setMoney = (s: AccountStore, key: string, coins: number, crystals: number) => {
+  const p = (s as unknown as { data: { users: Record<string, { profile: { coins: number; crystals: number } }> } }).data.users[key]!.profile;
+  p.coins = coins;
+  p.crystals = crystals;
 };
 
 const openGuild = (s: AccountStore, master: string, name: string) => {
   s.createGuild(master, name);
   s.guildSettings(master, { joinMode: 'open' });
 };
+
+describe('guild creation cost', () => {
+  it(`costs ${GUILD_COST_COINS} coins + ${GUILD_COST_GEMS} diamonds; checks both before charging`, async () => {
+    const { s } = mk();
+    await s.signup('poor1', 'secret1', '가난');
+    setMoney(s, 'poor1', GUILD_COST_COINS - 1, 1000);
+    expect(code(() => s.createGuild('poor1', 'Blaze'))).toBe('not_enough_coins');
+    setMoney(s, 'poor1', 5000, GUILD_COST_GEMS - 1);
+    expect(code(() => s.createGuild('poor1', 'Blaze'))).toBe('not_enough_gems');
+    expect(s.profile('poor1')!.coins).toBe(5000);
+    setMoney(s, 'poor1', 5000, 150);
+    s.createGuild('poor1', 'Blaze');
+    expect(s.profile('poor1')!.coins).toBe(5000 - GUILD_COST_COINS);
+    expect(s.profile('poor1')!.crystals).toBe(150 - GUILD_COST_GEMS);
+  });
+  it('a taken name costs nothing', async () => {
+    const { s } = mk();
+    await users(s, 2);
+    s.createGuild('user1', 'Blaze');
+    expect(code(() => s.createGuild('user2', 'blaze'))).toBe('guild_taken');
+    expect(s.profile('user2')!.coins).toBe(100_000);
+  });
+  it('admin creates for free', async () => {
+    const { s } = mk();
+    await s.signup('mineack991', 'secret1', '관리자');
+    setMoney(s, 'mineack991', 0, 0);
+    s.createGuild('mineack991', 'Admins');
+    expect(s.profile('mineack991')!.coins).toBe(0);
+  });
+});
 
 describe('guilds', () => {
   it('create → master; name unique (case-insensitive); profile shows the guild; starts as approval-only', async () => {

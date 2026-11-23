@@ -2107,3 +2107,25 @@
   font-size: 15px;
   color: #aab4e0;
 }
+.gd-create-row {
+  align-items: center;
+  justify-content: space-between !important;
+}
+.gd-cost {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+}
+.gd-cost-label {
+  color: #cfd8ff;
+}
+.gd-cost-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gd-cost-item .ico {
+  width: 24px;
+  height: 24px;
+}

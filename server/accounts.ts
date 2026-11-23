@@ -28,6 +28,8 @@ export const ADMIN_USERNAMES = new Set(
 );
 import {
   GUILD_CHAT_KEEP,
+  GUILD_COST_COINS,
+  GUILD_COST_GEMS,
   GUILD_CHAT_MAX,
   GUILD_DESC_MAX,
   GUILD_MAX_MEMBERS,
@@ -543,7 +545,7 @@ export class AccountStore {
     pushChat(g, null, text, this.now());
   }
 
-  /** 길드 만들기(만든 사람 = 마스터). 처음 가입 방식은 승인 필요 */
+  /** 길드 만들기(만든 사람 = 마스터). 코인 GUILD_COST_COINS + 다이아 GUILD_COST_GEMS(관리자는 무료). 처음 가입 방식은 승인 필요 */
   createGuild(key: string, name: unknown, description: unknown = ''): void {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
@@ -551,6 +553,12 @@ export class AccountStore {
     if (!isValidGuildName(name)) throw new AccountError('invalid_guild_name');
     const id = name.trim().toLowerCase();
     if (this.guilds[id]) throw new AccountError('guild_taken');
+    if (!isAdmin(u)) {
+      if (u.profile.coins < GUILD_COST_COINS) throw new AccountError('not_enough_coins');
+      if (u.profile.crystals < GUILD_COST_GEMS) throw new AccountError('not_enough_gems');
+      u.profile.coins -= GUILD_COST_COINS;
+      u.profile.crystals -= GUILD_COST_GEMS;
+    }
     const desc = typeof description === 'string' ? cleanText(description, GUILD_DESC_MAX) : '';
     const g: StoredGuild = { name: name.trim(), description: desc, leader: key, vices: [], members: [key], createdAt: this.now(), joinMode: 'approval', requests: [], chat: [], nextChatId: 1 };
     this.system(g, `${u.nickname}님이 길드를 만들었어요`);

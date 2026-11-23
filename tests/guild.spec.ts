@@ -26,6 +26,23 @@ test('lobby: 길드 button on the right, 상자 moved to the left', async ({ pag
   await expect(page.locator('.lb-side-right .side-btn[data-btn="box"]')).toHaveCount(0);
 });
 
+/** 가짜 계정에 코인·다이아를 넣고 다시 로그인(토큰으로 자동) */
+async function giveMoney(page: Page, id: string, coins: number, crystals: number) {
+  await page.evaluate(
+    ([key, c, g]) => {
+      const all = JSON.parse(localStorage.getItem('fg.fakeaccounts.v2') ?? '{}');
+      all[key as string].profile.coins = c;
+      all[key as string].profile.crystals = g;
+      localStorage.setItem('fg.fakeaccounts.v2', JSON.stringify(all));
+    },
+    [id, coins, crystals] as const,
+  );
+  await page.reload();
+  await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });
+  await page.locator('.title').tap();
+  await expect(page.locator('.lobby')).toBeVisible();
+}
+
 const openGuildScreen = async (page: Page) => {
   await page.locator('.side-btn[data-btn="crew"]').tap();
   await expect(page.locator('.guild-screen')).toBeVisible();
@@ -33,6 +50,15 @@ const openGuildScreen = async (page: Page) => {
 
 test('create a guild: master, settings, profile shows it, leave', async ({ page }, info) => {
   await signup(page, 'guild1', '번개짱');
+  // 돈이 모자라면 못 만든다
+  await openGuildScreen(page);
+  await expect(page.locator('.gd-cost')).toContainText('2,000');
+  await expect(page.locator('.gd-cost')).toContainText('100');
+  await page.locator('.gd-none .fr-addpanel .fr-input').nth(0).fill('번개팀');
+  await page.locator('.gd-create').tap();
+  await expect(page.locator('.gd-none .fr-err')).toHaveText('코인이 부족해요');
+  await page.locator('.hdr .btn-back').tap();
+  await giveMoney(page, 'guild1', 2500, 120);
   await openGuildScreen(page);
   await expect(page.locator('.gd-none')).toBeVisible();
   await expect(page.locator('.gd-row')).toHaveCount(2);
@@ -55,6 +81,9 @@ test('create a guild: master, settings, profile shows it, leave', async ({ page 
   await page.screenshot({ path: info.outputPath('guild-master.png') });
 
   await page.locator('.hdr .btn-back').tap();
+  // 비용이 빠졌다: 2500 - 2000, 120 - 100
+  await expect(page.locator('.lb-top-right .currency').nth(0)).toHaveText('500');
+  await expect(page.locator('.lb-top-right .currency').nth(1)).toHaveText('20');
   await page.locator('.profile-card').tap();
   await expect(page.locator('.pf-guild')).toHaveText('번개팀');
   await page.locator('.pf-panel .btn-close').tap();
@@ -101,6 +130,7 @@ test('member: join an open guild directly, chat, no management; approval guilds 
 
 test('master manages: accept a request, appoint a vice, kick a member', async ({ page }, info) => {
   await signup(page, 'guild3', '마스터짱');
+  await giveMoney(page, 'guild3', 2000, 100);
   await openGuildScreen(page);
   await page.locator('.gd-none .fr-addpanel .fr-input').nth(0).fill('천둥');
   await page.locator('.gd-create').tap();
