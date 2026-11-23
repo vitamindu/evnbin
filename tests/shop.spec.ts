@@ -41,6 +41,13 @@ test('lobby: no 소식 button; 상점 opens the shop', async ({ page }) => {
   await page.locator('.side-btn[data-btn="shop"]').tap();
   await expect(page.locator('.shop-screen')).toBeVisible();
   await expect(page.locator('.shop-card')).toHaveCount(6);
+  // 코인·다이아 표시를 눌러도 상점
+  for (const i of [0, 1]) {
+    await page.locator('.hdr .btn-back').tap();
+    await expect(page.locator('.lobby')).toBeVisible();
+    await page.locator('.lb-top-right .currency').nth(i).tap();
+    await expect(page.locator('.shop-screen')).toBeVisible();
+  }
 });
 
 test('daily gift once, buy boxes and coins with diamonds', async ({ page }, info) => {

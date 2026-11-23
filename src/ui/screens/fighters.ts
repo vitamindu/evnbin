@@ -47,7 +47,7 @@ export function createFightersScreen(ctx: AppContext): Screen {
   onProfileChange(render);
 
   const root = el('div', 'fighters', [
-    header('캐릭터', () => ctx.go.lobby(), currencyBar(comingSoon)),
+    header('캐릭터', () => ctx.go.lobby(), currencyBar(() => ctx.go.shop())),
     el('div', 'fighters-count', [txt(`${FIGHTERS.length} / ${FIGHTERS.length} 보유`)]),
     grid,
   ]);

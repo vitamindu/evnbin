@@ -186,8 +186,6 @@ test('T-08 not-yet-available buttons show COMING SOON and stay on the lobby', as
     ['+ left', page.locator('.party-slot.slot-left')],
     ['+ right', page.locator('.party-slot.slot-right')],
     // Also "준비 중" per docs/02 §2 lobby table (the profile card now opens the profile window, tests/profile.spec.ts):
-    ['coins', page.locator('.lb-top-right .currency').nth(0)],
-    ['crystals', page.locator('.lb-top-right .currency').nth(1)],
   ];
   for (const [label, loc] of targets) {
     await test.step(label, async () => {
