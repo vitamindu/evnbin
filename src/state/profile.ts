@@ -18,6 +18,8 @@ export interface Profile {
   fighters: Record<FighterId, FighterProgress>;
   /** 랭크 점수(TEAM FIGHT 온라인 경기로만 바뀐다, src/data/ranks.ts) */
   rankPoints: number;
+  /** 오늘의 선물을 받은 날(한국 시간 YYYY-MM-DD) */
+  dailyClaimed?: string;
   /** 들어가 있는 길드 이름 */
   guild?: string;
   /** 아직 열지 않은 파이터 상자 수(관리자는 무한) */

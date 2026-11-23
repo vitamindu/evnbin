@@ -5,6 +5,8 @@ import type { Profile } from '../../state/profile';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
 import { upgradeCost } from '../../data/power';
 import { boxTotals, rollFighterBox, type BoxItem } from '../../data/boxes';
+import { getShopItem, shopDay } from '../../data/shop';
+import type { ShopGot } from '../../net/account';
 
 /**
  * 계정 기능의 UI 쪽 입구(어댑터). 진짜는 Network 담당의 src/net/account.ts.
@@ -48,6 +50,7 @@ export type AccountErrorCode =
   | 'not_allowed'
   | 'already_requested'
   | 'rate_limited_chat'
+  | 'already_claimed'
   | 'server_error'
   | 'network';
 
@@ -63,6 +66,7 @@ interface AccountModule {
   setAvatar(avatar: string | null): Promise<unknown>;
   upgradeFighter(fighterId: FighterId): Promise<unknown>;
   openBox(): Promise<{ items: BoxItem[] }>;
+  buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
   /** 가짜 모듈만 */
   patch?(fn: (p: Profile) => void): void;
   getAccount(): Account | null;
@@ -87,6 +91,7 @@ type RealModule = {
   setAvatar(a: string | null): Promise<unknown>;
   upgradeFighter(f: FighterId): Promise<unknown>;
   openBox(): Promise<{ items: BoxItem[] }>;
+  buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -105,6 +110,7 @@ function realAdapter(m: RealModule): AccountModule {
     setAvatar: (a) => m.setAvatar(a),
     upgradeFighter: (f) => m.upgradeFighter(f),
     openBox: () => m.openBox(),
+    buyShopItem: (id) => m.buyShopItem(id),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -315,6 +321,38 @@ function fakeModule(): AccountModule {
       });
       return { items };
     },
+    async buyShopItem(itemId) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const item = getShopItem(itemId);
+      if (!item) fail('server_error');
+      const p = account!.profile;
+      const got: ShopGot = { coins: 0, gems: 0, boxes: 0 };
+      if (item!.kind === 'daily') {
+        if (p.dailyClaimed === shopDay(Date.now())) fail('already_claimed');
+        got.coins = item!.coins;
+        got.gems = item!.gems;
+        got.boxes = item!.boxes;
+      } else {
+        if (item!.kind === 'skin') {
+          if (p.admin || p.skins?.includes(item!.skinId)) fail('already_owned');
+          got.skin = item!.skinId;
+        }
+        if (!p.admin && p.crystals < item!.price) fail('not_enough_gems');
+        if (item!.kind === 'box') got.boxes = item!.boxes;
+        if (item!.kind === 'coins') got.coins = item!.coins;
+      }
+      save((row) => {
+        const q = row.profile;
+        if (item!.kind === 'daily') q.dailyClaimed = shopDay(Date.now());
+        else if (!p.admin) q.crystals -= item!.price;
+        q.coins += got.coins;
+        q.crystals += got.gems;
+        q.boxes = (q.boxes ?? 0) + got.boxes;
+        if (got.skin) q.skins = [...(q.skins ?? []), got.skin];
+      });
+      return { got };
+    },
     patch(fn: (p: Profile) => void) {
       if (account) save((row) => fn(row.profile));
     },
@@ -340,6 +378,7 @@ export const buySkin = (skinId: string) => api.buySkin(skinId);
 export const setAvatar = (avatar: string | null) => api.setAvatar(avatar);
 export const upgradeFighter = (fighterId: FighterId) => api.upgradeFighter(fighterId);
 export const openBox = () => api.openBox();
+export const buyShopItem = (itemId: string) => api.buyShopItem(itemId);
 /** 가짜 계정(?fakeonline)일 때만: 저장된 프로필을 고친다(가짜 길드 등) */
 export const patchFakeProfile = (fn: (p: Profile) => void) => api.patch?.(fn);
 export const getAccount = () => api.getAccount();
@@ -406,6 +445,8 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '이미 가입 요청을 보냈어요';
     case 'rate_limited_chat':
       return '조금 천천히 보내 주세요';
+    case 'already_claimed':
+      return '오늘은 이미 받았어요. 내일 다시 와 주세요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

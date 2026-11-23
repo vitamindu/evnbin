@@ -22,6 +22,7 @@
  *   PUT    /api/guild/settings (Bearer) {joinMode?, description?} → { guild }  (마스터만)
  *   GET    /api/guild/chat?after=id (Bearer)         → { messages }  (after보다 새 것, 최대 100)
  *   POST   /api/guild/chat (Bearer) {text}           → { messages }  (1초에 1번, 100자)
+ *   POST   /api/shop/buy (Bearer) {itemId}           → { profile, username, got }  (src/data/shop.ts, 다이아 차감)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -50,6 +51,8 @@ export interface AccountProfile {
   fighters: Record<FighterId, AccountFighterProgress>;
   rankPoints: number;
   avatar?: string;
+  /** 오늘의 선물을 받은 날(한국 시간 YYYY-MM-DD) */
+  dailyClaimed?: string;
   /** 들어가 있는 길드 이름 */
   guild?: string;
   boxes?: number;
@@ -95,7 +98,9 @@ export type AccountApiError =
   /** 길드: 권한 없음(마스터·부마스터만) / 이미 가입 요청함 / 채팅을 너무 빨리 보냄 */
   | 'not_allowed'
   | 'already_requested'
-  | 'rate_limited_chat';
+  | 'rate_limited_chat'
+  /** 상점: 오늘의 선물을 이미 받음 */
+  | 'already_claimed';
 
 export interface AuthResponse {
   token: string;

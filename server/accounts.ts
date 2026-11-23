@@ -18,6 +18,7 @@ import { FIGHTERS, type FighterId } from '../src/data/fighters';
 import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../src/data/skins';
 import { MAX_POWER, upgradeCost } from '../src/data/power';
 import { boxTotals, rollFighterBox, type BoxItem } from '../src/data/boxes';
+import { getShopItem, shopDay } from '../src/data/shop';
 
 /** 관리자 로그인 아이디(대소문자 무시). FG_ADMINS 환경 변수(쉼표 구분)로 바꿀 수 있다 */
 export const ADMIN_USERNAMES = new Set(
@@ -722,6 +723,43 @@ export class AccountStore {
       })
       .sort((a, b) => b.members - a.members || a.name.localeCompare(b.name))
       .slice(0, 20);
+  }
+
+  /** 상점에서 사기. 다이아(관리자는 무료)를 내고 받은 것을 돌려준다. 오늘의 선물은 하루 1번 */
+  buyShopItem(key: string, itemId: unknown): { profile: Profile; got: { coins: number; gems: number; boxes: number; skin?: string } } {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const item = typeof itemId === 'string' ? getShopItem(itemId) : undefined;
+    if (!item) throw new AccountError('bad_request');
+    const p = u.profile;
+    const got = { coins: 0, gems: 0, boxes: 0 } as { coins: number; gems: number; boxes: number; skin?: string };
+    if (item.kind === 'daily') {
+      const today = shopDay(this.now());
+      if (p.dailyClaimed === today) throw new AccountError('already_claimed');
+      p.dailyClaimed = today;
+      got.coins = item.coins;
+      got.gems = item.gems;
+      got.boxes = item.boxes;
+    } else {
+      if (item.kind === 'skin') {
+        const skin = getSkin(item.skinId);
+        if (!skin) throw new AccountError('bad_request');
+        if (owns(u, skin.id)) throw new AccountError('already_owned');
+        got.skin = skin.id;
+      }
+      if (!isAdmin(u)) {
+        if (p.crystals < item.price) throw new AccountError('not_enough_gems');
+        p.crystals -= item.price;
+      }
+      if (item.kind === 'box') got.boxes = item.boxes;
+      if (item.kind === 'coins') got.coins = item.coins;
+    }
+    p.coins += got.coins;
+    p.crystals += got.gems;
+    p.boxes = (p.boxes ?? 0) + got.boxes;
+    if (got.skin) p.skins = [...(p.skins ?? []), got.skin];
+    this.save();
+    return { profile: present(u, this.data.guilds), got };
   }
 
   /** 경기에 쓸 스킨(가진 것만) */

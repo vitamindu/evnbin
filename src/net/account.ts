@@ -261,3 +261,12 @@ export async function openBox(): Promise<{ profile: Profile; items: BoxItem[] }>
   setProfile(r.profile, r.username);
   return { profile: r.profile, items: r.items };
 }
+
+export type ShopGot = { coins: number; gems: number; boxes: number; skin?: string };
+
+/** 상점에서 사기(src/data/shop.ts). 받은 것을 돌려준다 */
+export async function buyShopItem(itemId: string): Promise<{ profile: Profile; got: ShopGot }> {
+  const r = await authed<ProfileResponse & { got: ShopGot }>('POST', '/api/shop/buy', { itemId });
+  setProfile(r.profile, r.username);
+  return { profile: r.profile, got: r.got };
+}

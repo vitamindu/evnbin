@@ -133,9 +133,8 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     el('div', 'lb-top-left', [profileCard, trophyCard]),
     el('div', 'lb-top-right', [currencyBar(comingSoon), button('icon-btn', [iconEl('gear')], () => openSettings(ctx))]),
     el('div', 'lb-side lb-side-left', [
-      sideBtn('상점', 'shop', comingSoon),
+      sideBtn('상점', 'shop', () => ctx.go.shop()),
       sideBtn('캐릭터', 'fighters', () => ctx.go.fighters(), String(FIGHTERS.length)),
-      sideBtn('소식', 'news', comingSoon),
       boxBtn,
     ]),
     el('div', 'lb-side lb-side-right', [

@@ -58,6 +58,7 @@ const STATUS: Record<AccountApiError, number> = {
   not_allowed: 403,
   already_requested: 409,
   rate_limited_chat: 429,
+  already_claimed: 409,
   self: 400,
 };
 
@@ -324,6 +325,12 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (!key) throw new HttpError('unauthorized');
     const r = store.openBox(key);
     return { ...me(key), items: r.items };
+  }
+  if (method === 'POST' && path === '/api/shop/buy') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    const r = store.buyShopItem(key, b.itemId);
+    return { ...me(key), got: r.got };
   }
   if (method === 'POST' && path === '/api/upgrade') {
     if (!key) throw new HttpError('unauthorized');
