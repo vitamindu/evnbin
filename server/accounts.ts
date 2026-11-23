@@ -27,8 +27,13 @@ export const ADMIN_USERNAMES = new Set(
     .filter(Boolean),
 );
 import {
+  GUILD_CHAT_KEEP,
+  GUILD_CHAT_MAX,
   GUILD_DESC_MAX,
   GUILD_MAX_MEMBERS,
+  GUILD_MAX_REQUESTS,
+  type GuildJoinMode,
+  type GuildRole,
   NICKNAME_MAX,
   isValidGuildName,
   isValidNickname,
@@ -81,11 +86,39 @@ interface StoredUser {
 interface StoredGuild {
   name: string;
   description: string;
-  /** 길드장 계정 키 */
+  /** 마스터 계정 키 */
   leader: string;
-  /** 멤버 계정 키(들어온 순서, 길드장 포함) */
+  /** 부마스터 계정 키(임명된 순서) */
+  vices: string[];
+  /** 멤버 계정 키(들어온 순서, 마스터·부마스터 포함) */
   members: string[];
   createdAt: number;
+  joinMode: GuildJoinMode;
+  /** 가입 요청(승인 필요일 때) */
+  requests: { key: string; at: number }[];
+  /** 채팅(최근 GUILD_CHAT_KEEP개). from = 계정 키, null이면 알림 */
+  chat: { id: number; from: string | null; text: string; at: number }[];
+  nextChatId: number;
+}
+
+/** 예전 파일(직급·채팅 없음)을 지금 모양으로 */
+function normalizeGuild(g: StoredGuild) {
+  g.vices ??= [];
+  g.requests ??= [];
+  g.chat ??= [];
+  g.nextChatId ??= 1;
+  g.joinMode ??= 'open';
+}
+
+function pushChat(g: StoredGuild, from: string | null, text: string, at: number) {
+  normalizeGuild(g);
+  g.chat.push({ id: g.nextChatId++, from, text, at });
+  if (g.chat.length > GUILD_CHAT_KEEP) g.chat.splice(0, g.chat.length - GUILD_CHAT_KEEP);
+}
+
+/** 한 줄 글: 제어 문자 빼고, 앞뒤 공백 정리, 최대 길이 */
+function cleanText(t: string, max: number): string {
+  return Array.from(t.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, ' ').trim()).slice(0, max).join('');
 }
 
 interface StoreFile {
@@ -465,12 +498,12 @@ export class AccountStore {
   }
 
   // ───────────── 길드 ─────────────
+  // 직급: 마스터(1명, leader) / 부마스터(vices) / 멤버. 가입 방식: open(바로) / approval(요청 → 마스터·부마스터 승인)
   private get guilds(): Record<string, StoredGuild> {
     return (this.data.guilds ??= {});
   }
 
-  /** 들어가 있는 길드(없으면 null). 사라진 길드를 가리키면 정리한다 */
-  guildOf(key: string): (StoredGuild & { id: string }) | null {
+  private guildRec(key: string): { id: string; g: StoredGuild } | null {
     const u = this.data.users[key];
     const id = u?.guild;
     if (!u || !id) return null;
@@ -479,57 +512,206 @@ export class AccountStore {
       delete u.guild;
       return null;
     }
-    return { ...g, members: [...g.members], id };
+    normalizeGuild(g);
+    return { id, g };
   }
 
-  /** 길드 만들기(만든 사람 = 길드장) */
+  /** 들어가 있는 길드(사본). 없으면 null */
+  guildOf(key: string): (StoredGuild & { id: string }) | null {
+    const r = this.guildRec(key);
+    if (!r) return null;
+    const g = r.g;
+    return { ...g, members: [...g.members], vices: [...g.vices], requests: g.requests.map((q) => ({ ...q })), chat: [...g.chat], id: r.id };
+  }
+
+  /** 길드 안 직급 */
+  guildRole(key: string): GuildRole | null {
+    const r = this.guildRec(key);
+    if (!r) return null;
+    return r.g.leader === key ? 'master' : r.g.vices.includes(key) ? 'vice' : 'member';
+  }
+
+  private staff(key: string): { id: string; g: StoredGuild; role: GuildRole } {
+    if (!this.data.users[key]) throw new AccountError('unauthorized');
+    const r = this.guildRec(key);
+    if (!r) throw new AccountError('not_in_guild');
+    const role = r.g.leader === key ? 'master' : r.g.vices.includes(key) ? 'vice' : 'member';
+    return { ...r, role };
+  }
+
+  private system(g: StoredGuild, text: string) {
+    pushChat(g, null, text, this.now());
+  }
+
+  /** 길드 만들기(만든 사람 = 마스터). 처음 가입 방식은 승인 필요 */
   createGuild(key: string, name: unknown, description: unknown = ''): void {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
-    if (this.guildOf(key)) throw new AccountError('already_in_guild');
+    if (this.guildRec(key)) throw new AccountError('already_in_guild');
     if (!isValidGuildName(name)) throw new AccountError('invalid_guild_name');
     const id = name.trim().toLowerCase();
     if (this.guilds[id]) throw new AccountError('guild_taken');
-    const desc = typeof description === 'string' ? description.trim().slice(0, GUILD_DESC_MAX) : '';
-    this.guilds[id] = { name: name.trim(), description: desc, leader: key, members: [key], createdAt: this.now() };
+    const desc = typeof description === 'string' ? cleanText(description, GUILD_DESC_MAX) : '';
+    const g: StoredGuild = { name: name.trim(), description: desc, leader: key, vices: [], members: [key], createdAt: this.now(), joinMode: 'approval', requests: [], chat: [], nextChatId: 1 };
+    this.system(g, `${u.nickname}님이 길드를 만들었어요`);
+    this.guilds[id] = g;
+    this.removeRequestsOf(key);
     u.guild = id;
     this.save();
   }
 
-  /** 이름으로 길드 가입(바로 들어간다) */
-  joinGuild(key: string, name: unknown): void {
+  /** 가입: 자유 가입이면 바로 들어가고 'joined', 승인 필요면 요청을 남기고 'requested' */
+  joinGuild(key: string, name: unknown): 'joined' | 'requested' {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
-    if (this.guildOf(key)) throw new AccountError('already_in_guild');
+    if (this.guildRec(key)) throw new AccountError('already_in_guild');
     const id = typeof name === 'string' ? name.trim().toLowerCase() : '';
     const g = this.guilds[id];
     if (!g) throw new AccountError('not_found');
+    normalizeGuild(g);
     if (g.members.length >= GUILD_MAX_MEMBERS) throw new AccountError('guild_full');
+    if (g.joinMode === 'approval') {
+      if (g.requests.some((q) => q.key === key)) throw new AccountError('already_requested');
+      g.requests.push({ key, at: this.now() });
+      if (g.requests.length > GUILD_MAX_REQUESTS) g.requests.shift();
+      this.save();
+      return 'requested';
+    }
+    this.addMember(id, g, key);
+    this.save();
+    return 'joined';
+  }
+
+  private addMember(id: string, g: StoredGuild, key: string) {
+    const u = this.data.users[key]!;
     g.members.push(key);
+    g.requests = g.requests.filter((q) => q.key !== key);
     u.guild = id;
+    this.removeRequestsOf(key);
+    this.system(g, `${u.nickname}님이 들어왔어요`);
+  }
+
+  /** 다른 길드들에 남긴 가입 요청 지우기(길드에 들어가면) */
+  private removeRequestsOf(key: string) {
+    for (const g of Object.values(this.guilds)) if (g.requests?.length) g.requests = g.requests.filter((q) => q.key !== key);
+  }
+
+  /** 가입 요청을 남긴 길드 이름들 */
+  requestedGuilds(key: string): string[] {
+    return Object.values(this.guilds)
+      .filter((g) => g.requests?.some((q) => q.key === key))
+      .map((g) => g.name);
+  }
+
+  /** 가입 요청 승인·거절(마스터·부마스터) */
+  answerRequest(key: string, nickname: unknown, accept: boolean): void {
+    const { id, g, role } = this.staff(key);
+    if (role === 'member') throw new AccountError('not_allowed');
+    const other = this.findByNickname(nickname);
+    if (!other || !g.requests.some((q) => q.key === other)) throw new AccountError('not_found');
+    g.requests = g.requests.filter((q) => q.key !== other);
+    if (accept) {
+      if (this.guildRec(other)) {
+        this.save();
+        throw new AccountError('already_in_guild');
+      }
+      if (g.members.length >= GUILD_MAX_MEMBERS) {
+        this.save();
+        throw new AccountError('guild_full');
+      }
+      this.addMember(id, g, other);
+    }
     this.save();
   }
 
-  /** 길드 나가기. 길드장이 나가면 가장 먼저 들어온 멤버가 길드장, 마지막 사람이 나가면 길드가 없어진다 */
+  /** 추방: 마스터는 누구나, 부마스터는 마스터를 뺀 누구나. 자기 자신은 안 된다(나가기를 쓴다) */
+  kickMember(key: string, nickname: unknown): void {
+    const { g, role } = this.staff(key);
+    if (role === 'member') throw new AccountError('not_allowed');
+    const other = this.findByNickname(nickname);
+    if (!other || !g.members.includes(other)) throw new AccountError('not_found');
+    if (other === key) throw new AccountError('self');
+    if (other === g.leader) throw new AccountError('not_allowed');
+    g.members = g.members.filter((m) => m !== other);
+    g.vices = g.vices.filter((m) => m !== other);
+    delete this.data.users[other]!.guild;
+    this.system(g, `${this.nickname(other)}님이 추방됐어요`);
+    this.save();
+  }
+
+  /** 부마스터 임명(on=true)·해제(on=false). 마스터만 */
+  setVice(key: string, nickname: unknown, on: boolean): void {
+    const { g, role } = this.staff(key);
+    if (role !== 'master') throw new AccountError('not_allowed');
+    const other = this.findByNickname(nickname);
+    if (!other || !g.members.includes(other) || other === key) throw new AccountError('not_found');
+    const was = g.vices.includes(other);
+    if (on && !was) g.vices.push(other);
+    if (!on && was) g.vices = g.vices.filter((m) => m !== other);
+    if (on !== was) this.system(g, on ? `${this.nickname(other)}님이 부마스터가 됐어요` : `${this.nickname(other)}님이 부마스터에서 내려왔어요`);
+    this.save();
+  }
+
+  /** 길드 설정(마스터만): 가입 방식, 소개 */
+  guildSettings(key: string, opts: { joinMode?: unknown; description?: unknown }): void {
+    const { g, role } = this.staff(key);
+    if (role !== 'master') throw new AccountError('not_allowed');
+    if (opts.joinMode !== undefined) {
+      if (opts.joinMode !== 'open' && opts.joinMode !== 'approval') throw new AccountError('bad_request');
+      g.joinMode = opts.joinMode;
+    }
+    if (opts.description !== undefined) {
+      if (typeof opts.description !== 'string') throw new AccountError('bad_request');
+      g.description = cleanText(opts.description, GUILD_DESC_MAX);
+    }
+    this.save();
+  }
+
+  /** 길드 나가기. 마스터가 나가면 가장 먼저 임명된 부마스터 → 없으면 가장 먼저 들어온 멤버가 마스터. 마지막 사람이 나가면 길드가 없어진다 */
   leaveGuild(key: string): void {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
-    const g = this.guildOf(key);
-    if (!g) throw new AccountError('not_in_guild');
-    const stored = this.guilds[g.id]!;
-    stored.members = stored.members.filter((m) => m !== key);
+    const r = this.guildRec(key);
+    if (!r) throw new AccountError('not_in_guild');
+    const { g, id } = r;
+    g.members = g.members.filter((m) => m !== key);
+    g.vices = g.vices.filter((m) => m !== key);
     delete u.guild;
-    if (!stored.members.length) delete this.guilds[g.id];
-    else if (stored.leader === key) stored.leader = stored.members[0]!;
+    if (!g.members.length) delete this.guilds[id];
+    else {
+      this.system(g, `${u.nickname}님이 나갔어요`);
+      if (g.leader === key) {
+        g.leader = g.vices[0] ?? g.members[0]!;
+        g.vices = g.vices.filter((m) => m !== g.leader);
+        this.system(g, `${this.nickname(g.leader)}님이 새 마스터가 됐어요`);
+      }
+    }
     this.save();
   }
 
+  /** 길드 채팅 보내기(1초에 1번, 100자까지) */
+  guildChat(key: string, text: unknown): void {
+    const { g } = this.staff(key);
+    if (typeof text !== 'string') throw new AccountError('bad_request');
+    const t = cleanText(text, GUILD_CHAT_MAX);
+    if (!t) throw new AccountError('bad_request');
+    const now = this.now();
+    if (now - (this.lastChat.get(key) ?? 0) < 1000) throw new AccountError('rate_limited_chat');
+    this.lastChat.set(key, now);
+    pushChat(g, key, t, now);
+    this.save();
+  }
+  private readonly lastChat = new Map<string, number>();
+
   /** 길드 찾기: 이름에 q가 들어간 길드(없으면 전부), 멤버 많은 순 최대 20개 */
-  searchGuilds(q: unknown): { name: string; description: string; members: number; leader: string }[] {
+  searchGuilds(q: unknown): { name: string; description: string; members: number; leader: string; joinMode: GuildJoinMode }[] {
     const needle = typeof q === 'string' ? q.trim().toLowerCase() : '';
     return Object.entries(this.guilds)
       .filter(([id]) => !needle || id.includes(needle))
-      .map(([, g]) => ({ name: g.name, description: g.description, members: g.members.length, leader: this.nickname(g.leader) ?? '' }))
+      .map(([, g]) => {
+        normalizeGuild(g);
+        return { name: g.name, description: g.description, members: g.members.length, leader: this.nickname(g.leader) ?? '', joinMode: g.joinMode };
+      })
       .sort((a, b) => b.members - a.members || a.name.localeCompare(b.name))
       .slice(0, 20);
   }

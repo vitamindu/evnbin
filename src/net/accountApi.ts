@@ -16,6 +16,12 @@
  *   POST   /api/guild/join (Bearer) {name}           → { guild }
  *   POST   /api/guild/leave (Bearer)                 → { guild: null }
  *   GET    /api/guilds?q=이름 (Bearer)               → { guilds: GuildSummary[] }  (멤버 많은 순 20개)
+ *   POST   /api/guild/answer (Bearer) {nickname, accept} → { guild }  (가입 요청 승인·거절, 마스터·부마스터)
+ *   POST   /api/guild/kick (Bearer) {nickname}       → { guild }  (마스터: 누구나, 부마스터: 마스터 빼고)
+ *   POST   /api/guild/vice (Bearer) {nickname, on}   → { guild }  (부마스터 임명·해제, 마스터만)
+ *   PUT    /api/guild/settings (Bearer) {joinMode?, description?} → { guild }  (마스터만)
+ *   GET    /api/guild/chat?after=id (Bearer)         → { messages }  (after보다 새 것, 최대 100)
+ *   POST   /api/guild/chat (Bearer) {text}           → { messages }  (1초에 1번, 100자)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -85,7 +91,11 @@ export type AccountApiError =
   | 'not_in_guild'
   | 'invalid_guild_name'
   | 'guild_taken'
-  | 'guild_full';
+  | 'guild_full'
+  /** 길드: 권한 없음(마스터·부마스터만) / 이미 가입 요청함 / 채팅을 너무 빨리 보냄 */
+  | 'not_allowed'
+  | 'already_requested'
+  | 'rate_limited_chat';
 
 export interface AuthResponse {
   token: string;
@@ -140,6 +150,16 @@ export const GUILD_NAME_PATTERN = /^[A-Za-z0-9_가-힣]{2,12}$/u;
 export const GUILD_NAME_MAX = 12;
 export const GUILD_DESC_MAX = 40;
 export const GUILD_MAX_MEMBERS = 30;
+/** 한 길드에 쌓이는 가입 요청 최대 수(넘으면 오래된 것부터 지운다) */
+export const GUILD_MAX_REQUESTS = 50;
+export const GUILD_CHAT_MAX = 100;
+/** 서버에 남겨 두는 채팅 수 */
+export const GUILD_CHAT_KEEP = 100;
+
+/** 직급: 마스터 / 부마스터 / 멤버 */
+export type GuildRole = 'master' | 'vice' | 'member';
+/** 가입 방식: 바로 가입 / 마스터·부마스터 승인 */
+export type GuildJoinMode = 'open' | 'approval';
 
 export function isValidGuildName(n: unknown): n is string {
   return typeof n === 'string' && GUILD_NAME_PATTERN.test(n.trim());
@@ -149,18 +169,38 @@ export interface GuildMember {
   nickname: string;
   rankPoints: number;
   avatar?: string;
-  leader: boolean;
+  role: GuildRole;
   online: boolean;
   inRoom: boolean;
+}
+
+export interface GuildRequest {
+  nickname: string;
+  rankPoints: number;
+  avatar?: string;
+  at: number;
+}
+
+export interface GuildChatMessage {
+  id: number;
+  /** 보낸 사람 닉네임. null이면 알림(가입·추방 등) */
+  from: string | null;
+  text: string;
+  at: number;
 }
 
 export interface GuildInfo {
   name: string;
   description: string;
-  /** 길드장 닉네임 */
+  /** 마스터 닉네임 */
   leader: string;
   members: GuildMember[];
   maxMembers: number;
+  joinMode: GuildJoinMode;
+  /** 내 직급 */
+  myRole: GuildRole;
+  /** 가입 요청(마스터·부마스터에게만, 그 외에는 빈 배열) */
+  requests: GuildRequest[];
 }
 
 export interface GuildSummary {
@@ -168,11 +208,20 @@ export interface GuildSummary {
   description: string;
   members: number;
   leader: string;
+  joinMode: GuildJoinMode;
+  /** 내가 가입 요청을 남겼는가 */
+  requested?: boolean;
 }
 
 /** GET /api/guild 등 길드 응답 */
 export interface GuildResponse {
   guild: GuildInfo | null;
+  /** 가입 요청만 남겼을 때(승인 필요 길드) */
+  requested?: boolean;
+}
+
+export interface GuildChatResponse {
+  messages: GuildChatMessage[];
 }
 
 export function isValidPassword(p: unknown): p is string {

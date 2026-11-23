@@ -45,6 +45,9 @@ export type AccountErrorCode =
   | 'invalid_guild_name'
   | 'guild_taken'
   | 'guild_full'
+  | 'not_allowed'
+  | 'already_requested'
+  | 'rate_limited_chat'
   | 'server_error'
   | 'network';
 
@@ -397,6 +400,12 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '이미 있는 길드 이름이에요';
     case 'guild_full':
       return '길드 인원이 꽉 찼어요';
+    case 'not_allowed':
+      return '권한이 없어요';
+    case 'already_requested':
+      return '이미 가입 요청을 보냈어요';
+    case 'rate_limited_chat':
+      return '조금 천천히 보내 주세요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:

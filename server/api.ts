@@ -3,7 +3,7 @@
  * CORS: 게임 페이지(https://vitamindu.github.io)와 http://localhost:*, http://127.0.0.1:* 만 허용.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { GUILD_MAX_MEMBERS, type AccountApiError, type GuildResponse } from '../src/net/accountApi';
+import { GUILD_MAX_MEMBERS, type AccountApiError, type GuildResponse, type GuildRole } from '../src/net/accountApi';
 import { AccountError, type AccountStore, type RateLimiter } from './accounts';
 
 export const DEFAULT_API_ORIGINS = ['https://vitamindu.github.io'];
@@ -55,6 +55,9 @@ const STATUS: Record<AccountApiError, number> = {
   invalid_guild_name: 400,
   guild_taken: 409,
   guild_full: 409,
+  not_allowed: 403,
+  already_requested: 409,
+  rate_limited_chat: 429,
   self: 400,
 };
 
@@ -172,30 +175,47 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
       }))
       .sort((a, b) => Number(b.online) - Number(a.online) || a.nickname.localeCompare(b.nickname)),
   });
-  const guildInfo = (k: string): GuildResponse => {
+  const guildInfo = (k: string, requested?: boolean): GuildResponse => {
     const g = store.guildOf(k);
-    if (!g) return { guild: null };
+    if (!g) return { guild: null, ...(requested ? { requested } : {}) };
+    const myRole = store.guildRole(k)!;
+    const roleOf = (m: string): GuildRole => (m === g.leader ? 'master' : g.vices.includes(m) ? 'vice' : 'member');
     return {
       guild: {
         name: g.name,
         description: g.description,
         leader: store.nickname(g.leader) ?? '',
         maxMembers: GUILD_MAX_MEMBERS,
+        joinMode: g.joinMode,
+        myRole,
         members: g.members.map((m) => {
           const p = store.profile(m);
           return {
             nickname: store.nickname(m) ?? '',
             rankPoints: p?.rankPoints ?? 0,
             ...(p?.avatar ? { avatar: p.avatar } : {}),
-            leader: m === g.leader,
+            role: roleOf(m),
             online: false,
             inRoom: false,
             ...(presence?.(m) ?? {}),
           };
         }),
+        requests:
+          myRole === 'member'
+            ? []
+            : g.requests.map((q) => {
+                const p = store.profile(q.key);
+                return { nickname: store.nickname(q.key) ?? '', rankPoints: p?.rankPoints ?? 0, ...(p?.avatar ? { avatar: p.avatar } : {}), at: q.at };
+              }),
       },
     };
   };
+  const chatSince = (k: string, after: number) => {
+    const g = store.guildOf(k);
+    if (!g) throw new HttpError('not_in_guild');
+    return { messages: g.chat.filter((c) => c.id > after).map((c) => ({ id: c.id, from: c.from ? (store.nickname(c.from) ?? '') : null, text: c.text, at: c.at })) };
+  };
+  const query = () => new URL(req.url ?? '/', 'http://x').searchParams;
   if (path === '/api/guild' && (method === 'GET' || method === 'POST')) {
     if (!key) throw new HttpError('unauthorized');
     if (method === 'POST') {
@@ -208,17 +228,50 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
   if (method === 'POST' && path === '/api/guild/join') {
     if (!key) throw new HttpError('unauthorized');
     const b = await readJson(req);
-    store.joinGuild(key, b.name);
-    return guildInfo(key);
+    const r = store.joinGuild(key, b.name);
+    return guildInfo(key, r === 'requested');
   }
   if (method === 'POST' && path === '/api/guild/leave') {
     if (!key) throw new HttpError('unauthorized');
     store.leaveGuild(key);
     return guildInfo(key);
   }
+  if (method === 'POST' && path === '/api/guild/answer') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.answerRequest(key, b.nickname, b.accept === true);
+    return guildInfo(key);
+  }
+  if (method === 'POST' && path === '/api/guild/kick') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.kickMember(key, b.nickname);
+    return guildInfo(key);
+  }
+  if (method === 'POST' && path === '/api/guild/vice') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.setVice(key, b.nickname, b.on === true);
+    return guildInfo(key);
+  }
+  if (method === 'PUT' && path === '/api/guild/settings') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.guildSettings(key, { joinMode: b.joinMode, description: b.description });
+    return guildInfo(key);
+  }
+  if (path === '/api/guild/chat' && (method === 'GET' || method === 'POST')) {
+    if (!key) throw new HttpError('unauthorized');
+    if (method === 'POST') {
+      const b = await readJson(req);
+      store.guildChat(key, b.text);
+    }
+    return chatSince(key, Number(query().get('after')) || 0);
+  }
   if (method === 'GET' && path === '/api/guilds') {
     if (!key) throw new HttpError('unauthorized');
-    return { guilds: store.searchGuilds(new URL(req.url ?? '/', 'http://x').searchParams.get('q') ?? '') };
+    const mine = new Set(store.requestedGuilds(key));
+    return { guilds: store.searchGuilds(query().get('q') ?? '').map((g) => (mine.has(g.name) ? { ...g, requested: true } : g)) };
   }
   if (method === 'GET' && path === '/api/me') {
     if (!key) throw new HttpError('unauthorized');
