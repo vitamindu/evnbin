@@ -639,7 +639,7 @@ test('T-32 exit button returns to the lobby; the stage keeps rendering; PLAY aga
   expect(await drawCallsWithin(page, 10_000, 50), 'lobby draws after the second exit').toBeGreaterThanOrEqual(50);
 });
 
-test('T-33 HINAKO glb model loads: no load warning, textured portrait, textured model in battle', async ({ page }) => {
+test('T-33 SAKURA HINAKO skin glb loads at boot without warnings; default HINAKO is the toon model in battle', async ({ page }) => {
   const warnings: string[] = [];
   const glb: Record<string, number> = {};
   page.on('console', (msg) => {
@@ -651,34 +651,9 @@ test('T-33 HINAKO glb model loads: no load warning, textured portrait, textured 
   });
   await page.goto('/?qa');
   await tapToLobby(page);
+  // 스킨(src/data/skins.ts)용 glb는 부팅 때 미리 받는다
   expect(glb).toEqual({ 'hinako.glb': 200, 'hinako_gun.glb': 200 });
 
-  await page.locator('.side-btn[data-btn="fighters"]').tap();
-  const img = page.locator('.fcard[data-fighter="hinako"] img');
-  await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
-  // A textured glb portrait has hundreds of colours; the capsule placeholder used on load failure ~15.
-  const stats = await img.evaluate((i: HTMLImageElement) => {
-    const c = document.createElement('canvas');
-    c.width = i.naturalWidth;
-    c.height = i.naturalHeight;
-    const g = c.getContext('2d')!;
-    g.drawImage(i, 0, 0);
-    const d = g.getImageData(0, 0, c.width, c.height).data;
-    let opaque = 0;
-    const colors = new Set<number>();
-    for (let k = 0; k < d.length; k += 4) {
-      if (d[k + 3]! > 200) {
-        opaque++;
-        colors.add(((d[k]! >> 4) << 8) | ((d[k + 1]! >> 4) << 4) | (d[k + 2]! >> 4));
-      }
-    }
-    return { opaque: opaque / (c.width * c.height), colors: colors.size };
-  });
-  expect(stats.opaque, 'portrait is not empty').toBeGreaterThan(0.1);
-  expect(stats.colors, 'portrait is the textured model, not the placeholder capsule').toBeGreaterThan(60);
-
-  await page.locator('.fighters .btn-back').tap();
-  await expect(page.locator('.lobby')).toBeVisible();
   await selectFighterViaUi(page, 'hinako');
   await page.locator('.btn-play').tap();
   await waitBattleReady(page, 'hinako');
@@ -687,19 +662,17 @@ test('T-33 HINAKO glb model loads: no load warning, textured portrait, textured 
     const root = scene.getObjectByName('fighter:hinako');
     let meshes = 0;
     let textured = 0;
-    let capsules = 0;
     root?.traverse((o) => {
-      const mesh = o as unknown as { isMesh?: boolean; geometry?: { type: string }; material?: { map?: unknown } };
+      const mesh = o as unknown as { isMesh?: boolean; material?: { map?: unknown } };
       if (!mesh.isMesh) return;
       meshes++;
-      if (mesh.geometry?.type === 'CapsuleGeometry') capsules++;
       if (mesh.material?.map) textured++;
     });
-    return { found: !!root, meshes, textured, capsules };
+    return { found: !!root, meshes, textured };
   });
   expect(model.found).toBe(true);
-  expect(model.capsules, 'no placeholder capsule').toBe(0);
-  expect(model.textured).toBeGreaterThan(0);
+  expect(model.meshes, 'built from toon primitives').toBeGreaterThan(10);
+  expect(model.textured, 'default look is not the textured skin (only the soft blob shadow has a map)').toBeLessThanOrEqual(1);
   expect(warnings.filter((w) => /model load failed/i.test(w))).toEqual([]);
 });
 
