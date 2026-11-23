@@ -142,10 +142,12 @@ describe('fighter boxes', () => {
     expect(r.profile.crystals).toBe(before.crystals + t.gems);
     expect(code(() => s.openBox('boxer1'))).toBe('no_boxes');
   });
-  it('admin opens without boxes (unlimited)', async () => {
+  it('admin has no unlimited boxes (only unlimited coins/diamonds)', async () => {
     const s = store();
     await s.signup('mineack991', 'secret1', '관리자');
-    for (let i = 0; i < 3; i++) expect(s.openBox('mineack991').items.length).toBeGreaterThanOrEqual(3);
-    expect(s.profile('mineack991')!.boxes ?? 0).toBe(0);
+    expect(code(() => s.openBox('mineack991'))).toBe('no_boxes');
+    s.applyMatchResults([{ account: 'mineack991', fighterId: 'rivet', outcome: 'win' }]);
+    expect(s.openBox('mineack991').profile.boxes).toBe(0);
+    expect(code(() => s.openBox('mineack991'))).toBe('no_boxes');
   });
 });

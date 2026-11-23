@@ -433,14 +433,12 @@ export class AccountStore {
     return present(u);
   }
 
-  /** 파이터 상자 하나 열기(관리자는 상자 무한). rand는 테스트용 */
+  /** 파이터 상자 하나 열기(관리자도 상자는 있어야 연다). rand는 테스트용 */
   openBox(key: string, rand: () => number = () => randomInt(0, 2 ** 32) / 2 ** 32): { profile: Profile; items: BoxItem[] } {
     const u = this.data.users[key];
     if (!u) throw new AccountError('unauthorized');
-    if (!isAdmin(u)) {
-      if ((u.profile.boxes ?? 0) < 1) throw new AccountError('no_boxes');
-      u.profile.boxes = (u.profile.boxes ?? 0) - 1;
-    }
+    if ((u.profile.boxes ?? 0) < 1) throw new AccountError('no_boxes');
+    u.profile.boxes = (u.profile.boxes ?? 0) - 1;
     const items = rollFighterBox(rand);
     const t = boxTotals(items);
     u.profile.coins += t.coins;

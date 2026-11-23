@@ -295,12 +295,11 @@ function fakeModule(): AccountModule {
     async openBox() {
       if (!account) fail('unauthorized');
       await fakeNet();
-      const admin = !!account!.profile.admin;
-      if (!admin && (account!.profile.boxes ?? 0) < 1) fail('no_boxes');
+      if ((account!.profile.boxes ?? 0) < 1) fail('no_boxes');
       const items = rollFighterBox(Math.random);
       const t = boxTotals(items);
       save((row) => {
-        if (!admin) row.profile.boxes = (row.profile.boxes ?? 0) - 1;
+        row.profile.boxes = (row.profile.boxes ?? 0) - 1;
         row.profile.coins += t.coins;
         row.profile.crystals += t.gems;
       });

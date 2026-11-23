@@ -7,11 +7,8 @@ import type { AppContext } from '../context';
 import { toast } from './toast';
 import { button, iconEl, txt } from '../widgets';
 
-/** 지금 열 수 있는 상자 수(관리자는 무한) */
-export const boxCountLabel = () => {
-  const p = getProfile();
-  return p.admin ? '∞' : String(p.boxes ?? 0);
-};
+/** 지금 열 수 있는 상자 수 */
+export const boxCountLabel = () => String(getProfile().boxes ?? 0);
 
 /**
  * 파이터 상자 창: 상자를 누르거나 "열기" → 서버가 연 결과를 한 칸씩 보여 준다.
@@ -34,7 +31,7 @@ export function openBoxes(ctx: AppContext) {
   const render = () => {
     const p = getProfile();
     count.textContent = `보유 ${boxCountLabel()}개`;
-    const has = p.admin || (p.boxes ?? 0) > 0;
+    const has = (p.boxes ?? 0) > 0;
     openBtn.classList.toggle('is-empty', !has);
   };
 
@@ -58,7 +55,7 @@ export function openBoxes(ctx: AppContext) {
   async function doOpen() {
     if (busy) return;
     const p = getProfile();
-    if (!p.admin && (p.boxes ?? 0) < 1) {
+    if ((p.boxes ?? 0) < 1) {
       toast('열 수 있는 상자가 없어요. 온라인 경기에서 이기면 1개!');
       return;
     }
