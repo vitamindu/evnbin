@@ -352,7 +352,7 @@ for (const vp of [
       await gotoLobby(page);
       const { problems, count } = await lobbyLayoutProblems(page, vp.width, vp.height);
       await shot(page, testInfo, `13-lobby-${vp.width}x${vp.height}`);
-      expect(count).toBe(6 + 1 + 1 + 1 + 1 + 2 + 1);
+      expect(count).toBe(7 + 1 + 1 + 1 + 1 + 2 + 1); // 옆 버튼 7개(상자 포함)
       expect(problems).toEqual([]);
     });
   });
