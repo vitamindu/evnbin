@@ -22,8 +22,9 @@ export class ShowcaseView implements View {
   readonly camera: THREE.PerspectiveCamera;
   private readonly opts: ShowcaseOptions;
   private readonly stand = new THREE.Group();
-  private readonly models = new Map<FighterId, FighterModel>();
+  private readonly models = new Map<string, FighterModel>();
   private current: FighterModel | null = null;
+  private currentKey = '';
   private yaw: number;
   private dragging = false;
   private ring!: THREE.Mesh;
@@ -55,15 +56,18 @@ export class ShowcaseView implements View {
     this.stand.add(this.ring);
   }
 
-  setFighter(id: FighterId) {
-    if (this.current?.id === id) return;
+  /** skin: 입힌 스킨 id(없으면 기본 외형) */
+  setFighter(id: FighterId, skin?: string) {
+    const key = `${id}:${skin ?? ''}`;
+    if (this.currentKey === key) return;
     if (this.current) this.stand.remove(this.current.root);
-    let m = this.models.get(id);
+    let m = this.models.get(key);
     if (!m) {
-      m = buildFighterModel(getFighter(id));
-      this.models.set(id, m);
+      m = buildFighterModel(getFighter(id), { skin });
+      this.models.set(key, m);
     }
     this.current = m;
+    this.currentKey = key;
     this.stand.add(m.root);
     this.yaw = this.opts.baseYaw;
   }

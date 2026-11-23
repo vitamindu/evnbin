@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { FighterDef, FighterId } from '../data/fighters';
 import { blobShadow, part, toon } from './toon';
 import { buildGlbFighterModel } from './glbFighter';
+import { getSkin } from '../data/skins';
 
 /**
  * 스켈레톤(임시) 3D 캐릭터. 기본 도형을 조합해 만들며, 최종 모델(glTF)이 준비되면
@@ -535,10 +536,90 @@ function buildPrism(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
+// ───────────────────────── HINAKO: 벚꽃 저격수(기본 외형, 오리지널) ─────────────────────────
+function buildHinako(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.46, torsoH: 0.56, torsoD: 0.36, headR: 0.36, headLift: 0.88,
+    legR: 0.1, legLen: 0.24, legX: 0.12, armR: 0.08, armLen: 0.3, shoeH: 0.11,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.primary, legs: c.secondary, shoes: c.dark, skin: c.skin, hands: c.skin });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.21, spread: 0.3, y: -0.02 });
+  // 흰 긴 머리: 윗머리 + 양옆으로 내려오는 머리 + 등까지 내려오는 뒷머리
+  const HAIR = '#f4f1fa';
+  const hairMat = toon(HAIR);
+  const top = part(g.add(new THREE.SphereGeometry(r * 1.05, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.42)), hairMat);
+  top.rotation.x = -0.4;
+  rig.head.add(top);
+  const sideGeo = g.add(new RoundedBoxGeometry(r * 0.34, r * 1.5, r * 0.5, 2, 0.08));
+  for (const sx of [-1, 1]) {
+    const side = part(sideGeo, hairMat);
+    side.position.set(sx * r * 0.9, -r * 0.25, -r * 0.05);
+    side.rotation.z = sx * 0.08;
+    rig.head.add(side);
+  }
+  const back = part(g.add(new RoundedBoxGeometry(r * 1.8, r * 2.2, r * 0.5, 3, 0.14)), hairMat);
+  back.position.set(0, -r * 0.5, -r * 0.7);
+  rig.head.add(back);
+  // 벚꽃 머리핀(꽃잎 5장)
+  const petalGeo = g.add(new THREE.SphereGeometry(0.055, 8, 6));
+  const pin = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const petal = part(petalGeo, toon(c.accent), { outline: false });
+    petal.position.set(Math.cos(a) * 0.06, Math.sin(a) * 0.06, 0);
+    petal.scale.set(1, 1, 0.4);
+    pin.add(petal);
+  }
+  const heart = new THREE.Mesh(g.add(new THREE.SphereGeometry(0.03, 8, 6)), new THREE.MeshBasicMaterial({ color: '#ffd23f' }));
+  pin.add(heart);
+  pin.position.set(-r * 0.72, r * 0.6, r * 0.45);
+  pin.rotation.y = -0.9;
+  rig.head.add(pin);
+  // 기모노풍 깃(V자) + 허리띠 + 매듭
+  for (const sx of [-1, 1]) {
+    const collar = part(g.add(new RoundedBoxGeometry(0.07, p.torsoH * 0.75, 0.03, 1, 0.012)), toon(c.accent), { outline: false });
+    collar.position.set(sx * 0.07, rig.torso.position.y + p.torsoH * 0.08, p.torsoD / 2 + 0.006);
+    collar.rotation.z = sx * 0.35;
+    rig.body.add(collar);
+  }
+  const obi = part(g.add(new RoundedBoxGeometry(p.torsoW * 1.06, 0.12, p.torsoD * 1.08, 2, 0.04)), toon(c.secondary));
+  obi.position.y = rig.torso.position.y - p.torsoH * 0.2;
+  rig.body.add(obi);
+  const bow = part(g.add(new RoundedBoxGeometry(0.26, 0.12, 0.08, 2, 0.04)), toon(c.accent));
+  bow.position.set(0, rig.torso.position.y - p.torsoH * 0.2, -p.torsoD / 2 - 0.06);
+  rig.body.add(bow);
+  // 긴 저격총: 몸 앞에 비스듬히 든다
+  rig.armR.rotation.set(-1.05, 0, -0.75);
+  rig.armL.rotation.set(-0.7, 0, 0.45);
+  const rifle = new THREE.Group();
+  rifle.position.set(-0.02, rig.torso.position.y + 0.02, p.torsoD / 2 + 0.17);
+  rifle.rotation.set(0.15, 0, -0.75);
+  const stock = part(g.add(new RoundedBoxGeometry(0.12, 0.5, 0.1, 2, 0.04)), toon(c.dark));
+  rifle.add(stock);
+  const barrel = part(g.add(new THREE.CylinderGeometry(0.03, 0.035, 0.75, 10)), toon(METAL));
+  barrel.position.y = 0.6;
+  rifle.add(barrel);
+  const scope = part(g.add(new THREE.CylinderGeometry(0.045, 0.045, 0.24, 12)), toon(c.secondary));
+  scope.position.set(0, 0.14, 0.09);
+  rifle.add(scope);
+  const lens = new THREE.Mesh(g.add(new THREE.CircleGeometry(0.035, 12)), new THREE.MeshBasicMaterial({ color: '#7fe4ff' }));
+  lens.rotation.x = -Math.PI / 2;
+  lens.position.set(0, 0.265, 0.09);
+  rifle.add(lens);
+  const charm = part(petalGeo, toon(c.accent), { outline: false });
+  charm.position.set(0.08, -0.1, 0);
+  rifle.add(charm);
+  rig.body.add(rifle);
+  return rig;
+}
+
 const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
   boulder: buildBoulder,
+  hinako: buildHinako,
   fuse: buildFuse,
   shard: buildShard,
   grizzle: buildGrizzle,
@@ -552,7 +633,10 @@ const IDLE: Partial<Record<FighterId, { speed: number; bob: number }>> = {
   boulder: { speed: 1.6, bob: 0.03 },
 };
 
-export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean } = {}): FighterModel {
+/** opts.skin: 입힌 스킨 id(src/data/skins.ts). 그 캐릭터의 스킨이면 외형만 바꾼다 */
+export function buildFighterModel(def: FighterDef, opts: { shadow?: boolean; skin?: string } = {}): FighterModel {
+  const skin = getSkin(opts.skin);
+  if (skin && skin.fighterId === def.id) def = { ...def, model: skin.model };
   if (def.model.type === 'glb') return buildGlbFighterModel(def, opts);
   const root = new THREE.Group();
   root.name = `fighter:${def.id}`;

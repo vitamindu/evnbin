@@ -18,6 +18,8 @@ export interface BattleLike extends View {
   readonly match: MatchState;
   /** 이동 입력(길이 0~1). UI가 매 프레임 쓴다 */
   readonly controls: { move: Vec2 };
+  /** 유닛 머리 위에 보일 이름(닉네임). 더미 등 이름이 없으면 undefined */
+  nameOf(id: EntityId): string | undefined;
   queueAttack(aim: Aim): void;
   queueSuper(aim: Aim): void;
   onFrame: (() => void) | null;

@@ -5,7 +5,7 @@ import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { FIGHTERS, getFighter } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
-import { getProfile, onProfileChange, totalTrophies } from '../../state/profile';
+import { equippedSkin, getProfile, onProfileChange, totalTrophies } from '../../state/profile';
 import { getSettings, onSettingsChange } from '../../state/settings';
 import type { AppContext } from '../context';
 import { MODES, openModePicker } from '../overlays/modePicker';
@@ -161,7 +161,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
     plateTrophy.textContent = String(p.fighters[f.id].trophies);
     platePower.textContent = String(p.fighters[f.id].power);
     nameplate.style.setProperty('--c', f.palette.primary);
-    view.setFighter(f.id);
+    view.setFighter(f.id, equippedSkin(p, f.id));
   };
   render();
   onProfileChange(render);

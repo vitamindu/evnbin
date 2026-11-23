@@ -6,7 +6,7 @@ import { getFighter } from '../../data/fighters';
 import type { Team } from '../../game/types';
 import type { MatchResult, PlayerStats } from '../../net/protocol';
 import { ShowcaseView } from '../../render/views/showcaseView';
-import { getProfile } from '../../state/profile';
+import { equippedSkin, getProfile } from '../../state/profile';
 import type { AppContext } from '../context';
 import { getOnlineClient } from '../online/clientFactory';
 import { portrait } from '../online/widgets';
@@ -90,7 +90,8 @@ export function createResultsScreen(ctx: AppContext) {
     const mvp = best && best.kills > 0 ? best.playerId : null;
     const sort = (t: Team) => r.stats.filter((p) => p.team === t).sort((a, b) => b.kills - a.kills || b.damage - a.damage);
     tables.replaceChildren(table(sort(myTeam), 'is-blue', '우리 팀', myId, mvp), table(sort(other), 'is-red', '상대 팀', myId, mvp));
-    view.setFighter(me?.fighterId ?? getProfile().selected);
+    const fid = me?.fighterId ?? getProfile().selected;
+    view.setFighter(fid, equippedSkin(getProfile(), fid));
     celebrate = outcome === 'win';
     roomBtn.hidden = !c.room;
   }

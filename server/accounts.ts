@@ -15,6 +15,15 @@ import { createHash, randomBytes, randomInt, scrypt as scryptCb, timingSafeEqual
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FIGHTERS, type FighterId } from '../src/data/fighters';
+import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../src/data/skins';
+
+/** 관리자 로그인 아이디(대소문자 무시). FG_ADMINS 환경 변수(쉼표 구분)로 바꿀 수 있다 */
+export const ADMIN_USERNAMES = new Set(
+  (process.env.FG_ADMINS ?? 'mineack991')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+);
 import {
   NICKNAME_MAX,
   isValidNickname,
@@ -24,7 +33,7 @@ import {
   type AccountProfile as Profile,
 } from '../src/net/accountApi';
 
-export type AccountErrorCode = Exclude<AccountApiError, 'rate_limited' | 'bad_request'>;
+export type AccountErrorCode = Exclude<AccountApiError, 'rate_limited'>;
 
 export class AccountError extends Error {
   constructor(readonly code: AccountErrorCode) {
@@ -225,7 +234,7 @@ export class AccountStore {
       this.byNick.set(nick, key);
       const token = this.issueToken(key, user);
       this.save();
-      return { token, profile: clone(user.profile), username };
+      return { token, profile: present(user), username };
     } finally {
       this.signingUp.delete(key);
       this.reservedNicks.delete(nick);
@@ -244,7 +253,7 @@ export class AccountStore {
     if (want.length !== got.length || !timingSafeEqual(want, got)) throw new AccountError('bad_credentials');
     const token = this.issueToken(key, user);
     this.save();
-    return { token, profile: clone(user.profile), username: user.username };
+    return { token, profile: present(user), username: user.username };
   }
 
   /** 토큰 → 계정 키(없거나 만료면 null) */
@@ -281,7 +290,7 @@ export class AccountStore {
 
   profile(key: string): Profile | null {
     const u = this.data.users[key];
-    return u ? clone(u.profile) : null;
+    return u ? present(u) : null;
   }
 
   /** 로그인 아이디(가입할 때 쓴 대소문자 그대로) */
@@ -311,7 +320,7 @@ export class AccountStore {
     u.nickname = nickname;
     u.profile.name = nickname;
     this.save();
-    return clone(u.profile);
+    return present(u);
   }
 
   /** 친구 계정 키 목록 */
@@ -352,7 +361,47 @@ export class AccountStore {
     if (typeof selected !== 'string' || !FIGHTERS.some((f) => f.id === selected)) return null;
     u.profile.selected = selected as FighterId;
     this.save();
-    return clone(u.profile);
+    return present(u);
+  }
+
+  /** 캐릭터에 스킨 입히기(skinId=null이면 기본). 가진 스킨만 */
+  equipSkin(key: string, fighterId: unknown, skinId: unknown): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    if (typeof fighterId !== 'string' || !FIGHTERS.some((f) => f.id === fighterId)) throw new AccountError('bad_request');
+    const sel = { ...(u.profile.skinSel ?? {}) };
+    if (skinId === null) delete sel[fighterId as FighterId];
+    else {
+      const skin = typeof skinId === 'string' ? getSkin(skinId) : undefined;
+      if (!skin || skin.fighterId !== fighterId) throw new AccountError('bad_request');
+      if (!owns(u, skin.id)) throw new AccountError('not_owned');
+      sel[fighterId as FighterId] = skin.id;
+    }
+    u.profile.skinSel = sel;
+    this.save();
+    return present(u);
+  }
+
+  /** 코인으로 스킨 사기(상점이 열려 있을 때만) */
+  buySkin(key: string, skinId: unknown): Profile {
+    const u = this.data.users[key];
+    if (!u) throw new AccountError('unauthorized');
+    const skin = typeof skinId === 'string' ? getSkin(skinId) : undefined;
+    if (!skin) throw new AccountError('bad_request');
+    if (owns(u, skin.id)) throw new AccountError('already_owned');
+    if (!SKIN_SHOP_OPEN) throw new AccountError('shop_closed');
+    if (u.profile.coins < skin.price) throw new AccountError('not_enough_coins');
+    u.profile.coins -= skin.price;
+    u.profile.skins = [...(u.profile.skins ?? []), skin.id];
+    this.save();
+    return present(u);
+  }
+
+  /** 경기에 쓸 스킨(가진 것만) */
+  skinFor(key: string, fighterId: FighterId): string | undefined {
+    const u = this.data.users[key];
+    const id = u?.profile.skinSel?.[fighterId];
+    return u && id && owns(u, id) ? id : undefined;
   }
 
   /** 경기 결과: 캐릭터별 트로피(승 +8, 무 0, 패 −4, 0 아래로 안 내려감), 코인(승 +20, 그 외 +10) */
@@ -386,6 +435,22 @@ export class AccountStore {
     this.byToken.set(h, key);
     return token;
   }
+}
+
+/** 클라이언트에 보내는 프로필: 관리자 표시 + 관리자는 모든 스킨 */
+function present(u: StoredUser): Profile {
+  const p = clone(u.profile);
+  if (ADMIN_USERNAMES.has(u.username.toLowerCase())) {
+    p.admin = true;
+    p.skins = SKINS.map((s) => s.id);
+  } else {
+    delete p.admin;
+  }
+  return p;
+}
+
+function owns(u: StoredUser, skinId: string): boolean {
+  return ADMIN_USERNAMES.has(u.username.toLowerCase()) || !!u.profile.skins?.includes(skinId);
 }
 
 function clone(p: Profile): Profile {

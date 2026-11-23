@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { FIGHTERS, type FighterDef } from '../data/fighters';
+import { FIGHTERS, getFighter, type FighterDef } from '../data/fighters';
+import { SKINS } from '../data/skins';
 import type { FighterModel } from './fighterModel';
 import { blobShadow, toon, toonTextured } from './toon';
 
@@ -83,23 +84,27 @@ async function load(def: FighterDef): Promise<Loaded> {
   toToon(b.scene);
   if (w) toToon(w.scene);
   const loaded = { body: normalizeBody(b.scene), weapon: w ? normalizeWeapon(w.scene) : null };
-  ready.set(def.id, loaded);
+  ready.set(keyOf(def), loaded);
   return loaded;
 }
 
+/** 같은 캐릭터라도 스킨마다 파일이 다르므로 파일 주소로 구분한다 */
+const keyOf = (def: FighterDef) => (def.model.type === 'glb' ? def.model.body : def.id);
+
 function loadOnce(def: FighterDef): Promise<Loaded> {
-  let p = cache.get(def.id);
+  let p = cache.get(keyOf(def));
   if (!p) {
     p = load(def);
-    cache.set(def.id, p);
+    cache.set(keyOf(def), p);
   }
   return p;
 }
 
 /** 모든 glb 캐릭터를 미리 받는다(부팅 로딩 화면에서 호출) */
 export async function preloadGlbFighters(): Promise<void> {
+  const defs = [...FIGHTERS, ...SKINS.map((s) => ({ ...getFighter(s.fighterId), model: s.model }))];
   await Promise.all(
-    FIGHTERS.filter((f) => f.model.type === 'glb').map((f) =>
+    defs.filter((f) => f.model.type === 'glb').map((f) =>
       loadOnce(f).catch((e) => {
         console.warn(`model load failed: ${f.id}`, e);
       }),
@@ -135,7 +140,7 @@ export function buildGlbFighterModel(def: FighterDef, opts: { shadow?: boolean }
     }
   };
 
-  const have = ready.get(def.id);
+  const have = ready.get(keyOf(def));
   if (have) attach(have);
   else {
     const geo = new THREE.CapsuleGeometry(0.35, 0.9, 6, 14);

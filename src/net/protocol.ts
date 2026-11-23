@@ -45,6 +45,8 @@ export interface MatchRosterEntry {
   team: Team;
   fighterId: FighterId;
   bot: boolean;
+  /** 입힌 스킨 id(src/data/skins.ts). 없으면 기본 외형 */
+  skin?: string;
 }
 
 export interface MatchStartInfo {

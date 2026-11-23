@@ -45,10 +45,15 @@ export class FakeOnlineSession implements BattleLike {
   private readonly ownRules: boolean;
   private readonly ownMatch: MatchState;
   private readonly view_: SimView;
+  private readonly names = new Map<EntityId, string>();
   private acc = 0;
   private finished = false;
   private pendingAttack: { aim: Aim } | null = null;
   private pendingSuper: { aim: Aim } | null = null;
+
+  nameOf(id: EntityId): string | undefined {
+    return this.names.get(id);
+  }
 
   constructor(info: MatchStartInfo, myEntityId: EntityId, seconds: number) {
     const perTeam: [number, number] = [0, 0];
@@ -65,6 +70,10 @@ export class FakeOnlineSession implements BattleLike {
       })),
     });
     this.playerId = myEntityId;
+    info.roster.forEach((r, i) => {
+      const u = this.sim.units[i];
+      if (u) this.names.set(u.id, r.name);
+    });
     for (const u of this.sim.units) this.stats.set(u.id, { kills: 0, deaths: 0, damage: 0 });
     // Sim이 teamfight 규칙을 이미 돌리면 그것을, 아니면 여기서 흉내 낸 것을 쓴다
     this.ownRules = this.sim.match.mode !== info.mode;

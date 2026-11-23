@@ -16,6 +16,12 @@ export interface Profile {
   fighters: Record<FighterId, FighterProgress>;
   /** 랭크 점수(TEAM FIGHT 온라인 경기로만 바뀐다, src/data/ranks.ts) */
   rankPoints: number;
+  /** 관리자 계정(서버가 정한다). 관리자는 모든 스킨을 쓸 수 있다 */
+  admin?: boolean;
+  /** 가진 스킨 id(관리자는 서버가 전부 넣어 준다) */
+  skins?: string[];
+  /** 캐릭터별로 고른 스킨 id(없으면 기본 외형) */
+  skinSel?: Partial<Record<FighterId, string>>;
 }
 
 const KEY = 'fg.profile.v1';
@@ -101,4 +107,15 @@ export function resetProfile() {
   profile = makeDefault();
   save();
   for (const l of listeners) l(profile);
+}
+
+/** 이 프로필이 쓸 수 있는 스킨인지 */
+export function ownsSkin(p: Readonly<Profile>, skinId: string): boolean {
+  return !!p.admin || !!p.skins?.includes(skinId);
+}
+
+/** 캐릭터에 지금 입힌 스킨 id(가진 것만, 없으면 undefined = 기본) */
+export function equippedSkin(p: Readonly<Profile>, fighterId: FighterId): string | undefined {
+  const id = p.skinSel?.[fighterId];
+  return id && ownsSkin(p, id) ? id : undefined;
 }

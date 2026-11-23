@@ -1295,3 +1295,40 @@ img {
 .room-ranked.is-ranked {
   color: #ffd34d;
 }
+
+/* 캐릭터 상세: 스킨 고르기(선택 버튼 왼쪽) */
+.skin-bar {
+  position: absolute;
+  right: 336px;
+  bottom: 22px;
+  display: flex;
+  gap: 10px;
+}
+.skin-chip {
+  width: 170px;
+  height: 100px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(#3b4fb8, #24318a);
+  border: 3px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+}
+.skin-chip.is-preview {
+  background: linear-gradient(#ff9fc8, #e2588f);
+}
+.skin-chip.is-locked .skin-state {
+  color: #ffd23f;
+}
+.skin-name {
+  font-size: 18px;
+  --o: 2px;
+}
+.skin-state {
+  font-size: 15px;
+  --o: 2px;
+  color: #c9f7ff;
+}

@@ -254,7 +254,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   const startMatch = (room: Room) => {
     const seed = randomInt(1, 2 ** 31 - 1);
     const match = new Match(
-      { seed, mapId: room.mapId, mode: room.mode, roster: room.rosterSeeds(), ...opts.match },
+      { seed, mapId: room.mapId, mode: room.mode, roster: room.rosterSeeds().map((r) => (r.account ? { ...r, skin: accounts.skinFor(r.account, r.fighterId) } : r)), ...opts.match },
       {
         send: (pid, data) => {
           const c = byPlayer.get(pid);

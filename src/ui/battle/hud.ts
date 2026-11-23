@@ -185,14 +185,16 @@ export class BattleHud {
     this.updateRespawn(s);
   }
 
-  private makeBar(u: Unit, isMe: boolean, ally: boolean): UnitBar {
+  private makeBar(u: Unit, isMe: boolean, ally: boolean, name?: string): UnitBar {
     const fill = el('i', 'ub-fill');
     const lag = el('i', 'ub-lag');
     const num = txt('', 'ub-num');
     const gemNum = txt('0', 'ub-gem-num');
     const gems = el('div', 'ub-gems', [iconEl('rushGem', 'ico ub-gem'), gemNum]);
     gems.hidden = true;
-    const children: HTMLElement[] = [gems, num, el('div', 'ub-bar', [lag, fill])];
+    const children: HTMLElement[] = [gems];
+    if (name) children.push(txt(name, 'ub-name'));
+    children.push(num, el('div', 'ub-bar', [lag, fill]));
     let ammo: UnitBar['ammo'] = null;
     if (isMe && u.type === 'fighter') {
       const segs: HTMLElement[] = [];
@@ -216,7 +218,7 @@ export class BattleHud {
   private updateBar(s: BattleLike, u: Unit, ally: boolean) {
     let b = this.bars.get(u.id);
     if (!b) {
-      b = this.makeBar(u, u.id === s.playerId, ally);
+      b = this.makeBar(u, u.id === s.playerId, ally, s.nameOf(u.id));
       this.bars.set(u.id, b);
     }
     b.seen = this.frameNo;

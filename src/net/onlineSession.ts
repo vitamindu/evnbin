@@ -126,7 +126,13 @@ export class OnlineSession implements BattleLike {
     this.predictor = meUnit?.type === 'fighter' ? new Predictor(this.grid, meUnit.fighterId, meUnit.radius) : null;
 
     this.view = (opts.createView ?? ((g, id) => new BattleView(g, id)))(this.grid, this.playerId);
+    const skins = new Map(info.roster.filter((r) => r.skin).map((r) => [r.entityId, r.skin!]));
+    this.view.skinOf = (id) => skins.get(id);
     this.view.snapshot(this.current);
+  }
+
+  nameOf(id: EntityId): string | undefined {
+    return this.info.roster.find((r) => r.entityId === id)?.name;
   }
 
   get scene() {

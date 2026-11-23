@@ -162,6 +162,9 @@ export class BattleView {
   private readonly raycaster = new THREE.Raycaster();
   readonly followId: EntityId;
 
+  /** 유닛이 입은 스킨(세션이 첫 snapshot 전에 정한다) */
+  skinOf: (id: EntityId) => string | undefined = () => undefined;
+
   constructor(grid: Grid, followId: EntityId) {
     this.grid = grid;
     this.followId = followId;
@@ -186,7 +189,7 @@ export class BattleView {
       seen.add(u.id);
       let v = this.units.get(u.id);
       if (!v) {
-        const model = u.type === 'fighter' ? buildFighterModel(getFighter(u.fighterId)) : buildDummyModel(u.behavior);
+        const model = u.type === 'fighter' ? buildFighterModel(getFighter(u.fighterId), { skin: this.skinOf(u.id) }) : buildDummyModel(u.behavior);
         model.root.scale.setScalar(MODEL_SCALE);
         if (u.type === 'fighter') model.root.add(this.teamRing(u));
         this.scene.add(model.root);

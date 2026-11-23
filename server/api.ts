@@ -41,6 +41,10 @@ const STATUS: Record<AccountApiError, number> = {
   invalid_nickname: 400,
   not_found: 404,
   already_friends: 409,
+  not_owned: 403,
+  already_owned: 409,
+  shop_closed: 403,
+  not_enough_coins: 409,
   self: 400,
 };
 
@@ -196,6 +200,19 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
     if (extra.length || b.selected === undefined) throw new HttpError('bad_request');
     const profile = store.updateSelected(key, b.selected);
     if (!profile) throw new HttpError('bad_request');
+    return me(key);
+  }
+  if (method === 'PUT' && path === '/api/skin') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.equipSkin(key, b.fighterId, b.skinId ?? null);
+    return me(key);
+  }
+  if (method === 'POST' && path === '/api/skins/buy') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    store.buySkin(key, b.skinId);
+    log(`[api] skin bought ${store.username(key)} ${String(b.skinId)}`);
     return me(key);
   }
   if (method === 'POST' && path === '/api/logout') {

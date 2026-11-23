@@ -240,7 +240,7 @@ export const FIGHTERS: readonly FighterDef[] = [
   },
   {
     id: 'hinako',
-    model: { type: 'glb', body: 'models/hinako.glb', weapon: 'models/hinako_gun.glb' },
+    model: { type: 'primitive' },
     name: 'HINAKO',
     role: 'sniper',
     roleLabel: '저격수',
@@ -260,7 +260,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       range: 7.35,
       projectileSpeed: 13,
       ammo: 3,
-      reload: 2.3,
+      reload: 3.85,
       superChargePerHit: 0.25,
     },
     super: {

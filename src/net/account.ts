@@ -225,3 +225,17 @@ export async function updateSelected(selected: FighterId): Promise<Profile> {
   setProfile(r.profile, r.username);
   return r.profile;
 }
+
+/** 캐릭터에 스킨 입히기(null = 기본 외형) */
+export async function equipSkin(fighterId: FighterId, skinId: string | null): Promise<Profile> {
+  const r = await authed<ProfileResponse>('PUT', '/api/skin', { fighterId, skinId });
+  setProfile(r.profile, r.username);
+  return r.profile;
+}
+
+/** 코인으로 스킨 사기 */
+export async function buySkin(skinId: string): Promise<Profile> {
+  const r = await authed<ProfileResponse>('POST', '/api/skins/buy', { skinId });
+  setProfile(r.profile, r.username);
+  return r.profile;
+}

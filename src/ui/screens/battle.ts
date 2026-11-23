@@ -7,7 +7,7 @@ import type { BattleLike } from '../../battle/types';
 import { TRAINING_YARD } from '../../data/maps/training';
 import type { MatchResult } from '../../net/protocol';
 import { getServerUrl } from '../../net/config';
-import { getProfile } from '../../state/profile';
+import { equippedSkin, getProfile } from '../../state/profile';
 import type { AppContext, OnlineMatch } from '../context';
 import { BattleFeedback } from '../battle/feedback';
 import { BattleHud } from '../battle/hud';
@@ -157,7 +157,7 @@ export function createBattleScreen(ctx: AppContext) {
 
   function setup() {
     const m = pending;
-    const s: BattleLike = m ? m.session : new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD });
+    const s: BattleLike = m ? m.session : new BattleSession({ fighterId: getProfile().selected, map: TRAINING_YARD, playerName: getProfile().name, skin: equippedSkin(getProfile(), getProfile().selected) });
     session = s;
     online = m;
     ended = false;

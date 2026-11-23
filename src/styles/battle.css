@@ -75,6 +75,23 @@
   --o: 2px;
   margin-bottom: 4px;
 }
+.ub-name {
+  font-size: 14px;
+  line-height: 1;
+  --o: 2px;
+  margin-bottom: 2px;
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #ffffff;
+}
+.ub.is-ally .ub-name {
+  color: #9cc8ff;
+}
+.ub.is-enemy .ub-name {
+  color: #ff9b9b;
+}
 .ub-bar {
   position: relative;
   width: 72px;

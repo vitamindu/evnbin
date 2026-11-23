@@ -342,18 +342,18 @@ function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
       ctx.beginPath();
       ctx.arc(x, y, R - 8, 0, Math.PI * 2);
       ctx.stroke();
-      // 진행 방향 화살표 3개(팀0 → 오른쪽, 팀1 → 왼쪽)
-      const dir = team === 0 ? 1 : -1;
+      // 진행 방향 화살표 3개(세로 맵: 팀0은 아래에서 위쪽, 팀1은 위에서 아래쪽)
+      const dir = team === 0 ? -1 : 1;
       ctx.strokeStyle = 'rgba(255,255,255,0.9)';
       ctx.lineWidth = 7;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       for (let k = -1; k <= 1; k++) {
-        const cx = x + k * P * 0.32 * dir;
+        const cy = y + k * P * 0.32 * dir;
         ctx.beginPath();
-        ctx.moveTo(cx - P * 0.1 * dir, y - P * 0.2);
-        ctx.lineTo(cx + P * 0.1 * dir, y);
-        ctx.lineTo(cx - P * 0.1 * dir, y + P * 0.2);
+        ctx.moveTo(x - P * 0.2, cy - P * 0.1 * dir);
+        ctx.lineTo(x, cy + P * 0.1 * dir);
+        ctx.lineTo(x + P * 0.2, cy - P * 0.1 * dir);
         ctx.stroke();
       }
     }

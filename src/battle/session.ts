@@ -16,6 +16,10 @@ export interface BattleOptions {
   map: MapDef;
   seed?: number;
   mode?: MatchMode;
+  /** 내 이름(닉네임) */
+  playerName?: string;
+  /** 내가 입은 스킨 */
+  skin?: string;
 }
 
 export class BattleSession implements BattleLike {
@@ -30,6 +34,7 @@ export class BattleSession implements BattleLike {
   /** 틱마다 나온 사건(피해 숫자, 효과음 등) */
   onEvents: ((events: readonly SimEvent[]) => void) | null = null;
 
+  private readonly playerName: string | undefined;
   private acc = 0;
   private pendingAttack: { aim: Aim } | null = null;
   private pendingSuper: { aim: Aim } | null = null;
@@ -43,7 +48,10 @@ export class BattleSession implements BattleLike {
       fighters: [{ fighterId: opts.fighterId, team: 0, controller: 'player', spawnIndex: 0 }],
     });
     this.playerId = this.sim.units[0]!.id;
+    this.playerName = opts.playerName;
     this.view = new BattleView(this.sim.grid, this.playerId);
+    const skin = opts.skin;
+    this.view.skinOf = (id) => (id === this.playerId ? skin : undefined);
     this.view.snapshot(this.sim);
   }
 
@@ -52,6 +60,10 @@ export class BattleSession implements BattleLike {
   }
   get camera() {
     return this.view.camera;
+  }
+
+  nameOf(id: EntityId): string | undefined {
+    return id === this.playerId ? this.playerName : undefined;
   }
 
   get state(): SimView {

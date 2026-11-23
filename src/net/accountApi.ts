@@ -8,6 +8,8 @@
  *   GET    /api/me      (Authorization: Bearer)         → { profile, username }
  *   PUT    /api/profile (Bearer) {selected}             → { profile, username }
  *   PUT    /api/nickname (Bearer) {nickname}            → { profile, username }
+ *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
+ *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
  *   GET    /api/friends (Bearer)                        → { friends: FriendInfo[] }
  *   POST   /api/friends (Bearer) {nickname}             → { friends: FriendInfo[] }  (바로 서로 친구)
@@ -32,6 +34,9 @@ export interface AccountProfile {
   selected: FighterId;
   fighters: Record<FighterId, AccountFighterProgress>;
   rankPoints: number;
+  admin?: boolean;
+  skins?: string[];
+  skinSel?: Partial<Record<FighterId, string>>;
 }
 
 export type AccountApiError =
@@ -49,7 +54,13 @@ export type AccountApiError =
   /** 친구: 자기 자신 */
   | 'self'
   /** 형식이 틀린 요청(JSON 아님, 필드 없음, 모르는 캐릭터 등) */
-  | 'bad_request';
+  | 'bad_request'
+  /** 스킨: 가지지 않은 스킨 */
+  | 'not_owned'
+  | 'already_owned'
+  /** 스킨 상점이 아직 닫혀 있음 */
+  | 'shop_closed'
+  | 'not_enough_coins';
 
 export interface AuthResponse {
   token: string;

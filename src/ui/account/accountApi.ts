@@ -2,6 +2,7 @@ import type { FighterId } from '../../data/fighters';
 import * as realAccount from '../../net/account';
 import { getServerUrl } from '../../net/config';
 import type { Profile } from '../../state/profile';
+import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
 
 /**
  * 계정 기능의 UI 쪽 입구(어댑터). 진짜는 Network 담당의 src/net/account.ts.
@@ -30,6 +31,10 @@ export type AccountErrorCode =
   | 'not_found'
   | 'already_friends'
   | 'self'
+  | 'not_owned'
+  | 'already_owned'
+  | 'shop_closed'
+  | 'not_enough_coins'
   | 'server_error'
   | 'network';
 
@@ -40,6 +45,8 @@ interface AccountModule {
   restore(): Promise<unknown>;
   updateSelected(fighterId: FighterId): Promise<unknown>;
   changeNickname(nickname: string): Promise<unknown>;
+  equipSkin(fighterId: FighterId, skinId: string | null): Promise<unknown>;
+  buySkin(skinId: string): Promise<unknown>;
   getAccount(): Account | null;
   onAccountChange(cb: (a: Account | null) => void): () => void;
 }
@@ -57,6 +64,8 @@ type RealModule = {
   restore(): Promise<unknown>;
   updateSelected(f: FighterId): Promise<unknown>;
   changeNickname?: (n: string) => Promise<unknown>;
+  equipSkin(f: FighterId, s: string | null): Promise<unknown>;
+  buySkin(s: string): Promise<unknown>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -70,6 +79,8 @@ function realAdapter(m: RealModule): AccountModule {
     restore: () => m.restore(),
     updateSelected: (f) => m.updateSelected(f),
     changeNickname: (n) => (m.changeNickname ? m.changeNickname(n) : Promise.reject(Object.assign(new Error('server_error'), { code: 'server_error' }))),
+    equipSkin: (f, id) => m.equipSkin(f, id),
+    buySkin: (id) => m.buySkin(id),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -130,8 +141,19 @@ function fakeModule(): AccountModule {
       },
     };
   };
+  const present = (row: Row): Profile =>
+    row.username.toLowerCase() === 'mineack991' ? { ...row.profile, admin: true, skins: SKINS.map((k) => k.id) } : { ...row.profile };
+  const save = (fn: (row: Row) => void) => {
+    const all = readUsers();
+    const row = all[account!.username.toLowerCase()];
+    if (!row) return;
+    fn(row);
+    writeUsers(all);
+    account = { ...account!, profile: present(row) };
+    emit();
+  };
   const signIn = (key: string, row: Row) => {
-    account = { username: row.username, profile: { ...row.profile } };
+    account = { username: row.username, profile: present(row) };
     try {
       localStorage.setItem(TOKEN_KEY, key);
     } catch {
@@ -210,6 +232,30 @@ function fakeModule(): AccountModule {
       account = { ...account!, profile: { ...account!.profile, name: nickname } };
       emit();
     },
+    async equipSkin(fighterId, skinId) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      if (skinId && !account!.profile.admin && !account!.profile.skins?.includes(skinId)) fail('not_owned');
+      save((row) => {
+        const sel = { ...(row.profile.skinSel ?? {}) };
+        if (skinId) sel[fighterId] = skinId;
+        else delete sel[fighterId];
+        row.profile.skinSel = sel;
+      });
+    },
+    async buySkin(skinId) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      const skin = getSkin(skinId);
+      if (!skin) fail('server_error');
+      if (account!.profile.admin || account!.profile.skins?.includes(skinId)) fail('already_owned');
+      if (!SKIN_SHOP_OPEN) fail('shop_closed');
+      if (account!.profile.coins < skin!.price) fail('not_enough_coins');
+      save((row) => {
+        row.profile.coins -= skin!.price;
+        row.profile.skins = [...(row.profile.skins ?? []), skinId];
+      });
+    },
     getAccount: () => account,
     onAccountChange(cb) {
       listeners.add(cb);
@@ -227,6 +273,8 @@ export const logout = () => api.logout();
 export const restore = () => api.restore();
 export const updateSelected = (fighterId: FighterId) => api.updateSelected(fighterId);
 export const changeNickname = (nickname: string) => api.changeNickname(nickname);
+export const equipSkin = (fighterId: FighterId, skinId: string | null) => api.equipSkin(fighterId, skinId);
+export const buySkin = (skinId: string) => api.buySkin(skinId);
 export const getAccount = () => api.getAccount();
 export const onAccountChange = (cb: (a: Account | null) => void) => api.onAccountChange(cb);
 
@@ -261,6 +309,14 @@ export function accountErrorText(code: AccountErrorCode): string {
       return '이미 친구예요';
     case 'self':
       return '나 자신은 추가할 수 없어요';
+    case 'not_owned':
+      return '아직 없는 스킨이에요';
+    case 'already_owned':
+      return '이미 가진 스킨이에요';
+    case 'shop_closed':
+      return '스킨 상점은 아직 준비 중이에요';
+    case 'not_enough_coins':
+      return '코인이 부족해요';
     case 'server_error':
       return '서버에 문제가 생겼어요';
     default:
