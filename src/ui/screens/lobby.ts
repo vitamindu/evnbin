@@ -148,6 +148,7 @@ export function createLobbyScreen(ctx: AppContext): Screen {
       sideBtn('친구', 'friends', () => ctx.go.friends()),
       sideBtn('파티', 'party', () => party.invite()),
       sideBtn('길드', 'crew', () => ctx.go.guild()),
+      sideBtn('랭킹', 'trophy', () => ctx.go.ranking()),
     ]),
     nameplate,
     slotL,

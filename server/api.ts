@@ -376,6 +376,10 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
       }),
     } satisfies PartyResponse;
   }
+  if (method === 'GET' && path === '/api/ranking') {
+    if (!key) throw new HttpError('unauthorized');
+    return store.ranking(key);
+  }
   if (method === 'GET' && path === '/api/history') {
     if (!key) throw new HttpError('unauthorized');
     return store.history(key);

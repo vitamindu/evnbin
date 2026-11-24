@@ -1,6 +1,6 @@
 /**
  * 랭크(티어) 규칙. 서버와 클라이언트가 같이 쓴다(DOM import 금지).
- * 브론즈~다이아: 단계 IV→I, 단계마다 100점. 마스터 이상은 점수 문턱(친구끼리라 순위제 대신).
+ * 티어마다 100점, 단계 IV→I(단계마다 25점). 브론즈 0~100, 실버 100~200 … 챌린저 700~(챌린저 I은 끝이 없다).
  */
 export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'master' | 'grandmaster' | 'challenger';
 
@@ -17,16 +17,18 @@ export interface TierDef {
 
 export const TIERS: readonly TierDef[] = [
   { id: 'bronze', name: '브론즈', min: 0, divisions: true, colors: { light: '#e0a26b', dark: '#7a4626', gem: '#ffcf9a' } },
-  { id: 'silver', name: '실버', min: 400, divisions: true, colors: { light: '#dfe6ee', dark: '#6d7a8a', gem: '#ffffff' } },
-  { id: 'gold', name: '골드', min: 800, divisions: true, colors: { light: '#ffe27a', dark: '#b07a12', gem: '#fff6c8' } },
-  { id: 'platinum', name: '플래티넘', min: 1200, divisions: true, colors: { light: '#9ff0df', dark: '#2a8a7c', gem: '#e6fffa' } },
-  { id: 'diamond', name: '다이아몬드', min: 1600, divisions: true, colors: { light: '#a9c8ff', dark: '#3a4fb8', gem: '#e8f1ff' } },
-  { id: 'master', name: '마스터', min: 2000, divisions: false, colors: { light: '#d7a6ff', dark: '#6a2fa8', gem: '#f6e8ff' } },
-  { id: 'grandmaster', name: '그랜드마스터', min: 2500, divisions: false, colors: { light: '#ff9a8a', dark: '#a8232c', gem: '#ffe1da' } },
-  { id: 'challenger', name: '챌린저', min: 3000, divisions: false, colors: { light: '#bfe9ff', dark: '#1f5fa0', gem: '#ffe680' } },
+  { id: 'silver', name: '실버', min: 100, divisions: true, colors: { light: '#dfe6ee', dark: '#6d7a8a', gem: '#ffffff' } },
+  { id: 'gold', name: '골드', min: 200, divisions: true, colors: { light: '#ffe27a', dark: '#b07a12', gem: '#fff6c8' } },
+  { id: 'platinum', name: '플래티넘', min: 300, divisions: true, colors: { light: '#9ff0df', dark: '#2a8a7c', gem: '#e6fffa' } },
+  { id: 'diamond', name: '다이아몬드', min: 400, divisions: true, colors: { light: '#a9c8ff', dark: '#3a4fb8', gem: '#e8f1ff' } },
+  { id: 'master', name: '마스터', min: 500, divisions: true, colors: { light: '#d7a6ff', dark: '#6a2fa8', gem: '#f6e8ff' } },
+  { id: 'grandmaster', name: '그랜드마스터', min: 600, divisions: true, colors: { light: '#ff9a8a', dark: '#a8232c', gem: '#ffe1da' } },
+  { id: 'challenger', name: '챌린저', min: 700, divisions: true, colors: { light: '#bfe9ff', dark: '#1f5fa0', gem: '#ffe680' } },
 ];
 
-export const DIVISION_POINTS = 100;
+/** 단계 하나의 폭(티어 하나 = 4단계 = 100점) */
+export const DIVISION_POINTS = 25;
+export const TIER_POINTS = DIVISION_POINTS * 4;
 export const DIVISION_NAMES = ['IV', 'III', 'II', 'I'] as const;
 
 /** 경기 결과에 따른 점수 변화 폭: 이기면 +MIN~+MAX, 지면 −MIN~−MAX, 비기면 0 */
@@ -52,7 +54,9 @@ export function rankOf(points: number): RankInfo {
   if (tier.divisions) {
     const d = Math.min(3, Math.floor((p - tier.min) / DIVISION_POINTS));
     const from = tier.min + d * DIVISION_POINTS;
-    return { tier, division: DIVISION_NAMES[d]!, points: p, from, to: from + DIVISION_POINTS };
+    // 맨 위 티어의 마지막 단계(챌린저 I)는 끝이 없다
+    const top = !next && d === 3;
+    return { tier, division: DIVISION_NAMES[d]!, points: p, from, to: top ? null : from + DIVISION_POINTS };
   }
   return { tier, division: null, points: p, from: tier.min, to: next ? next.min : null };
 }

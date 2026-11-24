@@ -24,6 +24,7 @@ import { createFriendsScreen } from './ui/screens/friends';
 import { createGuildScreen } from './ui/screens/guild';
 import { createShopScreen } from './ui/screens/shop';
 import { createPassScreen } from './ui/screens/pass';
+import { createRankingScreen } from './ui/screens/ranking';
 import { createLobbyScreen } from './ui/screens/lobby';
 import { createLoginScreen } from './ui/screens/login';
 import { createOnlineScreen } from './ui/screens/online';
@@ -103,6 +104,7 @@ async function boot() {
       guild: () => screens.show(guildScreen),
       shop: () => screens.show(shopScreen),
       pass: () => screens.show(passScreen),
+      ranking: () => screens.show(rankingScreen),
       fighterDetail: (id) => {
         detail.setFighter(id);
         screens.show(detail);
@@ -131,6 +133,7 @@ async function boot() {
   const guildScreen = createGuildScreen(ctx);
   const shopScreen = createShopScreen(ctx);
   const passScreen = createPassScreen(ctx);
+  const rankingScreen = createRankingScreen(ctx);
   const results = createResultsScreen(ctx);
   const login = createLoginScreen(ctx);
   initAccountSync();

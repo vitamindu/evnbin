@@ -30,6 +30,8 @@ export const ADMIN_USERNAMES = new Set(
 );
 import {
   GUILD_CHAT_KEEP,
+  RANKING_SIZE,
+  type RankingEntry,
   HISTORY_KEEP,
   type HistoryTotals,
   type MatchRecord,
@@ -109,6 +111,21 @@ interface StoredGuild {
   /** 채팅(최근 GUILD_CHAT_KEEP개). from = 계정 키, null이면 알림 */
   chat: { id: number; from: string | null; text: string; at: number }[];
   nextChatId: number;
+}
+
+/** 가장 많이 쓴 캐릭터: 경기 수 → 트로피 → 선택한 캐릭터 */
+function mainFighter(p: Profile): FighterId {
+  let best: FighterId = p.selected;
+  let score: [number, number] = [0, 0];
+  for (const f of FIGHTERS) {
+    const fp = p.fighters[f.id];
+    const s: [number, number] = [fp?.games ?? 0, fp?.trophies ?? 0];
+    if (s[0] > score[0] || (s[0] === score[0] && s[1] > score[1])) {
+      best = f.id;
+      score = s;
+    }
+  }
+  return best;
 }
 
 const emptyTotals = (): HistoryTotals => ({ games: 0, wins: 0, draws: 0, losses: 0, kills: 0, deaths: 0, damage: 0, mvps: 0 });
@@ -813,6 +830,37 @@ export class AccountStore {
     u.profile.pass = pass;
     this.save();
     return present(u, this.data.guilds);
+  }
+
+  /** 서버 전체 랭킹(랭크 점수 높은 순, 같으면 같은 순위·먼저 가입한 사람이 위) */
+  ranking(key: string | null): { top: RankingEntry[]; me: RankingEntry | null; total: number } {
+    const all = Object.entries(this.data.users)
+      .map(([k, u]) => ({ k, u }))
+      .sort((a, b) => (b.u.profile.rankPoints ?? 0) - (a.u.profile.rankPoints ?? 0) || a.u.createdAt - b.u.createdAt);
+    const entries: RankingEntry[] = [];
+    let mine: RankingEntry | null = null;
+    let rank = 0;
+    let prev = -1;
+    all.forEach(({ k, u }, i) => {
+      const rp = u.profile.rankPoints ?? 0;
+      if (rp !== prev) {
+        rank = i + 1;
+        prev = rp;
+      }
+      if (i >= RANKING_SIZE && k !== key) return;
+      const g = u.guild ? this.data.guilds?.[u.guild] : undefined;
+      const e: RankingEntry = {
+        rank,
+        nickname: u.nickname,
+        rankPoints: rp,
+        ...(u.profile.avatar ? { avatar: u.profile.avatar } : {}),
+        ...(g && g.members.includes(k) ? { guild: g.name } : {}),
+        fighterId: mainFighter(u.profile),
+      };
+      if (i < RANKING_SIZE) entries.push(e);
+      if (k === key) mine = e;
+    });
+    return { top: entries, me: mine, total: all.length };
   }
 
   /** 전적 한 판 남기기 */

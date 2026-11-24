@@ -2,14 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { isRankedMatch, rankDelta, rankLabel, rankOf } from '../../../src/data/ranks';
 
 describe('랭크', () => {
-  it('점수 → 티어·단계', () => {
+  it('점수 → 티어·단계: 티어마다 100점, 단계마다 25점', () => {
     expect(rankLabel(rankOf(0))).toBe('브론즈 IV');
-    expect(rankLabel(rankOf(399))).toBe('브론즈 I');
-    expect(rankLabel(rankOf(400))).toBe('실버 IV');
-    expect(rankLabel(rankOf(1999))).toBe('다이아몬드 I');
-    expect(rankLabel(rankOf(2000))).toBe('마스터');
-    expect(rankLabel(rankOf(2500))).toBe('그랜드마스터');
-    expect(rankLabel(rankOf(9999))).toBe('챌린저');
+    expect(rankLabel(rankOf(24))).toBe('브론즈 IV');
+    expect(rankLabel(rankOf(25))).toBe('브론즈 III');
+    expect(rankLabel(rankOf(50))).toBe('브론즈 II');
+    expect(rankLabel(rankOf(99))).toBe('브론즈 I');
+    expect(rankLabel(rankOf(100))).toBe('실버 IV');
+    expect(rankLabel(rankOf(250))).toBe('골드 II');
+    expect(rankLabel(rankOf(399))).toBe('플래티넘 I');
+    expect(rankLabel(rankOf(499))).toBe('다이아몬드 I');
+    expect(rankLabel(rankOf(500))).toBe('마스터 IV');
+    expect(rankLabel(rankOf(675))).toBe('그랜드마스터 I');
+    expect(rankLabel(rankOf(700))).toBe('챌린저 IV');
+    expect(rankLabel(rankOf(9999))).toBe('챌린저 I');
+    expect(rankOf(9999).to).toBeNull();
+    expect(rankOf(690)).toMatchObject({ from: 675, to: 700 });
     expect(rankOf(-50).points).toBe(0);
   });
   it('랭크 경기: 양 팀 사람 수가 같을 때만(봇 제외)', () => {

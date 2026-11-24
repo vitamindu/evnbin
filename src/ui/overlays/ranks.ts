@@ -1,5 +1,5 @@
 import { el, icon } from '../../core/dom';
-import { DIVISION_POINTS, RANK_STEP_MAX, RANK_STEP_MIN, TIERS, rankLabel, rankOf } from '../../data/ranks';
+import { DIVISION_POINTS, TIER_POINTS, RANK_STEP_MAX, RANK_STEP_MIN, TIERS, rankLabel, rankOf } from '../../data/ranks';
 import { getProfile } from '../../state/profile';
 import type { AppContext } from '../context';
 import { rankEmblemSvg } from '../rankEmblem';
@@ -15,7 +15,7 @@ export function openRanks(ctx: AppContext) {
       const row = el('div', `rk-row${t.id === r.tier.id ? ' is-me' : ''}`, [
         icon(rankEmblemSvg(t.id), 'ico rk-emblem'),
         txt(t.name, 'rk-name'),
-        txt(t.divisions ? `${t.min}+ · IV→I` : `${t.min}+`, 'rk-min'),
+        txt(`${t.id === 'challenger' ? `${t.min}+` : `${t.min}~${t.min + TIER_POINTS}`} · IV→I`, 'rk-min'),
       ]);
       return row;
     }),
