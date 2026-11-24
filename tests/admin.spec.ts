@@ -4,12 +4,15 @@ import { expect, test } from './fixtures';
 /** 관리자 지급(설정 → 관리자). ?fakeonline 가짜 계정 */
 test.describe.configure({ timeout: 120_000 });
 
+/** fresh=false: 이미 로그인 화면(로그아웃 직후)에서 바로 가입 */
 async function signup(page: Page, id: string, nick: string, fresh = true) {
-  if (fresh) await page.goto('/?fakeonline&qa');
-  else await page.reload();
-  await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });
-  await page.locator('.title').tap();
-  await expect(page.locator('.login')).not.toHaveClass(/is-checking/);
+  if (fresh) {
+    await page.goto('/?fakeonline&qa');
+    await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });
+    await page.locator('.title').tap();
+  }
+  await expect(page.locator('.login')).toBeVisible();
+  await expect(page.locator('.login')).not.toHaveClass(/is-checking/, { timeout: 15_000 });
   await page.locator('.auth-tab').nth(1).tap();
   const inputs = page.locator('.auth-field:not([hidden]) .auth-input');
   await inputs.nth(0).fill(id);
@@ -25,12 +28,12 @@ const fakeUser = (page: Page, id: string) =>
 test('admin grants coins/gems to one player and to everyone', async ({ page }, info) => {
   // 받을 사람을 먼저 만든다(같은 브라우저의 가짜 계정 저장소)
   await signup(page, 'friend1', '받는이');
-  await page.locator('.icon-btn').last().tap();
+  await page.locator('.lb-top-right .icon-btn').tap();
   await page.locator('.btn-logout').tap();
   await signup(page, 'mineack991', '관리자', false);
   await page.locator('.lb-top-right .icon-btn').tap();
-  await expect(page.locator('.set-panel')).toBeVisible();
-  await page.waitForTimeout(400); // 팝업 등장 애니메이션이 끝난 뒤
+  // 설정 팝업이 커지는 애니메이션이 끝난 뒤에 누른다(움직이는 동안 누르면 탭이 빗나간다)
+  await page.locator('.set-panel').evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
   await page.locator('.ag-open').tap();
   await expect(page.locator('.ag-panel')).toBeVisible();
 

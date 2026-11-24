@@ -18,7 +18,11 @@ export const test = base.extend<{ errors: string[] }>({
   },
   page: async ({ page, errors }, use) => {
     page.on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(`console.error: ${msg.text()} @ ${msg.location().url}:${msg.location().lineNumber}`);
+      if (msg.type() !== 'error') return;
+      // Playwright의 tap은 주입한 스크립트(주소 없음)에서 대상이 아닌 곳에 닿은 touchstart를 취소한다.
+      // 기기가 바쁠 때 가끔 크롬이 이를 "취소할 수 없는 touchstart"로 알리는데, 게임 코드와 상관없는 도구 쪽 메시지다.
+      if (!msg.location().url && /Ignored attempt to cancel a touchstart/.test(msg.text())) return;
+      errors.push(`console.error: ${msg.text()} @ ${msg.location().url}:${msg.location().lineNumber}`);
     });
     page.on('pageerror', (err) => errors.push(`pageerror: ${err.stack ?? err.message}`));
     await page.addInitScript(
