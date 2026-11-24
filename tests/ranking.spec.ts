@@ -28,10 +28,10 @@ test('ranking: whole server by RP, ties share a rank, my row pinned, new tier na
   await expect(page.locator('.rk-total')).toHaveText('전체 13명');
   const first = page.locator('.rkg-list .rkg-row').nth(0);
   await expect(first).toContainText('탄탄');
-  await expect(first.locator('.rkg-tier-name')).toHaveText('챌린저 III'); // 742 → 725~749
+  await expect(first.locator('.rkg-tier-name')).toHaveText('챌린저'); // 마스터 이상은 단계 없음
   await expect(page.locator('.rkg-list .rkg-row[data-nickname="픽셀"] .rkg-rank')).toHaveText('2');
   await expect(page.locator('.rkg-list .rkg-row[data-nickname="모찌"] .rkg-rank')).toHaveText('2');
-  await expect(page.locator('.rkg-list .rkg-row[data-nickname="모찌"]')).toContainText('그랜드마스터 II');
+  await expect(page.locator('.rkg-list .rkg-row[data-nickname="모찌"]')).toContainText('그랜드마스터');
   await expect(page.locator('.rkg-list .rkg-row[data-nickname="별빛"]')).toContainText('플래티넘 I');
   // 나(0점)는 맨 아래와 같은 순위, 아래에 고정
   await expect(page.locator('.rkg-mine .rkg-row.is-me')).toContainText('랭커');
@@ -54,6 +54,8 @@ test('tier popup shows the new 100-point tiers', async ({ page }) => {
   await page.locator('.trophy-card').tap();
   await expect(page.locator('.rk-row')).toHaveCount(8);
   await expect(page.locator('.rk-row').nth(0)).toContainText('0~100 · IV→I');
-  await expect(page.locator('.rk-row').nth(7)).toContainText('700+ · IV→I');
+  await expect(page.locator('.rk-row').nth(4)).toContainText('400~500 · IV→I');
+  await expect(page.locator('.rk-row').nth(5)).toHaveText(/마스터.*500~600$/);
+  await expect(page.locator('.rk-row').nth(7)).toHaveText(/챌린저.*700\+$/);
   await expect(page.locator('.rk-rule')).toContainText('단계마다 25 RP');
 });

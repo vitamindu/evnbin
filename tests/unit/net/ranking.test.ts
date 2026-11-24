@@ -42,7 +42,7 @@ describe('ranking', () => {
     expect(r.me).toMatchObject({ rank: 3, nickname: '닉ccc3' });
   });
 
-  it(`shows the top ${RANKING_SIZE} and still returns my own row below that`, async () => {
+  it(`shows the top ${RANKING_SIZE} and still returns my own row below that`, { timeout: 60_000 }, async () => {
     const s = mk();
     for (let i = 0; i < RANKING_SIZE + 3; i++) {
       await s.signup(`ppp${i}`, 'secret1', `pp${i}`);

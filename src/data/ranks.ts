@@ -1,6 +1,7 @@
 /**
  * 랭크(티어) 규칙. 서버와 클라이언트가 같이 쓴다(DOM import 금지).
- * 티어마다 100점, 단계 IV→I(단계마다 25점). 브론즈 0~100, 실버 100~200 … 챌린저 700~(챌린저 I은 끝이 없다).
+ * 티어마다 100점. 브론즈~다이아몬드는 단계 IV→I(단계마다 25점), 마스터·그랜드마스터·챌린저는 단계 없음.
+ * 브론즈 0~100, 실버 100~200 … 마스터 500~600, 그랜드마스터 600~700, 챌린저 700~(끝 없음).
  */
 export type TierId = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'master' | 'grandmaster' | 'challenger';
 
@@ -21,9 +22,9 @@ export const TIERS: readonly TierDef[] = [
   { id: 'gold', name: '골드', min: 200, divisions: true, colors: { light: '#ffe27a', dark: '#b07a12', gem: '#fff6c8' } },
   { id: 'platinum', name: '플래티넘', min: 300, divisions: true, colors: { light: '#9ff0df', dark: '#2a8a7c', gem: '#e6fffa' } },
   { id: 'diamond', name: '다이아몬드', min: 400, divisions: true, colors: { light: '#a9c8ff', dark: '#3a4fb8', gem: '#e8f1ff' } },
-  { id: 'master', name: '마스터', min: 500, divisions: true, colors: { light: '#d7a6ff', dark: '#6a2fa8', gem: '#f6e8ff' } },
-  { id: 'grandmaster', name: '그랜드마스터', min: 600, divisions: true, colors: { light: '#ff9a8a', dark: '#a8232c', gem: '#ffe1da' } },
-  { id: 'challenger', name: '챌린저', min: 700, divisions: true, colors: { light: '#bfe9ff', dark: '#1f5fa0', gem: '#ffe680' } },
+  { id: 'master', name: '마스터', min: 500, divisions: false, colors: { light: '#d7a6ff', dark: '#6a2fa8', gem: '#f6e8ff' } },
+  { id: 'grandmaster', name: '그랜드마스터', min: 600, divisions: false, colors: { light: '#ff9a8a', dark: '#a8232c', gem: '#ffe1da' } },
+  { id: 'challenger', name: '챌린저', min: 700, divisions: false, colors: { light: '#bfe9ff', dark: '#1f5fa0', gem: '#ffe680' } },
 ];
 
 /** 단계 하나의 폭(티어 하나 = 4단계 = 100점) */
@@ -54,9 +55,7 @@ export function rankOf(points: number): RankInfo {
   if (tier.divisions) {
     const d = Math.min(3, Math.floor((p - tier.min) / DIVISION_POINTS));
     const from = tier.min + d * DIVISION_POINTS;
-    // 맨 위 티어의 마지막 단계(챌린저 I)는 끝이 없다
-    const top = !next && d === 3;
-    return { tier, division: DIVISION_NAMES[d]!, points: p, from, to: top ? null : from + DIVISION_POINTS };
+    return { tier, division: DIVISION_NAMES[d]!, points: p, from, to: from + DIVISION_POINTS };
   }
   return { tier, division: null, points: p, from: tier.min, to: next ? next.min : null };
 }

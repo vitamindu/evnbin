@@ -15,7 +15,7 @@ export function openRanks(ctx: AppContext) {
       const row = el('div', `rk-row${t.id === r.tier.id ? ' is-me' : ''}`, [
         icon(rankEmblemSvg(t.id), 'ico rk-emblem'),
         txt(t.name, 'rk-name'),
-        txt(`${t.id === 'challenger' ? `${t.min}+` : `${t.min}~${t.min + TIER_POINTS}`} · IV→I`, 'rk-min'),
+        txt(t.id === 'challenger' ? `${t.min}+` : `${t.min}~${t.min + TIER_POINTS}${t.divisions ? ' · IV→I' : ''}`, 'rk-min'),
       ]);
       return row;
     }),
