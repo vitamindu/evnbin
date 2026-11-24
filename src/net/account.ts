@@ -13,6 +13,7 @@
 import type { FighterId } from '../data/fighters';
 import type { Profile } from '../state/profile';
 import type { BoxItem } from '../data/boxes';
+import type { AdminGrantResponse } from './accountApi';
 import type { AccountApiError, AccountProfile, AuthResponse, ProfileResponse } from './accountApi';
 import { getServerUrl } from './config';
 
@@ -283,4 +284,11 @@ export async function buyPremiumPass(): Promise<Profile> {
   const r = await authed<ProfileResponse>('POST', '/api/pass/premium');
   setProfile(r.profile, r.username);
   return r.profile;
+}
+
+/** 관리자: 코인·보석 지급(target = 닉네임 또는 '*' = 모두). 내 프로필도 다시 읽는다(나에게 줬을 수 있다) */
+export async function adminGrant(target: string, coins: number, gems: number): Promise<AdminGrantResponse> {
+  const r = await authed<AdminGrantResponse>('POST', '/api/admin/grant', { target, coins, gems });
+  await refresh();
+  return r;
 }

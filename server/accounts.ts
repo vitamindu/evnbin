@@ -29,6 +29,7 @@ export const ADMIN_USERNAMES = new Set(
     .filter(Boolean),
 );
 import {
+  ADMIN_GRANT_MAX,
   GUILD_CHAT_KEEP,
   RANKING_SIZE,
   type RankingEntry,
@@ -830,6 +831,36 @@ export class AccountStore {
     u.profile.pass = pass;
     this.save();
     return present(u, this.data.guilds);
+  }
+
+  /** 관리자 지급: target = 닉네임 한 명 또는 '*'(서버의 모든 계정). 코인·보석(다이아) 0~ADMIN_GRANT_MAX */
+  adminGrant(adminKey: string, target: unknown, coins: unknown, gems: unknown): { count: number; coins: number; gems: number } {
+    const a = this.data.users[adminKey];
+    if (!a) throw new AccountError('unauthorized');
+    if (!isAdmin(a)) throw new AccountError('not_allowed');
+    const amount = (v: unknown) => {
+      const n = v === undefined || v === null || v === '' ? 0 : Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > ADMIN_GRANT_MAX) throw new AccountError('bad_request');
+      return n;
+    };
+    const c = amount(coins);
+    const g = amount(gems);
+    if (!c && !g) throw new AccountError('bad_request');
+    let keys: string[];
+    if (target === '*') keys = Object.keys(this.data.users);
+    else {
+      const k = this.findByNickname(target);
+      if (!k) throw new AccountError('not_found');
+      keys = [k];
+    }
+    for (const k of keys) {
+      const p = this.data.users[k]!.profile;
+      p.coins += c;
+      p.crystals += g;
+    }
+    this.save();
+    this.log(`[admin] ${a.username} granted coins ${c} gems ${g} to ${target === '*' ? `everyone (${keys.length})` : String(target)}`);
+    return { count: keys.length, coins: c, gems: g };
   }
 
   /** 서버 전체 랭킹(랭크 점수 높은 순, 같으면 같은 순위·먼저 가입한 사람이 위) */

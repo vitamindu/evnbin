@@ -2369,3 +2369,54 @@ img {
 .hs-panel {
   background: #121a52;
 }
+
+/* 관리자 지급 */
+.ag-panel {
+  width: 640px;
+  padding: 22px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ag-field {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.ag-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+}
+.ag-label .ico {
+  width: 28px;
+  height: 28px;
+}
+.ag-row {
+  display: flex;
+  gap: 10px;
+}
+.ag-row .set-input {
+  flex: 1;
+  min-width: 0;
+}
+.ag-all.is-on {
+  background: linear-gradient(#7ee68f, #3cbf5a 55%, #2a9e45);
+}
+.ag-err:empty {
+  display: none;
+}
+.ag-open {
+  width: auto;
+  padding: 0 18px;
+}
+.ag-all {
+  flex: none;
+  width: auto;
+  padding: 0 14px;
+}
+.ag-field {
+  grid-template-columns: 110px minmax(0, 1fr);
+}

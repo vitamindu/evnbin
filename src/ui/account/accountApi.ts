@@ -6,6 +6,7 @@ import { SKINS, SKIN_SHOP_OPEN, getSkin } from '../../data/skins';
 import { upgradeCost } from '../../data/power';
 import { boxTotals, rollFighterBox, type BoxItem } from '../../data/boxes';
 import { getShopItem, shopDay } from '../../data/shop';
+import { ADMIN_GRANT_MAX } from '../../net/accountApi';
 import { PASS_SKIN_REFUND, PREMIUM_PRICE, normalizePass, rewardOf, tierOf, type PassTrack } from '../../data/pass';
 import type { ShopGot } from '../../net/account';
 
@@ -77,6 +78,7 @@ interface AccountModule {
   buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
   claimPass(tier: number, track: PassTrack): Promise<{ got: ShopGot }>;
   buyPremiumPass(): Promise<unknown>;
+  adminGrant(target: string, coins: number, gems: number): Promise<{ count: number; coins: number; gems: number }>;
   /** 가짜 모듈만 */
   patch?(fn: (p: Profile) => void): void;
   getAccount(): Account | null;
@@ -104,6 +106,7 @@ type RealModule = {
   buyShopItem(itemId: string): Promise<{ got: ShopGot }>;
   claimPass(tier: number, track: PassTrack): Promise<{ got: ShopGot }>;
   buyPremiumPass(): Promise<unknown>;
+  adminGrant(target: string, coins: number, gems: number): Promise<{ count: number; coins: number; gems: number }>;
   getAccount(): RealState;
   onAccountChange(cb: (s: RealState) => void): () => void;
 };
@@ -125,6 +128,7 @@ function realAdapter(m: RealModule): AccountModule {
     buyShopItem: (id) => m.buyShopItem(id),
     claimPass: (t, k) => m.claimPass(t, k),
     buyPremiumPass: () => m.buyPremiumPass(),
+    adminGrant: (t, c, g) => m.adminGrant(t, c, g),
     getAccount: () => norm(m.getAccount()),
     onAccountChange: (cb) => m.onAccountChange((s) => cb(norm(s))),
   };
@@ -406,6 +410,27 @@ function fakeModule(): AccountModule {
         if (!p.admin) row.profile.crystals -= PREMIUM_PRICE;
       });
     },
+    async adminGrant(target, coins, gems) {
+      if (!account) fail('unauthorized');
+      await fakeNet();
+      if (!account!.profile.admin) fail('not_allowed');
+      const ok = (n: number) => Number.isInteger(n) && n >= 0 && n <= ADMIN_GRANT_MAX;
+      if (!ok(coins) || !ok(gems) || (!coins && !gems)) fail('server_error');
+      const all = readUsers();
+      const keys = target === '*' ? Object.keys(all) : Object.keys(all).filter((k) => all[k]!.profile.name.toLowerCase() === target.toLowerCase());
+      if (!keys.length) fail('not_found');
+      for (const k of keys) {
+        all[k]!.profile.coins += coins;
+        all[k]!.profile.crystals += gems;
+      }
+      writeUsers(all);
+      const mine = all[account!.username.toLowerCase()];
+      if (mine) {
+        account = { ...account!, profile: present(mine) };
+        emit();
+      }
+      return { count: keys.length, coins, gems };
+    },
     patch(fn: (p: Profile) => void) {
       if (account) save((row) => fn(row.profile));
     },
@@ -434,6 +459,7 @@ export const openBox = () => api.openBox();
 export const buyShopItem = (itemId: string) => api.buyShopItem(itemId);
 export const claimPass = (tier: number, track: PassTrack) => api.claimPass(tier, track);
 export const buyPremiumPass = () => api.buyPremiumPass();
+export const adminGrant = (target: string, coins: number, gems: number) => api.adminGrant(target, coins, gems);
 /** 가짜 계정(?fakeonline)일 때만: 저장된 프로필을 고친다(가짜 길드 등) */
 export const patchFakeProfile = (fn: (p: Profile) => void) => api.patch?.(fn);
 export const getAccount = () => api.getAccount();

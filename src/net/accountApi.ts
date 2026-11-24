@@ -33,6 +33,7 @@
  *   POST   /api/party/kick (Bearer) {nickname}       → PartyResponse  (파티장만)
  *   GET    /api/history (Bearer)                      → HistoryResponse  (최근 30판 + 전체 합계)
  *   GET    /api/ranking (Bearer)                      → RankingResponse  (서버 전체, 랭크 점수 순 100명 + 내 순위)
+ *   POST   /api/admin/grant (Bearer, 관리자) {target: 닉네임 | '*', coins, gems} → AdminGrantResponse  ('*' = 서버의 모든 계정)
  *   PUT    /api/skin    (Bearer) {fighterId, skinId|null} → { profile, username }  (가진 스킨만, null = 기본)
  *   POST   /api/skins/buy (Bearer) {skinId}             → { profile, username }  (코인 차감, SKIN_SHOP_OPEN일 때만)
  *   POST   /api/logout  (Bearer)                        → { ok: true }
@@ -333,6 +334,17 @@ export interface RankingResponse {
 }
 
 export const RANKING_SIZE = 100;
+
+/** 관리자 지급: 한 번에 줄 수 있는 최대 수량(코인·보석 각각) */
+export const ADMIN_GRANT_MAX = 1_000_000;
+
+/** POST /api/admin/grant 응답 */
+export interface AdminGrantResponse {
+  /** 받은 계정 수 */
+  count: number;
+  coins: number;
+  gems: number;
+}
 
 export interface GuildChatResponse {
   messages: GuildChatMessage[];

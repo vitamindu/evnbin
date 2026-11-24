@@ -5,6 +5,7 @@ import { getServerUrl, setServerUrl } from '../../net/config';
 import { resetProfile } from '../../state/profile';
 import { getSettings, updateSettings } from '../../state/settings';
 import type { AppContext } from '../context';
+import { openAdminGrant } from './adminGrant';
 import { accountErrorCode, accountErrorText, changeNickname, getAccount, logout } from '../account/accountApi';
 import { getOnlineClient } from '../online/clientFactory';
 import { toast } from './toast';
@@ -172,6 +173,16 @@ export function openSettings(ctx: AppContext) {
       row('graphics', '그래픽', quality),
       row('fps', 'FPS 표시', fps),
       acct ? row('nickname', '닉네임', nickCtl) : null,
+      acct?.profile.admin
+        ? row(
+            'admin',
+            '관리자',
+            button('btn-toggle ag-open', [txt('코인·보석 지급')], () => {
+              overlay.remove();
+              openAdminGrant(ctx);
+            }),
+          )
+        : null,
       acct ? null : row('reset', '진행 초기화', reset),
       row('server', '서버', server),
       info,

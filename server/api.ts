@@ -376,6 +376,11 @@ async function route(req: IncomingMessage, path: string, { store, limiter, log, 
       }),
     } satisfies PartyResponse;
   }
+  if (method === 'POST' && path === '/api/admin/grant') {
+    if (!key) throw new HttpError('unauthorized');
+    const b = await readJson(req);
+    return store.adminGrant(key, typeof b.target === 'string' ? b.target.trim() : b.target, b.coins, b.gems);
+  }
   if (method === 'GET' && path === '/api/ranking') {
     if (!key) throw new HttpError('unauthorized');
     return store.ranking(key);
