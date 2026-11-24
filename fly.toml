@@ -36,4 +36,4 @@ primary_region = "nrt" # 도쿄: 한국과 가장 가까운 지역
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
