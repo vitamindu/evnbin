@@ -130,7 +130,10 @@ export interface Lob {
   from: Vec2;
   to: Vec2;
   startTick: number;
+  /** 터지는 틱 */
   endTick: number;
+  /** 땅에 떨어지는 틱(있으면 그때부터 endTick까지 바닥에서 깜빡인다). 없으면 endTick에 떨어지자마자 터진다 */
+  landTick?: number;
   damage: number;
   aoeRadius: number;
   isSuper: boolean;

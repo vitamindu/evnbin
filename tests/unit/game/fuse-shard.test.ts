@@ -8,6 +8,7 @@ import { Tile } from '../../../src/game/world';
 import { attack, dummies, fighters, makeSim, ofType, run, superIn, testMap, tick, ticksFor } from './helpers';
 
 const FUSE = getFighter('fuse');
+const FUSE_TICKS = secToTicks(FUSE.attack.fuse ?? 0);
 const SHARD = getFighter('shard');
 
 describe('FUSE', () => {
@@ -22,7 +23,8 @@ describe('FUSE', () => {
     const ys = sim.lobs.map((l) => l.to.y).sort((a, b) => a - b);
     for (const l of sim.lobs) {
       expect(l.to.x).toBeCloseTo(tx, 9);
-      expect(l.endTick - l.startTick).toBe(LOB_FLIGHT_TICKS);
+      expect(l.landTick! - l.startTick).toBe(LOB_FLIGHT_TICKS);
+      expect(l.endTick - l.landTick!).toBe(FUSE_TICKS); // 떨어진 뒤 0.5초 있다가 터진다
       expect(l.aoeRadius).toBe(FUSE.attack.aoeRadius);
       expect(l.isSuper).toBe(false);
     }
@@ -49,7 +51,9 @@ describe('FUSE', () => {
     const p = fighters(sim)[0]!;
     const d = dummies(sim)[0]!;
     tick(sim, { [p.id]: attack({ x: 4 / FUSE.attack.range, y: 0 }) });
-    const ev = run(sim, LOB_FLIGHT_TICKS);
+    // 떨어진 순간에는 아직 안 터진다
+    expect(ofType(run(sim, LOB_FLIGHT_TICKS), 'explode')).toHaveLength(0);
+    const ev = run(sim, FUSE_TICKS);
     const hits = ofType(ev, 'hit').filter((h) => h.targetId === d.id);
     expect(ofType(ev, 'explode')).toHaveLength(FUSE.attack.count);
     expect(hits).toHaveLength(FUSE.attack.count); // 두 폭탄 모두 범위 안
@@ -67,7 +71,7 @@ describe('FUSE', () => {
     expect(sim.lobs).toHaveLength(1);
     expect(sim.lobs[0]!.aoeRadius).toBe(FUSE.super.aoeRadius);
     const x0 = d.pos.x;
-    const ev = run(sim, LOB_FLIGHT_TICKS + KNOCKBACK_TICKS + 2);
+    const ev = run(sim, LOB_FLIGHT_TICKS + secToTicks(FUSE.super.fuse ?? 0) + KNOCKBACK_TICKS + 2);
     expect(ofType(ev, 'hit').filter((h) => h.targetId === d.id)).toEqual([expect.objectContaining({ damage: FUSE.super.damage, isSuper: true })]);
     expect(ofType(ev, 'wallsBroken').flatMap((e) => e.tiles)).toContainEqual({ x: 8, y: 4 });
     expect(sim.grid.get(8, 4)).toBe(Tile.Floor);

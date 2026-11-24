@@ -57,6 +57,8 @@ export interface AttackDef {
   aoeRadius?: number;
   /** 거리 비례 피해: 사거리 끝까지 날아갔을 때의 피해량(가까울수록 damage에 가깝다) */
   damageFar?: number;
+  /** lob: 땅에 떨어진 뒤 터지기까지(초). 없으면 떨어지자마자 */
+  fuse?: number;
 }
 
 export interface SuperDef {
@@ -92,7 +94,7 @@ export interface SuperDef {
   slam?: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime?: number;
-  /** leap: 폭탄이 떨어져 터지기까지의 시간(초) */
+  /** leap: 폭탄이 떨어져 터지기까지의 시간(초). lob: 땅에 떨어진 뒤 터지기까지(초, 없으면 바로) */
   fuse?: number;
 }
 
@@ -174,7 +176,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       name: 'Pulse Burst',
       description: '좌우로 번갈아 가며 6발을 일직선으로 빠르게 쏜다.',
       kind: 'burst',
-      damage: 320,
+      damage: 288,
       count: 6,
       spreadDeg: 0,
       burstInterval: 0.08,
@@ -189,7 +191,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       name: 'Overdrive',
       description: '사거리가 늘어난 12발을 길게 퍼붓는다. 벽도 뚫고 부순다.',
       kind: 'burst',
-      damage: 320,
+      damage: 288,
       count: 12,
       spreadDeg: 0,
       burstInterval: 0.07,
@@ -304,6 +306,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       reload: 1.9,
       superChargePerHit: 0.12,
       aoeRadius: 0.9,
+      fuse: 0.5,
     },
     super: {
       name: 'Grand Finale',
@@ -318,6 +321,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       breaksWalls: true,
       knockback: 1.5,
       aoeRadius: 2,
+      fuse: 0.5,
     },
   },
   {

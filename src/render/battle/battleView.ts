@@ -134,7 +134,7 @@ export class BattleView {
   private readonly map: MapRenderer;
   private readonly units = new Map<EntityId, UnitVisual>();
   private readonly shots = new Map<EntityId, ShotVisual>();
-  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number }>();
+  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number }>();
   private effects: Effect[] = [];
   private readonly shotGeo = new THREE.SphereGeometry(0.22, 14, 10);
   private readonly shotKits = new Map<boolean, { core: THREE.BufferGeometry; halo: THREE.BufferGeometry; trail: THREE.BufferGeometry; shadow: THREE.BufferGeometry; r: number }>();
@@ -323,7 +323,7 @@ export class BattleView {
         marker.position.set(l.to.x, 0.04, l.to.y);
         this.scene.add(shell, marker);
         shell.userData.baseColor = baseColor;
-        this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick });
+        this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick, land: l.landTick });
       }
     }
     for (const [id, l] of this.lobs) {
@@ -481,8 +481,9 @@ export class BattleView {
     for (const l of this.lobs.values()) {
       const total = Math.max(1, l.end - l.start);
       const dist = Math.hypot(l.to.x - l.from.x, l.to.y - l.from.y);
-      // 짧게 던지는 폭탄(점프 폭탄 등)은 0.3초 만에 떨어져 바닥에서 깜빡이다 터진다. 긴 포물선은 끝까지 날아간다
-      const flight = dist < 2 ? Math.min(total, 9) : total;
+      // 짧게 던지는 폭탄(점프 폭탄 등)은 0.3초 만에 떨어져 바닥에서 깜빡이다 터진다. 긴 포물선은 끝까지 날아간다.
+      // landTick이 있으면(FUSE 등) 그때 떨어져 터질 때까지 깜빡인다
+      const flight = l.land !== undefined ? Math.max(1, l.land - l.start) : dist < 2 ? Math.min(total, 9) : total;
       const e = tickF - l.start;
       const k = Math.min(1, Math.max(0, e / flight));
       const height = dist < 2 ? 1.2 : LOB_HEIGHT;

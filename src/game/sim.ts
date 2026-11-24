@@ -146,6 +146,8 @@ export interface ShotSpec {
   leapTime: number;
   /** leap: 폭탄이 터지기까지(초) */
   fuse: number;
+  /** lob: 땅에 떨어진 뒤 터지기까지(초) */
+  lobFuse: number;
 }
 
 export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
@@ -172,6 +174,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       aoeRadius: s.aoeRadius ?? DEFAULT_LOB_AOE,
       leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
       fuse: s.fuse ?? DEFAULT_FUSE,
+      lobFuse: s.kind === 'lob' ? (s.fuse ?? 0) : 0,
     };
   }
   const a = def.attack;
@@ -197,6 +200,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     damageFar: a.damageFar,
     leapTime: DEFAULT_LEAP_TIME,
     fuse: DEFAULT_FUSE,
+    lobFuse: a.kind === 'lob' ? (a.fuse ?? 0) : 0,
   };
 }
 
@@ -687,6 +691,7 @@ export class Sim implements SimView {
       const to = this.clampToMap({ x: cx + px * off, y: cy + py * off });
       const flight = spec.speedGiven ? Math.max(1, Math.round((dist(f.pos, to) / spec.projectileSpeed) * TICK_RATE)) : LOB_FLIGHT_TICKS;
       const id = this.nextId++;
+      const fuseTicks = Math.round(spec.lobFuse * TICK_RATE);
       this.lobs.push({
         id,
         type: 'lob',
@@ -695,7 +700,8 @@ export class Sim implements SimView {
         from: { ...f.pos },
         to,
         startTick: this.tick,
-        endTick: this.tick + flight,
+        endTick: this.tick + flight + fuseTicks,
+        ...(fuseTicks > 0 ? { landTick: this.tick + flight } : {}),
         damage: spec.damage,
         aoeRadius: spec.aoeRadius,
         isSuper: spec.isSuper,

@@ -40,6 +40,8 @@ const SMOOTH_MAX_DIST = 1.5;
 /** 보정 차이를 줄이는 비율(틱마다, 시간 상수 0.1초) */
 const SMOOTH_KEEP = Math.exp(-TICK_DT / 0.1);
 /** 최신 snap보다 이만큼(틱)까지만 앞질러 그린다 */
+/** 내 탄을 그려진 내 위치에 맞추는 효과가 사라지는 거리(타일) */
+const SHOT_ALIGN_DIST = 2.5;
 const MAX_EXTRAPOLATE = 3;
 /** 이보다 오래된 사건(틱)은 효과를 생략한다(탭이 멈췄다 돌아온 경우) */
 const STALE_EVENT_TICKS = 30;
@@ -329,8 +331,36 @@ export class OnlineSession implements BattleLike {
     const s = this.buffer.sample(this.renderTick, MAX_EXTRAPOLATE);
     if (!s) return this.current;
     const remote = s.getUnit(this.playerId);
-    if (remote?.type === 'fighter') s.replaceUnit(this.myUnit(remote));
+    if (remote?.type === 'fighter') {
+      const me = this.myUnit(remote);
+      s.replaceUnit(me);
+      this.alignOwnShots(s, remote.pos, me.pos);
+    }
     return s;
+  }
+
+  /**
+   * 내 캐릭터는 예측해서 앞서 그리고, 내 탄은 서버 시간(약 100ms 전)의 위치에서 나온다.
+   * 그대로 그리면 움직이며 쏠 때 탄이 캐릭터 뒤(쏘기 시작한 자리)에서 나오는 것처럼 보이므로,
+   * 내 탄·내 폭탄의 출발점을 그려진 내 위치로 옮기고, 멀어질수록(SHOT_ALIGN_DIST 타일) 원래 길로 돌아오게 한다.
+   * 판정은 서버가 하므로 화면에서만 바뀐다.
+   */
+  private alignOwnShots(s: NetSimView, serverPos: Vec2, shownPos: Vec2) {
+    const dx = shownPos.x - serverPos.x;
+    const dy = shownPos.y - serverPos.y;
+    if (Math.abs(dx) + Math.abs(dy) < 1e-3) return;
+    for (const p of s.projectiles) {
+      if (p.ownerId !== this.playerId) continue;
+      const d = Math.hypot(p.pos.x - serverPos.x, p.pos.y - serverPos.y);
+      const w = Math.max(0, 1 - d / SHOT_ALIGN_DIST);
+      if (w <= 0) continue;
+      p.pos = { x: p.pos.x + dx * w, y: p.pos.y + dy * w };
+    }
+    for (const l of s.lobs) {
+      if (l.ownerId !== this.playerId) continue;
+      // 폭탄은 출발점만 옮긴다(떨어지는 곳은 그대로)
+      l.from = { x: l.from.x + dx, y: l.from.y + dy };
+    }
   }
 
   private myUnit(remote: Fighter): Fighter {
