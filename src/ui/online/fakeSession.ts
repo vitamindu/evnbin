@@ -105,7 +105,7 @@ export class FakeOnlineSession implements BattleLike {
       },
       getUnit: (id) => sim.getUnit(id),
     };
-    this.view = new BattleView(this.sim.grid, this.playerId);
+    this.view = new BattleView(this.sim.grid, this.playerId, this.sim.getUnit(this.playerId)?.team ?? 0);
     this.view.snapshot(this.sim);
   }
 

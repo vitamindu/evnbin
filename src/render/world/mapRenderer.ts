@@ -89,7 +89,8 @@ export class MapRenderer {
   private bushes!: BushLayer;
   private scenery: Scenery;
 
-  constructor(grid: Grid) {
+  /** viewerTeam: 보는 사람의 팀(출발 지점 색) */
+  constructor(grid: Grid, private readonly viewerTeam = 0) {
     this.grid = grid;
     this.scenery = new Scenery(grid);
     this.object.add(this.scenery.object);
@@ -139,7 +140,7 @@ export class MapRenderer {
       }
     }
     const geo = this.own(qb.build());
-    const tex = this.own(buildFloorTexture(g));
+    const tex = this.own(buildFloorTexture(g, 64, this.viewerTeam));
     const mat = this.own(new THREE.MeshLambertMaterial({ map: tex }));
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = 'floor';

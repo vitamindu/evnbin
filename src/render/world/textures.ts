@@ -48,7 +48,8 @@ const FLOOR = {
 };
 
 /** 바닥 전체 텍스처. 타일 하나 = ppt 픽셀. 캔버스 위쪽 = 맵 y=0 */
-export function buildFloorTexture(grid: Grid, ppt = 64): THREE.CanvasTexture {
+/** viewerTeam: 보는 사람의 팀. 출발 지점은 우리 팀 파랑, 상대 팀 빨강 */
+export function buildFloorTexture(grid: Grid, ppt = 64, viewerTeam = 0): THREE.CanvasTexture {
   const P = ppt;
   const [c, ctx] = canvas(grid.width * P, grid.height * P);
   const isGrass = (tx: number, ty: number) => grid.ground(tx, ty) === Ground.Grass && grid.get(tx, ty) !== Tile.Water;
@@ -209,7 +210,7 @@ export function buildFloorTexture(grid: Grid, ppt = 64): THREE.CanvasTexture {
   }
 
   drawLanes(ctx, grid, P);
-  drawPads(ctx, grid, P);
+  drawPads(ctx, grid, P, viewerTeam);
   return canvasTexture(c);
 }
 
@@ -319,11 +320,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-const TEAM_PAD = ['#3f8cff', '#ff4f5e'] as const;
+/** [우리 팀, 상대 팀] — 보는 사람 기준 */
+const TEAM_PAD = { ally: '#3f8cff', enemy: '#ff4f5e' } as const;
 const DUMMY_PAD: Record<string, string> = { idle: '#e84a4a', patrol: '#ff9a2a', turret: '#9b5cf0' };
 
 /** 출발 지점(팀 색 원판 + 화살표), 더미 받침(과녁 무늬, 왕복 경로, 포탑 판) */
-function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
+function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number, viewerTeam = 0) {
   grid.teamSpawns.forEach((spawns, team) => {
     for (const s of spawns) {
       const x = s.x * P;
@@ -333,7 +335,7 @@ function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number) {
       ctx.beginPath();
       ctx.arc(x, y + 4, R, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = TEAM_PAD[team as 0 | 1];
+      ctx.fillStyle = team === viewerTeam ? TEAM_PAD.ally : TEAM_PAD.enemy;
       ctx.beginPath();
       ctx.arc(x, y, R, 0, Math.PI * 2);
       ctx.fill();

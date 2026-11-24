@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../config';
 import { getFighter } from '../../data/fighters';
-import type { EntityId, Fighter, SimEvent, SimView, Unit, Vec2 } from '../../game/types';
+import type { EntityId, Fighter, SimEvent, SimView, Team, Unit, Vec2 } from '../../game/types';
 import type { Grid } from '../../game/world';
 import { isVisibleTo } from '../../game/visibility';
 import { buildFighterModel, type FighterModel } from '../fighterModel';
@@ -161,16 +161,20 @@ export class BattleView {
   private readonly aimShapes = new Map<string, THREE.Object3D>();
   private readonly raycaster = new THREE.Raycaster();
   readonly followId: EntityId;
+  /** 보는 사람의 팀(발밑 원·탄환 색 기준) */
+  private myTeam: Team = 0;
 
   /** 유닛이 입은 스킨(세션이 첫 snapshot 전에 정한다) */
   skinOf: (id: EntityId) => string | undefined = () => undefined;
 
-  constructor(grid: Grid, followId: EntityId) {
+  /** viewerTeam: 보는 사람의 팀(바닥 출발 지점 색. 발밑 원·탄환은 sim에서 다시 읽는다) */
+  constructor(grid: Grid, followId: EntityId, viewerTeam: Team = 0) {
+    this.myTeam = viewerTeam;
     this.grid = grid;
     this.followId = followId;
     this.scene.background = new THREE.Color('#1c2a52');
     addStandardLights(this.scene);
-    this.map = new MapRenderer(grid);
+    this.map = new MapRenderer(grid, viewerTeam);
     this.scene.add(this.map.object, this.aimRoot);
   }
 
@@ -184,6 +188,8 @@ export class BattleView {
   /** 시뮬레이션이 한 틱 진행한 직후 호출: 이전/현재 상태를 기록한다 */
   snapshot(sim: SimView) {
     this.simTick = sim.tick;
+    // 내 팀은 sim에서 바로 읽는다(위쪽 팀이면 내 모델이 팀원보다 늦게 만들어진다)
+    this.myTeam = sim.getUnit(this.followId)?.team ?? this.myTeam;
     const seen = new Set<EntityId>();
     for (const u of sim.units) {
       seen.add(u.id);
@@ -191,6 +197,7 @@ export class BattleView {
       if (!v) {
         const model = u.type === 'fighter' ? buildFighterModel(getFighter(u.fighterId), { skin: this.skinOf(u.id) }) : buildDummyModel(u.behavior);
         model.root.scale.setScalar(MODEL_SCALE);
+        model.root.userData.unitId = u.id;
         if (u.type === 'fighter') model.root.add(this.teamRing(u));
         this.scene.add(model.root);
         v = { unit: u, model, prev: { ...u.pos }, curr: { ...u.pos }, facingPrev: u.facing, facingCurr: u.facing, hidden: false };
@@ -340,8 +347,7 @@ export class BattleView {
   /** 발밑 팀 색 원(모델 크기에 맞춰 함께 커진다) */
   private teamRing(u: Unit): THREE.Mesh {
     // 보는 사람 기준: 나 / 같은 팀 / 상대 팀
-    const myTeam = this.units.get(this.followId)?.unit.team ?? (u.id === this.followId ? u.team : 0);
-    const color = u.id === this.followId ? TEAM_RING.me : u.team === myTeam ? TEAM_RING.ally : TEAM_RING.enemy;
+    const color = u.id === this.followId ? TEAM_RING.me : u.team === this.myTeam ? TEAM_RING.ally : TEAM_RING.enemy;
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.55, 0.7, 40),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false }),
@@ -355,8 +361,7 @@ export class BattleView {
   private shotColor(owner: Unit | undefined): string {
     if (!owner) return SHOT_COLOR.enemy!;
     // 규칙: 우리 팀 탄환은 무조건 파란색, 상대 팀은 무조건 빨간색(CLAUDE.md)
-    const myTeam = this.units.get(this.followId)?.unit.team ?? 0;
-    return owner.team === myTeam ? SHOT_COLOR.ally! : SHOT_COLOR.enemy!;
+    return owner.team === this.myTeam ? SHOT_COLOR.ally! : SHOT_COLOR.enemy!;
   }
 
   /** 몸통 재질(카툰 명암) */
