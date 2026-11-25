@@ -97,7 +97,7 @@ test('T-52 offline guests see a login hint on the friends screen', async ({ page
 test('T-53 crystal rush: host room shows the mode, battle shows team crystal totals, countdown and carried count', async ({ page }, testInfo) => {
   await signupToLobby(page);
   await page.locator('.mode-card').tap();
-  await expect(page.locator('.mp-card')).toHaveCount(3);
+  await expect(page.locator('.mp-card')).toHaveCount(4);
   await page.locator('.mp-card[data-mode="crystal"]').tap();
   await expect(page.locator('.mode-card .mode-name')).toHaveText('크리스탈 러시');
   await page.locator('.btn-play').tap();

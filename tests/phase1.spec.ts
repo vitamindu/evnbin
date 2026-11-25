@@ -185,7 +185,7 @@ test('T-08b mode card opens the mode picker; TEAM FIGHT is remembered, TRAINING 
   await page.locator('.mode-card').tap();
   const picker = page.locator('.mp-panel');
   await expect(picker).toBeVisible();
-  await expect(picker.locator('.mp-card')).toHaveCount(3);
+  await expect(picker.locator('.mp-card')).toHaveCount(4);
   await expect(picker.locator('.mp-card[data-mode="training"]')).toHaveClass(/is-selected/);
   await picker.locator('.mp-card[data-mode="teamfight"]').tap();
   await expect(picker).toHaveCount(0);
