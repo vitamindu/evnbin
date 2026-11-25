@@ -652,7 +652,7 @@ test('T-33 SAKURA HINAKO skin glb loads at boot without warnings; default HINAKO
   await page.goto('/?qa');
   await tapToLobby(page);
   // 스킨(src/data/skins.ts)용 glb는 부팅 때 미리 받는다
-  expect(glb).toEqual({ 'hinako.glb': 200, 'hinako_gun.glb': 200 });
+  expect(glb).toEqual({ 'hinako.glb': 200, 'hinako_gun.glb': 200, 'reaper.glb': 200, 'reaper_scythe.glb': 200 });
 
   await selectFighterViaUi(page, 'hinako');
   await page.locator('.btn-play').tap();
