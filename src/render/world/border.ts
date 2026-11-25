@@ -14,7 +14,7 @@ import { hash, worldTheme } from './textures';
 export type BorderStyle = 'stone' | 'rock' | 'hill' | 'cliff';
 
 /** 프로토타입 확인용: 주소의 ?edge=rock|hill|cliff|stone. 없으면 기본 */
-export const DEFAULT_BORDER: BorderStyle = 'stone'; // 시안 고르기 전까지는 지금 모습
+export const DEFAULT_BORDER: BorderStyle = 'hill'; // 사용자가 고른 B안(풀 언덕)
 export function borderStyleFromUrl(): BorderStyle {
   try {
     const v = new URLSearchParams(location.search).get('edge');
@@ -82,11 +82,14 @@ function rockPiece(seed: number, h: number): THREE.BufferGeometry {
   return g;
 }
 
-function hillPiece(seed: number, h: number): THREE.BufferGeometry {
-  const c = colors();
-  const g = new THREE.SphereGeometry(0.85, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  g.scale(1.05 + hash(seed, 3, 710) * 0.3, h / 0.85, 1.05 + hash(seed, 4, 710) * 0.3);
-  paint(g, (p) => (p.y > h * 0.35 ? lerpHex(c.topDark, c.top, p.y / h).getHex() : lerpHex(c.dirtDark, c.dirt, p.y / (h * 0.35)).getHex()));
+/** 풀 언덕: 크고 둥근 반구(색 대비를 줄여 눈이 편하게). radius = 바닥 반지름 */
+function hillPiece(seed: number, h: number, radius = 1.15): THREE.BufferGeometry {
+  const winter = worldTheme() === 'winter';
+  const base = winter ? '#cfdcec' : '#5fa857';
+  const top = winter ? '#f4f8fd' : '#86d06e';
+  const g = new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  g.scale(1 + hash(seed, 3, 710) * 0.15, h / radius, 1 + hash(seed, 4, 710) * 0.15);
+  paint(g, (p) => lerpHex(base, top, Math.pow(p.y / h, 0.7)).getHex());
   return g;
 }
 
@@ -116,12 +119,17 @@ export function buildBorder(grid: Grid, style: Exclude<BorderStyle, 'stone'>): {
   const H = grid.height;
   const tiles = borderTiles(grid);
   const parts: THREE.BufferGeometry[] = [];
+  // 열마다 가장 아래 바닥 칸. 그보다 아래(카메라 쪽)의 테두리는 '앞쪽'이라 낮고 작게(골대 주머니 옆 포함)
+  const lowestFloor = new Array<number>(W).fill(-1);
+  for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (grid.get(x, y) !== Tile.HardWall) lowestFloor[x] = y;
   const piece = (seed: number, h: number) => (style === 'rock' ? rockPiece(seed, h) : style === 'hill' ? hillPiece(seed, h) : cliffPiece(seed, h));
   for (const k of tiles) {
     const tx = k % W;
     const ty = (k - tx) / W;
+    // 풀 언덕은 한 칸 건너 하나씩(언덕이 커서 옆 칸까지 덮는다) — 덜 빽빽하게
+    if (style === 'hill' && (tx + ty) % 2 === 1 && !(ty >= H - 2 || (ty > H * 0.6 && ty > lowestFloor[tx]!))) continue;
     const r = (s: number) => hash(tx, ty, 740 + s);
-    const south = ty >= H - 2;
+    const south = ty >= H - 2 || (ty > H * 0.6 && ty > lowestFloor[tx]!);
     // 맵 안쪽과 맞닿은 칸인가(그 칸은 벽 높이를 지키고, 더 바깥 칸은 높아진다)
     const inner = [
       [1, 0],
@@ -133,17 +141,27 @@ export function buildBorder(grid: Grid, style: Exclude<BorderStyle, 'stone'>): {
       const ny = ty + dy!;
       return nx >= 0 && ny >= 0 && nx < W && ny < H && grid.get(nx, ny) !== Tile.HardWall;
     });
-    const base = south ? 0.75 : inner ? 1.05 : 1.45;
+    // 앞쪽(카메라 쪽) 언덕: 경기장과 맞닿은 줄만 낮게, 그 뒤는 비워 둔다(풀밭이 보이게)
+    if (style === 'hill' && south && !inner) continue;
+    const base = south ? (style === 'hill' ? 0.55 : 0.75) : inner ? 1.05 : 1.45;
     const h = base + r(1) * (south ? 0.2 : 0.45);
     const jx = style === 'cliff' ? 0 : (r(2) - 0.5) * 0.25;
     const jz = style === 'cliff' ? 0 : (r(3) - 0.5) * 0.25;
     const yaw = style === 'cliff' ? Math.floor(r(4) * 4) * (Math.PI / 2) : r(4) * Math.PI * 2;
-    parts.push(placed(piece(tx * 31 + ty * 17, h), tx + 0.5 + jx, ty + 0.5 + jz, yaw));
+    // 아래쪽 언덕은 카메라 앞이라 작게(경기장 쪽으로 넘어오지 않게)
+    const geo = style === 'hill' ? hillPiece(tx * 31 + ty * 17, h, south ? 0.9 : 1.15) : piece(tx * 31 + ty * 17, h);
+    parts.push(placed(geo, tx + 0.5 + jx, ty + 0.5 + (style === 'hill' && south ? 0.15 : jz), yaw));
   }
-  // 맵 밖 바로 바깥: 산기슭처럼 한두 줄 더(남쪽은 없음)
-  for (let ring = 1; ring <= 2; ring++) {
+  // 맵 밖 바로 바깥: 산기슭처럼 한두 줄 더(남쪽은 없음). 풀 언덕은 한 줄, 세 칸마다 큰 언덕 하나
+  const rings = style === 'hill' ? 1 : 2;
+  for (let ring = 1; ring <= rings; ring++) {
     const add = (x: number, z: number, seed: number) => {
       const r = (s: number) => hash(Math.round(x * 10), Math.round(z * 10), 760 + s);
+      if (style === 'hill') {
+        if (seed % 3 !== 0) return;
+        parts.push(placed(hillPiece(seed, 1.7 + r(1) * 0.5, 1.6), x + (r(3) - 0.5) * 0.4, z + (r(4) - 0.5) * 0.4, r(2) * Math.PI * 2));
+        return;
+      }
       const h = (style === 'cliff' ? 1.6 : 1.7) + ring * 0.55 + r(1) * 0.6;
       const yaw = style === 'cliff' ? Math.floor(r(2) * 4) * (Math.PI / 2) : r(2) * Math.PI * 2;
       const j = style === 'cliff' ? 0 : 0.35;

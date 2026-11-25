@@ -99,7 +99,7 @@ export class MapRenderer {
     // 겉모습(눈·얼음 등)을 먼저 정한다: 아래에서 만드는 텍스처·풍경이 읽는다
     setWorldTheme(grid.theme);
     this.borderStyle = borderStyleFromUrl();
-    this.scenery = new Scenery(grid, { clearNear: this.borderStyle === 'stone' ? 0 : 2.6 });
+    this.scenery = new Scenery(grid, { clearNear: this.borderStyle === 'stone' ? 0 : this.borderStyle === 'hill' ? 1.8 : 2.6 });
     this.object.add(this.scenery.object);
     this.build();
     // 맵 테두리: 자연 지형(바위·언덕·절벽). 단단한 벽은 바뀌지 않으므로 한 번만 만든다
