@@ -959,3 +959,97 @@
 .battle.is-crystal .ko-feed {
   top: 74px;
 }
+
+/* ───────────── 점수판: 왼쪽 위 나가기 버튼 옆에 작게 ───────────── */
+.scoreboard {
+  top: 16px;
+  left: 104px;
+  transform: none;
+  align-items: stretch;
+  height: 60px;
+}
+.sb-team {
+  width: 58px;
+  height: 60px;
+  gap: 3px;
+  border-width: 2.5px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.28),
+    0 3px 0 var(--ink);
+}
+.sb-blue {
+  border-radius: 14px 0 0 14px;
+}
+.sb-red {
+  border-radius: 0 14px 14px 0;
+}
+.sb-num {
+  font-size: 28px;
+  --o: 2.5px;
+}
+.sb-bar {
+  width: 40px;
+  height: 6px;
+  border-width: 1.5px;
+}
+.sb-clock {
+  width: 76px;
+  height: 60px;
+  margin: 0 -2px;
+  padding-top: 0;
+  border-width: 2.5px;
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 2px var(--panel-line),
+    0 3px 0 var(--ink);
+}
+.sb-time {
+  font-size: 24px;
+  --o: 2.5px;
+}
+.sb-target {
+  margin-top: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.crystal-board .sb-team {
+  width: 72px;
+}
+.cb-gem {
+  width: 22px;
+  height: 22px;
+}
+.crystal-board .sb-target {
+  font-size: 9px;
+}
+
+/* 크리스탈 승리 카운트다운: 점수판 바로 아래에 작게(한 줄) */
+.crystal-countdown {
+  left: 104px;
+  top: 84px;
+  transform: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 14px 3px;
+  border-radius: 14px;
+  border-width: 2.5px;
+  box-shadow: 0 3px 0 var(--ink);
+}
+.cd-cap {
+  font-size: 13px;
+}
+.cd-num {
+  font-size: 26px;
+  --o: 2.5px;
+}
+/* 연습장 맵 이름: 나가기 버튼 옆에 작게 */
+.battle-label {
+  top: 26px;
+  left: 104px;
+  transform: none;
+  padding: 4px 14px 5px;
+  border-radius: 16px;
+  border-width: 2.5px;
+  font-size: 16px;
+}
