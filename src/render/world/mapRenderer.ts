@@ -6,6 +6,7 @@ import { adobeGeometry, crateGeometry, mergeParts, outlineGeometry, paint, reedG
 import { InstancedLayer, tileMatrix } from './instancedLayer';
 import { outlineMaterial, waterMaterial, worldToon, type TimeUniform } from './materials';
 import { Scenery } from './scenery';
+import { borderStyleFromUrl, borderTiles, buildBorder, type BorderStyle } from './border';
 import { buildAdobeTexture, buildCrateTexture, buildFloorTexture, buildStoneTexture, hash, setWorldTheme } from './textures';
 
 /**
@@ -88,15 +89,24 @@ export class MapRenderer {
   private wallKind = new Map<number, WallKind>();
   private bushes!: BushLayer;
   private scenery: Scenery;
+  private readonly borderStyle: BorderStyle;
+  private border: { object: THREE.Group; dispose(): void } | null = null;
+  private borderSet: Set<number> | null = null;
 
   /** viewerTeam: 보는 사람의 팀(출발 지점 색) */
   constructor(grid: Grid, private readonly viewerTeam = 0) {
     this.grid = grid;
     // 겉모습(눈·얼음 등)을 먼저 정한다: 아래에서 만드는 텍스처·풍경이 읽는다
     setWorldTheme(grid.theme);
-    this.scenery = new Scenery(grid);
+    this.borderStyle = borderStyleFromUrl();
+    this.scenery = new Scenery(grid, { clearNear: this.borderStyle === 'stone' ? 0 : 2.6 });
     this.object.add(this.scenery.object);
     this.build();
+    // 맵 테두리: 자연 지형(바위·언덕·절벽). 단단한 벽은 바뀌지 않으므로 한 번만 만든다
+    if (this.borderStyle !== 'stone') {
+      this.border = buildBorder(grid, this.borderStyle);
+      this.object.add(this.border.object);
+    }
   }
 
   // ───────────── 만들기 ─────────────
@@ -260,9 +270,12 @@ export class MapRenderer {
     for (const l of [this.stone, this.walls.crate, this.walls.adobe, this.rubble]) l.addTo(root);
 
     const stoneColor = new THREE.Color();
+    // 테두리 칸은 border.ts가 자연 지형으로 그린다(돌벽돌은 안쪽 단단한 벽만)
+    if (this.borderStyle !== 'stone') this.borderSet ??= borderTiles(g);
     for (let ty = 0; ty < g.height; ty++) {
       for (let tx = 0; tx < W; tx++) {
         if (g.get(tx, ty) !== Tile.HardWall) continue;
+        if (this.borderSet?.has(ty * W + tx)) continue;
         const r = (s: number) => hash(tx, ty, 300 + s);
         const k = 0.9 + r(1) * 0.14;
         stoneColor.setRGB(k * (0.98 + r(2) * 0.04), k, k * (1 + r(3) * 0.05));
@@ -339,6 +352,7 @@ export class MapRenderer {
   dispose() {
     this.disposeBuild();
     this.scenery.dispose();
+    this.border?.dispose();
     this.object.removeFromParent();
   }
 }

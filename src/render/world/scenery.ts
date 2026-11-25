@@ -171,7 +171,9 @@ export class Scenery {
   readonly object = new THREE.Group();
   private readonly disposables: { dispose(): void }[] = [];
 
-  constructor(grid: Grid) {
+  /** clearNear: 테두리 바깥 이 거리(타일)까지는 풍경을 두지 않는다(자연 테두리가 차지). 남쪽은 그대로 */
+  constructor(grid: Grid, opts: { clearNear?: number } = {}) {
+    const clearNear = opts.clearNear ?? 0;
     const W = grid.width;
     const H = grid.height;
 
@@ -212,6 +214,7 @@ export class Scenery {
         const d = Math.max(dx, dz);
         if (d < 0.55) continue;
         const south = z > H;
+        if (!south && d < clearNear) continue;
         const r = hash(ix, iz, 3);
         const yaw = hash(ix, iz, 4) * Math.PI * 2;
         const tint = 0.88 + hash(ix, iz, 5) * 0.2;
