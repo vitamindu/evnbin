@@ -147,6 +147,8 @@ export class BattleView {
   private readonly zones = new Map<EntityId, THREE.Group>();
   /** 크리스탈 러시: 바닥의 크리스탈(오리지널 디자인: 깎인 보석 + 바닥 빛 고리) */
   private readonly crystals = new Map<EntityId, THREE.Group>();
+  /** 파이터 볼의 공(모델, 이전/현재 위치, 들고 있는 사람) */
+  private ballView: { root: THREE.Group; prev: Vec2; curr: Vec2; carrierId: EntityId | null; spin: number } | null = null;
   private readonly crystalGeo = new THREE.OctahedronGeometry(0.32, 0).scale(0.8, 1.25, 0.8);
   private readonly crystalMat = new THREE.MeshToonMaterial({ color: '#b46cff', emissive: new THREE.Color('#5a1fa8'), emissiveIntensity: 0.5 });
   private readonly crystalRingGeo = new THREE.RingGeometry(0.28, 0.4, 28).rotateX(-Math.PI / 2);
@@ -244,6 +246,7 @@ export class BattleView {
     }
 
     const crySeen = new Set<EntityId>();
+    this.syncBall(sim);
     for (const c of sim.crystals ?? []) {
       crySeen.add(c.id);
       if (!this.crystals.has(c.id)) {
@@ -455,6 +458,45 @@ export class BattleView {
     }
   }
 
+  /** 공: 처음 보이면 만들고, 위치·들고 있는 사람을 기록한다 */
+  private syncBall(sim: SimView) {
+    const b = sim.ball;
+    if (!b) {
+      if (this.ballView) {
+        this.ballView.root.removeFromParent();
+        this.ballView = null;
+      }
+      return;
+    }
+    if (!this.ballView) {
+      const root = new THREE.Group();
+      root.name = 'ball';
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 16), new THREE.MeshToonMaterial({ color: '#ffffff' }));
+      body.name = 'ball-body';
+      // 공 무늬(어두운 띠 두 줄) + 외곽선
+      for (const rot of [0, Math.PI / 2]) {
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.035, 8, 32), new THREE.MeshBasicMaterial({ color: '#2b2f6b' }));
+        band.rotation.y = rot;
+        body.add(band);
+      }
+      const outline = new THREE.Mesh(new THREE.SphereGeometry(0.33, 20, 14), new THREE.MeshBasicMaterial({ color: '#1a1530', side: THREE.BackSide }));
+      body.add(outline);
+      root.add(body);
+      const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.25, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = 0.02;
+      shadow.name = 'ball-shadow';
+      root.add(shadow);
+      this.scene.add(root);
+      this.ballView = { root, prev: { ...b.pos }, curr: { ...b.pos }, carrierId: b.carrierId, spin: 0 };
+    }
+    const v = this.ballView;
+    const jumped = Math.hypot(b.pos.x - v.curr.x, b.pos.y - v.curr.y) > 3; // 킥오프로 가운데 돌아감
+    v.prev = jumped ? { ...b.pos } : v.curr;
+    v.curr = { ...b.pos };
+    v.carrierId = b.carrierId;
+  }
+
   // ───────────── 매 프레임 ─────────────
 
   /** alpha: 이전 틱→현재 틱 사이 진행률(0~1) */
@@ -497,6 +539,27 @@ export class BattleView {
       }
     }
     for (const g of this.zones.values()) g.rotation.y = t * 0.3;
+    if (this.ballView) {
+      const bv = this.ballView;
+      const body = bv.root.getObjectByName('ball-body')!;
+      const carrier = bv.carrierId !== null ? this.units.get(bv.carrierId) : undefined;
+      if (carrier && !carrier.hidden) {
+        // 든 사람 앞쪽 발밑에 붙인다(바라보는 방향)
+        const p = carrier.model.root.position;
+        const yaw = carrier.model.root.rotation.y;
+        bv.root.position.set(p.x + Math.sin(yaw) * 0.55, 0, p.z + Math.cos(yaw) * 0.55);
+        body.position.y = 0.32 + Math.abs(Math.sin(t * 9)) * 0.08;
+      } else {
+        const x = lerp(bv.prev.x, bv.curr.x, alpha);
+        const y = lerp(bv.prev.y, bv.curr.y, alpha);
+        const moved = Math.hypot(x - bv.root.position.x, y - bv.root.position.z);
+        bv.spin += moved / 0.3;
+        bv.root.position.set(x, 0, y);
+        body.position.y = 0.3;
+        body.rotation.x = bv.spin;
+      }
+      bv.root.visible = !carrier?.hidden;
+    }
     for (const g of this.crystals.values()) {
       const gem = g.getObjectByName('gem')!;
       const ph = g.userData.phase as number;

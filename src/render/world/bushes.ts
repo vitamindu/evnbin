@@ -41,7 +41,7 @@ export class BushLayer {
 
   constructor(grid: Grid, time: TimeUniform) {
     this.grid = grid;
-    this.geo = bushGeometry();
+    this.geo = bushGeometry(grid.theme === 'winter');
     this.lineGeo = outlineGeometry(this.geo);
     const cap = Math.max(1, grid.width * grid.height);
 
@@ -91,6 +91,7 @@ export class BushLayer {
         const s = 0.96 + r(1) * 0.1;
         this.tiles.push({
           matrix: tileMatrix(tx + 0.5 + (r(2) - 0.5) * 0.06, ty + 0.5 + (r(3) - 0.5) * 0.06, r(4) * Math.PI * 2, s, 0.92 + r(5) * 0.2),
+          // 겨울: 눈 덮인 덤불(초록을 하얗고 파랗게)
           color: new THREE.Color().setHSL(0, 0, 1).multiplyScalar(0.92 + r(6) * 0.12),
           cluster: this.labels[ty * g.width + tx]!,
         });

@@ -111,6 +111,8 @@ export type ClientMsg =
   | { t: 'setBots'; fillBots: boolean }
   /** 방장만: 경기 방식(teamfight | crystal) */
   | { t: 'setMode'; mode: MatchMode }
+  /** 방장: 맵 바꾸기(그 모드에서 고를 수 있는 맵만, src/data/maps MODE_MAPS) */
+  | { t: 'setMap'; mapId: string }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
   | { t: 'input'; seq: number; move: Vec2; attack?: WireAim; super?: WireAim }

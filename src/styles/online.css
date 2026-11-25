@@ -1612,8 +1612,8 @@
 }
 .room-mode {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
   width: 300px;
   padding: 4px;
   border-radius: 16px;
@@ -2233,4 +2233,32 @@
 .rkg-mine-label {
   font-size: 15px;
   color: #cfd8ff;
+}
+
+/* 방: 맵 고르기(방장이 누르면 다음 맵) */
+.room-map.btn {
+  box-shadow: none;
+  height: auto;
+}
+.room-map.is-pickable {
+  box-shadow: 0 0 0 3px #ffd34d;
+}
+.room-map-hint {
+  font-size: 13px;
+  color: #cfd8ff;
+}
+.room-map-hint:empty {
+  display: none;
+}
+
+/* 모드 버튼 3개: 아이콘 위, 글자 아래(한 줄) */
+.room-mode .room-mode-btn {
+  flex-direction: column;
+  gap: 0;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.room-mode .room-mode-btn .ico {
+  width: 26px;
+  height: 26px;
 }

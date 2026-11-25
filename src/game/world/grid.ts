@@ -82,6 +82,8 @@ const DUMMY_CHAR: Record<string, DummyBehavior> = { d: 'idle', p: 'patrol', q: '
 
 export class Grid {
   readonly id: string;
+  /** 겉모습(렌더러만 읽는다) */
+  readonly theme: 'spring' | 'winter';
   readonly width: number;
   readonly height: number;
   private readonly tiles: Uint8Array;
@@ -100,6 +102,7 @@ export class Grid {
 
   constructor(def: MapDef) {
     this.id = def.id;
+    this.theme = def.theme ?? 'spring';
     this.height = def.rows.length;
     this.width = Math.max(...def.rows.map((r) => r.length));
     this.tiles = new Uint8Array(this.width * this.height);

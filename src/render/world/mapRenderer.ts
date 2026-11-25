@@ -6,7 +6,7 @@ import { adobeGeometry, crateGeometry, mergeParts, outlineGeometry, paint, reedG
 import { InstancedLayer, tileMatrix } from './instancedLayer';
 import { outlineMaterial, waterMaterial, worldToon, type TimeUniform } from './materials';
 import { Scenery } from './scenery';
-import { buildAdobeTexture, buildCrateTexture, buildFloorTexture, buildStoneTexture, hash } from './textures';
+import { buildAdobeTexture, buildCrateTexture, buildFloorTexture, buildStoneTexture, hash, setWorldTheme } from './textures';
 
 /**
  * 맵 3D 표현. World 담당.
@@ -92,6 +92,8 @@ export class MapRenderer {
   /** viewerTeam: 보는 사람의 팀(출발 지점 색) */
   constructor(grid: Grid, private readonly viewerTeam = 0) {
     this.grid = grid;
+    // 겉모습(눈·얼음 등)을 먼저 정한다: 아래에서 만드는 텍스처·풍경이 읽는다
+    setWorldTheme(grid.theme);
     this.scenery = new Scenery(grid);
     this.object.add(this.scenery.object);
     this.build();
@@ -218,7 +220,7 @@ export class MapRenderer {
     maskTex.minFilter = THREE.LinearFilter;
     maskTex.needsUpdate = true;
     const sGeo = this.own(surface.build());
-    const sMat = this.own(waterMaterial(this.time, maskTex, new THREE.Vector2(g.width, g.height)));
+    const sMat = this.own(waterMaterial(this.time, maskTex, new THREE.Vector2(g.width, g.height), g.theme === 'winter'));
     const water = new THREE.Mesh(sGeo, sMat);
     water.name = 'water';
     const bGeo = this.own(banks.build());

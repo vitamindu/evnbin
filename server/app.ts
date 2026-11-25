@@ -461,6 +461,9 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
       case 'setMode':
         if (!sendErr(c, room.setMode(c.id, msg.mode))) broadcastRoom(room);
         return;
+      case 'setMap':
+        if (!sendErr(c, room.setMap(c.id, msg.mapId))) broadcastRoom(room);
+        return;
       case 'ready':
         if (!sendErr(c, room.setReady(c.id, msg.ready))) broadcastRoom(room);
         return;

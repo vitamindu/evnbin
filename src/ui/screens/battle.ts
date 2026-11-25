@@ -15,6 +15,7 @@ import { BattleInput } from '../battle/input';
 import { UiMetrics } from '../battle/metrics';
 import { CrystalBoard } from '../battle/crystalBoard';
 import { toast } from '../overlays/toast';
+import { sfx } from '../../audio/sfx';
 import { KoFeed, MatchBanner, Scoreboard, fighterNameOf, type NameOf } from '../battle/scoreboard';
 import { pingMeter } from '../online/widgets';
 import { button, iconEl, txt } from '../widgets';
@@ -201,6 +202,14 @@ export function createBattleScreen(ctx: AppContext) {
         lowHp.classList.add('is-on');
       }
       feed.onEvents(events, s.state, s.playerId, nameOf);
+      // 파이터 볼: 골 알림
+      for (const e of events) {
+        if (e.type !== 'goal') continue;
+        const ours = e.team === s.player.team;
+        const who = e.scorerId !== null ? nameOf(e.scorerId) : '';
+        toast(`${ours ? '우리 팀 골!' : '상대 팀 골!'}${who ? ` ${who}` : ''} · ${e.score[s.player.team]} : ${e.score[s.player.team === 0 ? 1 : 0]}`);
+        sfx(ours ? 'select' : 'back');
+      }
     };
     s.onFrame = () => {
       input.frame();

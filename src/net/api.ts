@@ -35,6 +35,8 @@ export interface OnlineClient {
   setFillBots(fill: boolean): void;
   /** 방장만: 경기 방식(teamfight | crystal) */
   setMode(mode: MatchMode): void;
+  /** 방장: 맵 바꾸기 */
+  setMap(mapId: string): void;
   setReady(ready: boolean): void;
   /** 방장만 */
   startMatch(): void;

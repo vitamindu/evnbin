@@ -59,7 +59,8 @@ export class Scoreboard {
     }
     if (goal !== this.last.target) {
       this.last.target = goal;
-      this.target.textContent = goal > 0 ? `${goal} KO 선승` : 'KO 많은 팀 승리';
+      const unit = match.mode === 'ball' ? '골' : ' KO';
+      this.target.textContent = goal > 0 ? `${goal}${unit} 선승` : match.mode === 'ball' ? '골 많은 팀 승리' : 'KO 많은 팀 승리';
     }
     const secs = match.ticksLeft < 0 ? -1 : Math.ceil(match.ticksLeft / TICK_RATE);
     if (secs !== this.last.secs) {

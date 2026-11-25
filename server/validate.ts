@@ -48,8 +48,11 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       if (typeof m.fillBots !== 'boolean') return null;
       return { t: 'setBots', fillBots: m.fillBots };
     case 'setMode':
-      if (m.mode !== 'teamfight' && m.mode !== 'crystal') return null;
+      if (m.mode !== 'teamfight' && m.mode !== 'crystal' && m.mode !== 'ball') return null;
       return { t: 'setMode', mode: m.mode };
+    case 'setMap':
+      if (typeof m.mapId !== 'string' || m.mapId.length > 40) return null;
+      return { t: 'setMap', mapId: m.mapId };
     case 'ready':
       if (typeof m.ready !== 'boolean') return null;
       return { t: 'ready', ready: m.ready };

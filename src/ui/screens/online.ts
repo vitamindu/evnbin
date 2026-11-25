@@ -148,7 +148,7 @@ export function createOnlineScreen(ctx: AppContext): Screen & { setAuto(a: Onlin
       await getClient().createRoom();
       // 로비에서 크리스탈 러시를 골랐으면 방도 그 모드로
       const mode = getSettings().playMode;
-      if (mode === 'crystal') setRoomMode(getClient(), mode);
+      if (mode === 'crystal' || mode === 'ball') setRoomMode(getClient(), mode);
       if (shown) setView('room');
     } catch (e) {
       toast(errorFrom(e, '방을 만들지 못했어요'));

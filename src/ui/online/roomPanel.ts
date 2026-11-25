@@ -1,3 +1,4 @@
+import { mapsFor } from '../../data/maps';
 import { isRankedMatch } from '../../data/ranks';
 import { el } from '../../core/dom';
 import { getFighter } from '../../data/fighters';
@@ -97,7 +98,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
   mini.height = 152;
   const mapName = txt('', 'room-map-name');
   // 경기 방식: 방장만 바꿀 수 있고, 모두에게 지금 모드가 보인다
-  const modeBtn = (mode: 'teamfight' | 'crystal', label: string, ico: 'modeTeamfight' | 'modeRush') => {
+  const modeBtn = (mode: 'teamfight' | 'crystal' | 'ball', label: string, ico: 'modeTeamfight' | 'modeRush' | 'modeBall') => {
     const b = button('room-mode-btn', [iconEl(ico), txt(label)], () => {
       const c = getClient();
       if (!c.room || c.room.mode === mode) return;
@@ -111,10 +112,25 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     return b;
   };
   const modeTeam = modeBtn('teamfight', '팀 대결', 'modeTeamfight');
-  const modeRush = modeBtn('crystal', '크리스탈 러시', 'modeRush');
-  const modeSwitch = el('div', 'room-mode', [modeTeam, modeRush]);
+  const modeRush = modeBtn('crystal', '크리스탈', 'modeRush');
+  const modeBall = modeBtn('ball', '파이터 볼', 'modeBall');
+  const modeSwitch = el('div', 'room-mode', [modeTeam, modeRush, modeBall]);
+  // 맵: 그 모드에서 고를 수 있는 맵이 둘 이상이면 방장이 눌러서 다음 맵으로
+  const mapHint = txt('', 'room-map-hint');
+  const mapPanel = button('room-map panel', [mini, mapName, mapHint], () => {
+    const c = getClient();
+    const r = c.room;
+    if (!r) return;
+    const list = mapsFor(r.mode);
+    if (list.length < 2) return;
+    if (!myPlayer(c)?.host) {
+      toast('방장만 맵을 바꿀 수 있어요');
+      return;
+    }
+    c.setMap(list[(list.indexOf(r.mapId) + 1) % list.length]!);
+  }, false);
   const facts = el('div', 'room-facts');
-  const center = el('div', 'room-center', [txt('VS', 'room-vs'), modeSwitch, el('div', 'room-map panel', [mini, mapName]), facts]);
+  const center = el('div', 'room-center', [txt('VS', 'room-vs'), modeSwitch, mapPanel, facts]);
 
   // ── 아래 줄
   const switchBtn = button('room-switch', [iconEl('swap'), txt('팀 바꾸기')], () => {
@@ -254,14 +270,19 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
 
     const host = !!me?.host;
     const crystal = room.mode === 'crystal';
-    modeTeam.classList.toggle('is-on', !crystal);
+    const ball = room.mode === 'ball';
+    modeTeam.classList.toggle('is-on', room.mode === 'teamfight');
     modeRush.classList.toggle('is-on', crystal);
+    modeBall.classList.toggle('is-on', ball);
+    const many = mapsFor(room.mode).length > 1;
+    mapHint.textContent = many ? (host ? '눌러서 맵 바꾸기' : '방장이 맵을 골라요') : '';
+    mapPanel.classList.toggle('is-pickable', many && host);
     modeSwitch.classList.toggle('is-locked', !host);
     const factKey = `${room.mode}`;
     if (facts.dataset.mode !== factKey) {
       facts.dataset.mode = factKey;
       facts.replaceChildren(
-        ...(crystal ? ['크리스탈 10개 + 12초', '3:00'] : ['10 KO 선승', '2:30']).map((t) => txt(t, 'room-fact')),
+        ...(crystal ? ['크리스탈 10개 + 12초', '3:00'] : ball ? ['2골 선승', '2:30'] : ['10 KO 선승', '2:30']).map((t) => txt(t, 'room-fact')),
       );
     }
     const lobby = room.phase === 'lobby';

@@ -361,6 +361,10 @@ export class OnlineClientImpl implements OnlineClient {
   }
 
   /** 방장만: 경기 방식(teamfight | crystal). api.ts의 OnlineClient에는 아직 없다(Lead에게 보고) */
+  setMap(mapId: string) {
+    this.sendIfConnected({ t: 'setMap', mapId });
+  }
+
   setMode(mode: MatchMode) {
     this.sendIfConnected({ t: 'setMode', mode });
   }

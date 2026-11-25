@@ -1,3 +1,4 @@
+import { isMapForMode, mapsFor } from '../../data/maps';
 import { FIGHTERS, type FighterId } from '../../data/fighters';
 import type { MatchMode, Team } from '../../game/types';
 import type { OnlineClient, OnlineEvents, OnlineStatus } from '../../net/api';
@@ -25,6 +26,7 @@ type Listeners = { [K in keyof OnlineEvents]?: Set<(v: OnlineEvents[K]) => void>
 
 export interface FakeOnlineClient extends OnlineClient {
   setMode(mode: MatchMode): void;
+  setMap(mapId: string): void;
   finishMatch(demo?: boolean): void;
   dropConnection(): void;
   emitError(code: string): void;
@@ -286,12 +288,22 @@ export function createFakeOnlineClient(): FakeOnlineClient {
       later(60, publish);
     },
 
+    setMap(mapId) {
+      const p = me();
+      if (!room || !p || room.phase !== 'lobby') return;
+      if (!p.host) return emit('error', { code: 'not_host', message: 'only the host can change the map' });
+      if (!isMapForMode(room.mode, mapId)) return;
+      room.mapId = mapId;
+      later(60, publish);
+    },
+
     setMode(mode) {
       const p = me();
       if (!room || !p || room.phase !== 'lobby') return;
       if (!p.host) return emit('error', { code: 'not_host', message: 'only the host can change the mode' });
-      if (mode !== 'teamfight' && mode !== 'crystal') return;
+      if (mode !== 'teamfight' && mode !== 'crystal' && mode !== 'ball') return;
       room.mode = mode;
+      if (!isMapForMode(mode, room.mapId)) room.mapId = mapsFor(mode)[0]!;
       for (const q of room.players) if (!q.bot && q.id !== ME) q.ready = false;
       later(60, publish);
       // 친구들은 잠시 뒤 다시 준비

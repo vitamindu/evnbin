@@ -8,6 +8,7 @@
  * - 재접속: 같은 이름으로 다시 들어오면 그 자리(같은 playerId)를 이어받는다.
  *   로비에서는 연결이 끊긴 자리만, 경기 중에는 연결된 것처럼 보이는 자리(끊김을 아직 모름)도 이어받는다.
  */
+import { isMapForMode, mapsFor } from '../src/data/maps';
 import { randomInt } from 'node:crypto';
 import { FIGHTERS, type FighterId } from '../src/data/fighters';
 import type { MatchMode, Team } from '../src/game/types';
@@ -187,8 +188,19 @@ export class Room {
   setMode(id: string, mode: MatchMode): RoomError | null {
     if (id !== this.hostId) return 'not_host';
     if (this.phase !== 'lobby') return 'in_progress';
-    if (mode !== 'teamfight' && mode !== 'crystal') return null;
+    if (mode !== 'teamfight' && mode !== 'crystal' && mode !== 'ball') return null;
     this.mode = mode;
+    // 그 모드에서 못 쓰는 맵이면 그 모드의 기본 맵으로
+    if (!isMapForMode(mode, this.mapId)) this.mapId = mapsFor(mode)[0]!;
+    return null;
+  }
+
+  /** 방장: 맵 바꾸기(지금 모드에서 고를 수 있는 맵만) */
+  setMap(id: string, mapId: string): RoomError | null {
+    if (id !== this.hostId) return 'not_host';
+    if (this.phase !== 'lobby') return 'in_progress';
+    if (!isMapForMode(this.mode, mapId)) return null;
+    this.mapId = mapId;
     return null;
   }
 

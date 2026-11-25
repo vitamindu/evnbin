@@ -98,9 +98,9 @@ export function outlineMaterial(thickness: number, sway?: TimeUniform): THREE.Sh
  * 물 표면. 조명을 쓰지 않는 셰이더(색은 sRGB 값 그대로).
  * mask: 맵 크기 W×H, 물 타일 = 255. 선형 보간으로 물가까지의 거리를 근사해서 물가 거품을 그린다.
  */
-export function waterMaterial(time: TimeUniform, mask: THREE.Texture, size: THREE.Vector2): THREE.ShaderMaterial {
+export function waterMaterial(time: TimeUniform, mask: THREE.Texture, size: THREE.Vector2, frozen = false): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: time, uMask: { value: mask }, uSize: { value: size } },
+    uniforms: { uTime: time, uMask: { value: mask }, uSize: { value: size }, uIce: { value: frozen ? 1 : 0 } },
     vertexShader: /* glsl */ `
       varying vec2 vXZ;
       void main() {
@@ -112,6 +112,7 @@ export function waterMaterial(time: TimeUniform, mask: THREE.Texture, size: THRE
       uniform float uTime;
       uniform sampler2D uMask;
       uniform vec2 uSize;
+      uniform float uIce;
       varying vec2 vXZ;
       void main() {
         vec2 p = vXZ;
@@ -133,6 +134,13 @@ export function waterMaterial(time: TimeUniform, mask: THREE.Texture, size: THRE
         float edge = 0.585 + 0.025 * sin(uTime * 2.2 + p.x * 4.7 + p.y * 3.9);
         float foam = 1.0 - smoothstep(edge - 0.012, edge + 0.012, m);
         col = mix(col, vec3(0.93, 0.98, 1.0), foam * 0.9);
+        // 겨울: 꽁꽁 언 얼음(밝은 하늘색 + 금 간 무늬, 물결은 거의 안 보이게)
+        if (uIce > 0.5) {
+          float crack = step(0.97, abs(sin(p.x * 3.1 + p.y * 1.7)) ) + step(0.985, abs(sin(p.x * -2.3 + p.y * 2.9)));
+          vec3 ice = mix(vec3(0.78, 0.92, 0.99), vec3(0.62, 0.84, 0.97), depth);
+          ice = mix(ice, vec3(1.0), clamp(crack, 0.0, 1.0) * 0.7);
+          col = mix(col, ice, 0.85);
+        }
         gl_FragColor = vec4(col, 1.0);
       }
     `,

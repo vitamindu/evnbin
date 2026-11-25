@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Grid } from '../../game/world';
 import { mergeParts, outlineGeometry, paint } from './geometry';
 import { outlineMaterial, worldToon } from './materials';
-import { buildOuterGrassTexture, hash } from './textures';
+import { buildOuterGrassTexture, hash, worldTheme } from './textures';
 
 /**
  * 맵 바깥 장식: 풀밭, 나무, 바위, 건초 더미, 과녁판, 꽃. World 담당.
@@ -26,6 +26,13 @@ function place(geo: THREE.BufferGeometry, x: number, z: number, yaw: number, s: 
   return geo;
 }
 
+/** 겨울이면 높은 곳(눈 쌓인 윗면)을 하얗게 */
+function snowy(col: THREE.Color, height: number, from: number): THREE.Color {
+  if (worldTheme() !== 'winter') return col;
+  const k = Math.max(0, Math.min(1, (height - from) / 0.25));
+  return col.lerp(new THREE.Color('#f4f8fd'), 0.35 + 0.6 * k);
+}
+
 function roundTree(tint: number): THREE.BufferGeometry[] {
   const trunk = new THREE.CylinderGeometry(0.11, 0.16, 0.9, 6, 1, true);
   trunk.translate(0, 0.45, 0);
@@ -40,7 +47,7 @@ function roundTree(tint: number): THREE.BufferGeometry[] {
   for (const [x, y, z, r] of leaves) {
     const s = new THREE.SphereGeometry(r, 9, 6);
     s.translate(x, y, z);
-    paint(s, (p) => lerpHex('#2b7a3e', '#62c25a', (p.y - 0.75) / 1.25).multiplyScalar(tint).getHex());
+    paint(s, (p) => snowy(lerpHex('#2b7a3e', '#62c25a', (p.y - 0.75) / 1.25).multiplyScalar(tint), p.y, 1.25).getHex());
     parts.push(s);
   }
   return parts;
@@ -59,7 +66,7 @@ function pineTree(tint: number): THREE.BufferGeometry[] {
   for (const [r, h, y] of tiers) {
     const c = new THREE.ConeGeometry(r, h, 8, 1, true);
     c.translate(0, y, 0);
-    paint(c, (p) => lerpHex('#245f43', '#4fa86a', (p.y - 0.4) / 1.8).multiplyScalar(tint).getHex());
+    paint(c, (p) => snowy(lerpHex('#245f43', '#4fa86a', (p.y - 0.4) / 1.8).multiplyScalar(tint), p.y - y + h / 2, h * 0.45).getHex());
     parts.push(c);
   }
   return parts;

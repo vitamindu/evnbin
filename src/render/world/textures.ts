@@ -38,7 +38,7 @@ function shade(hex: string, k: number): string {
   return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
 
-const FLOOR = {
+const SPRING_FLOOR = {
   yard: ['#efd5a0', '#e7cb92'],
   dirt: '#cfa878',
   grass: ['#97d46c', '#8dcb63'],
@@ -46,6 +46,25 @@ const FLOOR = {
   laneLine: '#f7f9ff',
   shoreLip: '#eadcb9',
 };
+/** 겨울: 눈 덮인 마당, 살짝 파란 눈밭, 얼음 가장자리 */
+const WINTER_FLOOR: typeof SPRING_FLOOR = {
+  yard: ['#eef3fa', '#e4ecf6'],
+  dirt: '#c7d3e3',
+  grass: ['#dbe9f5', '#d2e3f1'],
+  lane: ['#b9c4d6', '#b1bccf'],
+  laneLine: '#ffffff',
+  shoreLip: '#ffffff',
+};
+let FLOOR = SPRING_FLOOR;
+
+/** 맵 겉모습(봄·겨울). MapRenderer가 맵을 만들기 전에 정한다. 텍스처·바깥 풍경이 이 값을 읽는다 */
+export type WorldTheme = 'spring' | 'winter';
+let THEME: WorldTheme = 'spring';
+export function setWorldTheme(t: WorldTheme) {
+  THEME = t;
+  FLOOR = t === 'winter' ? WINTER_FLOOR : SPRING_FLOOR;
+}
+export const worldTheme = (): WorldTheme => THEME;
 
 /** 바닥 전체 텍스처. 타일 하나 = ppt 픽셀. 캔버스 위쪽 = 맵 y=0 */
 /** viewerTeam: 보는 사람의 팀. 출발 지점은 우리 팀 파랑, 상대 팀 빨강 */
@@ -120,7 +139,7 @@ export function buildFloorTexture(grid: Grid, ppt = 64, viewerTeam = 0): THREE.C
       }
       if (g === Ground.Grass) {
         // 풀잎(작은 V)과 가끔 꽃
-        ctx.strokeStyle = 'rgba(60,130,50,0.55)';
+        ctx.strokeStyle = THEME === 'winter' ? 'rgba(150,180,215,0.5)' : 'rgba(60,130,50,0.55)';
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         for (let k = 0; k < 5; k++) {
@@ -132,7 +151,7 @@ export function buildFloorTexture(grid: Grid, ppt = 64, viewerTeam = 0): THREE.C
           ctx.lineTo(bx + 4, by - 7);
           ctx.stroke();
         }
-        if (r(30) < 0.28) {
+        if (r(30) < 0.28 && THEME !== 'winter') {
           const fx = x0 + P * (0.2 + r(31) * 0.6);
           const fy = y0 + P * (0.2 + r(32) * 0.6);
           ctx.fillStyle = r(33) < 0.5 ? '#fff6d8' : '#ffd84d';
@@ -211,6 +230,7 @@ export function buildFloorTexture(grid: Grid, ppt = 64, viewerTeam = 0): THREE.C
 
   drawLanes(ctx, grid, P);
   drawPads(ctx, grid, P, viewerTeam);
+  drawGoals(ctx, grid, P, viewerTeam);
   return canvasTexture(c);
 }
 
@@ -324,6 +344,46 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 const TEAM_PAD = { ally: '#3f8cff', enemy: '#ff4f5e' } as const;
 const DUMMY_PAD: Record<string, string> = { idle: '#e84a4a', patrol: '#ff9a2a', turret: '#9b5cf0' };
 
+/** 파이터 볼 골대 칸: 그물 무늬 + 골라인. 보는 사람 기준 우리 골대 파랑, 상대 골대 빨강 */
+function drawGoals(ctx: CanvasRenderingContext2D, grid: Grid, P: number, viewerTeam = 0) {
+  grid.goalTiles.forEach((tiles, team) => {
+    if (!tiles.length) return;
+    const color = team === viewerTeam ? TEAM_PAD.ally : TEAM_PAD.enemy;
+    const xs = tiles.map((t) => t.x);
+    const ys = tiles.map((t) => t.y);
+    const x0 = Math.min(...xs) * P;
+    const y0 = Math.min(...ys) * P;
+    const x1 = (Math.max(...xs) + 1) * P;
+    const y1 = (Math.max(...ys) + 1) * P;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.55;
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.globalAlpha = 1;
+    // 그물
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    for (let x = x0; x <= x1; x += P / 4) {
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+    }
+    for (let y = y0; y <= y1; y += P / 4) {
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+    }
+    // 골라인(경기장 쪽 가장자리): 골대가 위에 있으면 아래 변, 아래에 있으면 위 변
+    const fieldBelow = y1 < (grid.height * P) / 2;
+    const ly = fieldBelow ? y1 : y0;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x0 - P * 0.6, ly - 4, x1 - x0 + P * 1.2, 8);
+    ctx.fillStyle = color;
+    ctx.fillRect(x0 - P * 0.6, ly - 2, x1 - x0 + P * 1.2, 4);
+  });
+}
+
 /** 출발 지점(팀 색 원판 + 화살표), 더미 받침(과녁 무늬, 왕복 경로, 포탑 판) */
 function drawPads(ctx: CanvasRenderingContext2D, grid: Grid, P: number, viewerTeam = 0) {
   grid.teamSpawns.forEach((spawns, team) => {
@@ -425,7 +485,7 @@ function octagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number)
 export function buildOuterGrassTexture(): THREE.CanvasTexture {
   const S = 128;
   const [c, ctx] = canvas(S, S);
-  ctx.fillStyle = '#74bf58';
+  ctx.fillStyle = THEME === 'winter' ? '#e8f0f8' : '#74bf58';
   ctx.fillRect(0, 0, S, S);
   const wrap = (fn: (ox: number, oy: number) => void) => {
     for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) fn(ox, oy);
@@ -434,14 +494,14 @@ export function buildOuterGrassTexture(): THREE.CanvasTexture {
     const x = hash(k, 1, 300) * S;
     const y = hash(k, 2, 300) * S;
     const r = 10 + hash(k, 3, 300) * 16;
-    ctx.fillStyle = k % 2 ? 'rgba(98,170,72,0.55)' : 'rgba(140,205,104,0.45)';
+    ctx.fillStyle = THEME === 'winter' ? (k % 2 ? 'rgba(190,210,232,0.5)' : 'rgba(255,255,255,0.6)') : k % 2 ? 'rgba(98,170,72,0.55)' : 'rgba(140,205,104,0.45)';
     wrap((ox, oy) => {
       ctx.beginPath();
       ctx.arc(x + ox, y + oy, r, 0, Math.PI * 2);
       ctx.fill();
     });
   }
-  ctx.strokeStyle = 'rgba(60,128,48,0.6)';
+  ctx.strokeStyle = THEME === 'winter' ? 'rgba(150,178,210,0.5)' : 'rgba(60,128,48,0.6)';
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   for (let k = 0; k < 26; k++) {
@@ -492,30 +552,32 @@ export function buildStoneTexture(): THREE.CanvasTexture {
 export function buildCrateTexture(): THREE.CanvasTexture {
   const S = 128;
   const [c, ctx] = canvas(S, S);
-  const planks = ['#e9ab66', '#dfa05a', '#e6a862', '#da9b55'];
+  // 겨울은 얼음 상자(파란 판), 봄은 나무 상자
+  const ice = THEME === 'winter';
+  const planks = ice ? ['#bfe6ff', '#b0dcfb', '#c6eaff', '#a9d6f7'] : ['#e9ab66', '#dfa05a', '#e6a862', '#da9b55'];
   for (let i = 0; i < 4; i++) {
     ctx.fillStyle = planks[i]!;
     ctx.fillRect(i * 32, 0, 32, S);
-    ctx.fillStyle = 'rgba(150,85,35,0.22)';
+    ctx.fillStyle = ice ? 'rgba(60,120,190,0.22)' : 'rgba(150,85,35,0.22)';
     ctx.fillRect(i * 32 + 9, 20 + i * 11, 2, 40);
     ctx.fillRect(i * 32 + 20, 62 - i * 7, 2, 34);
-    ctx.fillStyle = '#9b5b28';
+    ctx.fillStyle = ice ? '#5c94c9' : '#9b5b28';
     ctx.fillRect(i * 32 - 1, 0, 2, S);
   }
   // 대각선 버팀목
   ctx.save();
   ctx.translate(S / 2, S / 2);
   ctx.rotate(-Math.PI / 4);
-  ctx.fillStyle = '#8f5124';
+  ctx.fillStyle = ice ? '#4f86bd' : '#8f5124';
   ctx.fillRect(-S * 0.75, -11, S * 1.5, 22);
-  ctx.fillStyle = '#c27a38';
+  ctx.fillStyle = ice ? '#8cc6f0' : '#c27a38';
   ctx.fillRect(-S * 0.75, -9, S * 1.5, 16);
   ctx.fillStyle = 'rgba(255,220,170,0.35)';
   ctx.fillRect(-S * 0.75, -9, S * 1.5, 3);
   ctx.restore();
   // 테두리 틀
   const F = 17;
-  ctx.fillStyle = '#b86f30';
+  ctx.fillStyle = ice ? '#7db6e6' : '#b86f30';
   ctx.fillRect(0, 0, S, F);
   ctx.fillRect(0, S - F, S, F);
   ctx.fillRect(0, 0, F, S);
@@ -523,7 +585,7 @@ export function buildCrateTexture(): THREE.CanvasTexture {
   ctx.fillStyle = 'rgba(255,215,160,0.4)';
   ctx.fillRect(0, 0, S, 3);
   ctx.fillRect(0, 0, 3, S);
-  ctx.strokeStyle = '#7e4419';
+  ctx.strokeStyle = ice ? '#3f74a8' : '#7e4419';
   ctx.lineWidth = 3;
   ctx.strokeRect(F, F, S - 2 * F, S - 2 * F);
   // 못
@@ -545,7 +607,9 @@ export function buildCrateTexture(): THREE.CanvasTexture {
 export function buildAdobeTexture(): THREE.CanvasTexture {
   const S = 128;
   const [c, ctx] = canvas(S, S);
-  ctx.fillStyle = '#f1cf9f';
+  // 겨울은 눈 벽돌(하얀 줄눈 + 연한 파란 벽돌)
+  const snow = THEME === 'winter';
+  ctx.fillStyle = snow ? '#f4f8fc' : '#f1cf9f';
   ctx.fillRect(0, 0, S, S);
   const rowH = 32;
   for (let r = 0; r < 4; r++) {
@@ -554,14 +618,14 @@ export function buildAdobeTexture(): THREE.CanvasTexture {
     for (let k = 0; k < 4; k++) {
       const x = off + k * 43;
       const v = 0.94 + hash(k, r, 500) * 0.1;
-      ctx.fillStyle = shade('#d88957', v);
+      ctx.fillStyle = shade(snow ? '#b7cde6' : '#d88957', v);
       roundRect(ctx, x + 3, y + 3, 37, rowH - 6, 6);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,230,190,0.45)';
+      ctx.fillStyle = snow ? 'rgba(255,255,255,0.7)' : 'rgba(255,230,190,0.45)';
       ctx.fillRect(x + 7, y + 5, 29, 3);
-      ctx.fillStyle = 'rgba(120,55,25,0.22)';
+      ctx.fillStyle = snow ? 'rgba(60,90,140,0.22)' : 'rgba(120,55,25,0.22)';
       ctx.fillRect(x + 6, y + rowH - 9, 31, 3);
-      ctx.strokeStyle = 'rgba(255,236,170,0.75)';
+      ctx.strokeStyle = snow ? 'rgba(255,255,255,0.8)' : 'rgba(255,236,170,0.75)';
       ctx.lineWidth = 1.5;
       for (let s = 0; s < 2; s++) {
         const sx = x + 9 + hash(k, r, 510 + s) * 22;

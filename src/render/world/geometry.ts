@@ -118,7 +118,8 @@ export function rubbleGeometry(): THREE.BufferGeometry {
 // ───────────── 수풀 ─────────────
 
 /** 뭉게뭉게 수풀 한 칸: 공 여러 개. 아래는 어둡고 위는 밝은 초록 */
-export function bushGeometry(): THREE.BufferGeometry {
+/** winter: 눈 덮인 덤불(아래는 짙은 청록, 위는 눈처럼 하얗게) */
+export function bushGeometry(winter = false): THREE.BufferGeometry {
   const puffs: [number, number, number, number][] = [
     // x, y, z, r
     [-0.24, 0.3, -0.2, 0.31],
@@ -131,7 +132,7 @@ export function bushGeometry(): THREE.BufferGeometry {
   const parts = puffs.map(([x, y, z, r]) => {
     const s = new THREE.SphereGeometry(r, 10, 6);
     s.translate(x, y, z);
-    paint(s, (p) => lerpHex('#2d8a44', '#6fd468', (p.y - 0.05) / 0.8).getHex());
+    paint(s, (p) => (winter ? lerpHex('#2e6b5e', '#f2f7fc', (p.y - 0.15) / 0.55) : lerpHex('#2d8a44', '#6fd468', (p.y - 0.05) / 0.8)).getHex());
     return s;
   });
   return mergeParts(parts);
