@@ -983,8 +983,11 @@
 }
 .mp-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 22px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.mp-ball .mp-art {
+  background: radial-gradient(circle at 50% 55%, #e9fff0 0%, #5fcf7a 42%, #1f7a3e 100%);
 }
 .mp-crystal .mp-art {
   background: radial-gradient(circle at 50% 55%, #f1dcff 0%, #b67cf0 42%, #5b2aa8 100%);

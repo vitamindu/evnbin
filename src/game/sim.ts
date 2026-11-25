@@ -299,8 +299,6 @@ export class Sim implements SimView {
       };
     } else if (opts.mode === 'ball') {
       this.match = { mode: 'ball', score: [0, 0], targetScore: BALL_TARGET_SCORE, ticksLeft: BALL_MATCH_TICKS, winner: null, kickoffTicks: 0 };
-      const at = this.grid.ballSpawn;
-      if (at) this.ball = { id: this.nextId++, type: 'ball', pos: { ...at }, vel: { x: 0, y: 0 }, carrierId: null, noPickupUntil: 0, kickerId: null };
     }
     for (const spec of opts.fighters) {
       const spawns = this.grid.teamSpawns[spec.team];
@@ -333,6 +331,11 @@ export class Sim implements SimView {
       };
       if (this.match.mode === 'crystal') f.crystals = 0;
       this.addUnit(f);
+    }
+    // 공은 파이터 다음에 만든다: 파이터 id는 명단 순서대로 1, 2, 3…이어야 한다(src/net/roster.ts)
+    if (this.match.mode === 'ball') {
+      const at = this.grid.ballSpawn;
+      if (at) this.ball = { id: this.nextId++, type: 'ball', pos: { ...at }, vel: { x: 0, y: 0 }, carrierId: null, noPickupUntil: 0, kickerId: null };
     }
     if (opts.dummies && this.match.mode !== 'ball') {
       for (const d of this.grid.dummySpawns) {

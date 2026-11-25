@@ -87,7 +87,7 @@ export function openModePicker(ctx: AppContext, onPicked?: (m: MatchMode) => voi
   const overlay = el('div', 'overlay', [
     el('div', 'mp-panel', [
       el('div', 'mp-head', [txt('모드 선택', 'mp-title'), button('btn-close', [iconEl('close')], () => close(), 'back')]),
-      el('div', 'mp-cards', [card(MODES.training), card(MODES.teamfight), card(MODES.crystal)]),
+      el('div', 'mp-cards', [card(MODES.training), card(MODES.teamfight), card(MODES.crystal), card(MODES.ball)]),
     ]),
   ]);
   overlay.addEventListener('click', (e) => {

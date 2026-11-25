@@ -280,3 +280,22 @@ describe('FIGHTER BALL 규칙', () => {
     expect(b.sim.ball).toEqual(a.sim.ball);
   });
 });
+
+describe('ids', () => {
+  it('fighters keep ids 1..n in ball mode (the ball comes after them)', async () => {
+    const { Sim } = await import('../../../src/game/sim');
+    const { getMap } = await import('../../../src/data/maps');
+    const sim = new Sim({
+      map: getMap('meadow-pitch'),
+      seed: 1,
+      mode: 'ball',
+      dummies: false,
+      fighters: [
+        { fighterId: 'rivet', team: 0, controller: 'player', spawnIndex: 0 },
+        { fighterId: 'volley', team: 1, controller: 'bot', spawnIndex: 0 },
+      ],
+    });
+    expect(sim.units.map((u) => u.id)).toEqual([1, 2]);
+    expect(sim.ball!.id).toBe(3);
+  });
+});
