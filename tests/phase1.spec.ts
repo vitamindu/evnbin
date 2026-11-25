@@ -83,11 +83,11 @@ test('T-03 FIGHTERS button opens list: 4 cards + MORE SOON, RIVET SELECTED', asy
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'fighters');
 
   const cards = page.locator('.fighter-grid .fcard');
-  await expect(cards).toHaveCount(8);
-  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(8);
-  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM']);
+  await expect(cards).toHaveCount(10);
+  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(10);
+  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER']);
   await expect(page.locator('.fcard-soon')).toHaveCount(0);
-  await expect(page.locator('.fighters-count')).toHaveText('8 / 8 보유');
+  await expect(page.locator('.fighters-count')).toHaveText('10 / 10 보유');
 
   const rivet = page.locator('.fcard[data-fighter="rivet"]');
   await expect(rivet).toHaveClass(/is-selected/);

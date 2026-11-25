@@ -162,6 +162,10 @@ export interface ShotSpec {
   fuse: number;
   /** lob: 땅에 떨어진 뒤 터지기까지(초) */
   lobFuse: number;
+  /** 투사체 반지름(없으면 기본) */
+  projectileRadius?: number;
+  /** leap: 폭탄·내려찍기 없이 이동만 */
+  moveOnly?: boolean;
 }
 
 export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
@@ -189,6 +193,8 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       leapTime: s.leapTime ?? DEFAULT_LEAP_TIME,
       fuse: s.fuse ?? DEFAULT_FUSE,
       lobFuse: s.kind === 'lob' ? (s.fuse ?? 0) : 0,
+      ...(s.projectileRadius ? { projectileRadius: s.projectileRadius } : {}),
+      ...(s.moveOnly ? { moveOnly: true } : {}),
     };
   }
   const a = def.attack;
@@ -705,6 +711,14 @@ export class Sim implements SimView {
       if (f.ammo > f.maxAmmo - EPS) f.ammo = f.maxAmmo;
     }
     f.moving = false;
+    // 시간이 지나면 저절로 차는 궁극기(FISTER)
+    if (def.superChargePerSec && f.superCharge < 1 && !this.over) {
+      f.superCharge = Math.min(1, f.superCharge + def.superChargePerSec * TICK_DT);
+      if (f.superCharge >= 1 - EPS) {
+        f.superCharge = 1;
+        this.events.push({ type: 'superReady', unitId: f.id });
+      }
+    }
 
     // 점프·넉백(2단계에서 이미 밀려남)·돌진 중에는 이동·공격 입력을 받지 않는다
     if (f.action?.kind === 'leap') {
@@ -773,7 +787,7 @@ export class Sim implements SimView {
         break;
       }
       case 'dash':
-        f.action = { kind: 'dash', dir, remaining: spec.range, speed: spec.projectileSpeed, hitIds: [] };
+        f.action = { kind: 'dash', dir, remaining: spec.range, speed: spec.projectileSpeed, hitIds: [], isSuper };
         break;
       case 'melee':
         this.doMelee(f, spec, dir);
@@ -833,7 +847,7 @@ export class Sim implements SimView {
    * lateral: 진행 방향 기준 옆으로 띄우는 거리(+ = 진행 방향의 오른쪽, 화면 기준).
    */
   private spawnShot(owner: Unit, spec: ShotSpec, dir: number, lateral: number, speedMul = 1, groupId?: number) {
-    const radius = spec.isSuper ? SUPER_PROJECTILE_RADIUS : PROJECTILE_RADIUS;
+    const radius = spec.projectileRadius ?? (spec.isSuper ? SUPER_PROJECTILE_RADIUS : PROJECTILE_RADIUS);
     const maxLat = Math.max(0, owner.radius - radius);
     const lat = Math.sign(lateral) * Math.min(Math.abs(lateral), maxLat);
     const c = Math.cos(dir);
@@ -924,7 +938,8 @@ export class Sim implements SimView {
    * 지나간 경로에 닿은 적은 한 번씩 피해 + 넉백.
    */
   private stepDash(f: Fighter, act: DashAction) {
-    const spec = shotSpec(getFighter(f.fighterId), true);
+    const isSuper = act.isSuper ?? true;
+    const spec = shotSpec(getFighter(f.fighterId), isSuper);
     f.facing = act.dir;
     this.markCombat(f);
     const stepLen = Math.min(act.speed * TICK_DT, act.remaining);
@@ -954,7 +969,8 @@ export class Sim implements SimView {
       if (!isHittable(u) || u.team === f.team || act.hitIds.includes(u.id)) continue;
       if (!segmentCircle(from, to, u.pos, f.radius + u.radius)) continue;
       act.hitIds.push(u.id);
-      this.damage(u, spec.damage, f.id, true);
+      this.damage(u, spec.damage, f.id, isSuper);
+      if (!isSuper) this.chargeFromHit(f);
       if (u.alive && spec.knockback > 0) this.applyKnockback(u, u.pos.x - to.x, u.pos.y - to.y, spec.knockback, act.dir);
     }
 
@@ -978,6 +994,7 @@ export class Sim implements SimView {
     f.moving = false;
     f.inBush = false;
 
+    if (spec.moveOnly) return; // 이동만(FISTER)
     if (spec.slam) return; // 내려찍기: 폭탄 없이 착지할 때 피해(stepLeap → slamLand)
     const fuse = Math.max(1, secToTicks(spec.fuse));
     for (let i = 0; i < spec.count; i++) {
@@ -1386,8 +1403,15 @@ export class Sim implements SimView {
     // 캐릭터 레벨: 모든 피해(공격·궁극기·폭탄·지대)에 같은 배율
     const src = this.getUnit(sourceId);
     if (src?.type === 'fighter' && src.power && src.power > 1) amount = Math.round(amount * powerMult(src.power));
+    const dealt = Math.min(u.hp, amount);
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;
+    // 흡혈: 실제로 깎은 체력의 비율만큼 공격한 파이터 회복
+    if (src?.type === 'fighter' && src.alive) {
+      const sdef = getFighter(src.fighterId);
+      const ls = isSuper ? sdef.super.lifesteal : sdef.attack.lifesteal;
+      if (ls && ls > 0 && dealt > 0) src.hp = Math.min(src.maxHp, src.hp + Math.round(dealt * ls));
+    }
     const killed = u.hp <= 0;
     this.events.push({ type: 'hit', targetId: u.id, sourceId, damage: amount, pos: { ...u.pos }, isSuper, killed });
     if (killed) this.kill(u, sourceId);

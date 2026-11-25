@@ -697,8 +697,8 @@ img {
   left: 50%;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, 230px);
-  gap: 18px;
+  grid-template-columns: repeat(5, 214px);
+  gap: 16px;
 }
 .fcard {
   height: 292px;
@@ -1322,6 +1322,22 @@ img {
 }
 .skin-chip.is-locked .skin-state {
   color: #ffd23f;
+}
+.skin-rarity {
+  font-size: 12px;
+  --o: 2px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 2px solid var(--ink);
+}
+.skin-rarity.is-epic {
+  background: linear-gradient(#c77dff, #8a3ad1);
+}
+.skin-rarity.is-legendary {
+  background: linear-gradient(#ffe27a, #f0a21a);
+}
+.skin-chip.is-legendary {
+  box-shadow: 0 4px 0 var(--ink), 0 0 14px rgba(255, 210, 63, 0.55);
 }
 .skin-name {
   font-size: 18px;

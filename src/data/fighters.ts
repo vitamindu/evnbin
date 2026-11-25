@@ -4,11 +4,12 @@
  * 거리 단위는 타일(1타일 = 월드 1유닛), 시간 단위는 초.
  */
 
-export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard' | 'grizzle' | 'prism';
-export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control' | 'brawler' | 'bouncer';
+export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard' | 'grizzle' | 'prism' | 'reaper' | 'fister';
+export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control' | 'brawler' | 'bouncer' | 'assassin';
 
 /** 기본 공격 형태. 새 캐릭터는 가능하면 이 조합으로 표현하고, 부족할 때만 종류를 추가한다. */
 export type AttackKind =
+  | 'dash' // 기본 공격으로 짧게 돌진하며 지나가는 적에게 피해(REAPER)
   | 'spread' // 부채꼴로 여러 발 동시 발사
   | 'burst' // 같은 방향으로 여러 발을 짧은 간격으로 연사
   | 'melee' // 전방 부채꼴 범위 즉시 판정
@@ -59,6 +60,8 @@ export interface AttackDef {
   damageFar?: number;
   /** lob: 땅에 떨어진 뒤 터지기까지(초). 없으면 떨어지자마자 */
   fuse?: number;
+  /** 흡혈: 준 피해의 이 비율만큼 내 체력 회복(0~1) */
+  lifesteal?: number;
 }
 
 export interface SuperDef {
@@ -92,6 +95,12 @@ export interface SuperDef {
   bounces?: number;
   /** leap: true면 폭탄 대신 착지 지점 둘레(aoeRadius)에 damage 피해 + 넉백(내려찍기) */
   slam?: boolean;
+  /** 흡혈: 준 피해의 이 비율만큼 내 체력 회복(0~1) */
+  lifesteal?: number;
+  /** 투사체 반지름(타일). 없으면 기본. 넓게 퍼지는 궁극기(REAPER 박쥐 떼 같은)용 */
+  projectileRadius?: number;
+  /** leap: true면 착지 피해·폭탄 없이 이동만(FISTER) */
+  moveOnly?: boolean;
   /** leap: 공중에 떠 있는 시간(초) */
   leapTime?: number;
   /** leap: 폭탄이 떨어져 터지기까지의 시간(초). lob: 땅에 떨어진 뒤 터지기까지(초, 없으면 바로) */
@@ -120,6 +129,8 @@ export interface FighterDef {
   moveSpeed: number;
   attack: AttackDef;
   super: SuperDef;
+  /** 시간이 지나면 궁극기가 저절로 차는 양(초당, 0~1). FISTER */
+  superChargePerSec?: number;
 }
 
 export const FIGHTERS: readonly FighterDef[] = [
@@ -446,6 +457,89 @@ export const FIGHTERS: readonly FighterDef[] = [
       bounces: 3,
     },
   },
+  {
+    id: 'reaper',
+    model: { type: 'primitive' },
+    name: 'REAPER',
+    role: 'assassin',
+    roleLabel: '암살자형',
+    tagline: '밤의 장의사. 그림자처럼 파고들어 숨을 거둬 간다.',
+    palette: { primary: '#3b2a5c', secondary: '#b8a6ff', accent: '#7cffc4', skin: '#d9c8b8', dark: '#160f24' },
+    hp: 3800,
+    moveSpeed: 2.6,
+    attack: {
+      name: 'Shadow Step',
+      description: '조준한 쪽으로 짧게 돌진하며 지나가는 적을 벤다. 재장전이 느리다.',
+      kind: 'dash',
+      damage: 900,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      range: 2.8,
+      projectileSpeed: 9,
+      ammo: 3,
+      reload: 2.4,
+      superChargePerHit: 0.2,
+    },
+    super: {
+      name: 'Night Swarm',
+      description: '넓게 퍼지는 어둠의 떼를 날려 맞은 적의 체력을 빼앗는다.',
+      kind: 'burst',
+      damage: 1100,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 9,
+      range: 7,
+      breaksWalls: false,
+      knockback: 0,
+      pierce: true,
+      lifesteal: 1,
+      projectileRadius: 0.9,
+    },
+  },
+  {
+    id: 'fister',
+    model: { type: 'primitive' },
+    name: 'FISTER',
+    role: 'assassin',
+    roleLabel: '암살자형',
+    tagline: '거리의 싸움꾼. 때릴수록 살아나는 주먹.',
+    palette: { primary: '#2d2d34', secondary: '#ff5a3c', accent: '#ffd23f', skin: '#f1c19c', dark: '#121216' },
+    hp: 3600,
+    moveSpeed: 2.55,
+    superChargePerSec: 0.05,
+    attack: {
+      name: 'Rapid Jab',
+      description: '아주 가까이에서 두 번 빠르게 때리고, 준 피해의 25%만큼 체력을 회복한다.',
+      kind: 'burst',
+      damage: 300,
+      count: 2,
+      spreadDeg: 0,
+      burstInterval: 0.12,
+      range: 1.6,
+      projectileSpeed: 10,
+      ammo: 3,
+      reload: 0.6,
+      superChargePerHit: 0.03,
+      lifesteal: 0.25,
+    },
+    super: {
+      name: 'Rooftop Leap',
+      description: '조준한 곳으로 높이 뛰어 들어간다(벽을 넘는다). 궁극기는 시간이 지나면 저절로 찬다.',
+      kind: 'leap',
+      damage: 0,
+      count: 0,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 0,
+      range: 5.5,
+      breaksWalls: false,
+      knockback: 0,
+      moveOnly: true,
+      leapTime: 0.6,
+    },
+  }
 ];
 
 export function getFighter(id: FighterId): FighterDef {

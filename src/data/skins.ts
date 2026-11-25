@@ -16,6 +16,24 @@ export interface SkinDef {
   /** 다이아 가격(profile.crystals) */
   price: number;
   model: FighterDef['model'];
+  /** 등급: 서사(epic) < 전설(legendary). 전설 스킨은 스킬 이펙트까지 바뀐다 */
+  rarity: SkinRarity;
+  /** 전설 스킨의 이펙트 교체(흑백 이미지 → 팀 색으로 칠한다. 우리 팀 파랑 / 상대 빨강 규칙 유지) */
+  effects?: SkinEffects;
+}
+
+export type SkinRarity = 'epic' | 'legendary';
+export const RARITY_LABEL: Record<SkinRarity, string> = { epic: '서사', legendary: '전설' };
+/** 등급별 기본 가격(다이아) */
+export const RARITY_PRICE: Record<SkinRarity, number> = { epic: 100, legendary: 300 };
+
+/** 이펙트 이미지 경로(public/ 기준). 없는 항목은 기본 이펙트 */
+export interface SkinEffects {
+  attackShot?: string;
+  superShot?: string;
+  trail?: string;
+  hit?: string;
+  superCast?: string;
 }
 
 export const SKINS: readonly SkinDef[] = [
@@ -23,7 +41,8 @@ export const SKINS: readonly SkinDef[] = [
     id: 'hinako_sakura',
     fighterId: 'hinako',
     name: 'SAKURA HINAKO',
-    price: 100,
+    price: RARITY_PRICE.epic,
+    rarity: 'epic',
     model: { type: 'glb', body: 'models/hinako.glb', weapon: 'models/hinako_gun.glb' },
   },
 ];

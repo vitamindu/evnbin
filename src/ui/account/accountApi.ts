@@ -186,6 +186,8 @@ function fakeModule(): AccountModule {
         shard: { trophies: 0, power: 1 },
         grizzle: { trophies: 0, power: 1 },
         prism: { trophies: 0, power: 1 },
+        reaper: { trophies: 0, power: 1 },
+        fister: { trophies: 0, power: 1 },
       },
     };
   };

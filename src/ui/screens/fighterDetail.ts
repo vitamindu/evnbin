@@ -3,7 +3,7 @@ import type { Screen } from '../../core/screens';
 import { FIGHTERS, STAT_MAX, getFighter, type FighterDef, type FighterId } from '../../data/fighters';
 import { ShowcaseView } from '../../render/views/showcaseView';
 import { equippedSkin, getProfile, onProfileChange, ownsSkin, updateProfile } from '../../state/profile';
-import { SKIN_SHOP_OPEN, skinsOf } from '../../data/skins';
+import { RARITY_LABEL, SKIN_SHOP_OPEN, getSkin, skinsOf } from '../../data/skins';
 import { accountErrorCode, accountErrorText, buySkin, equipSkin, getAccount, upgradeFighter } from '../account/accountApi';
 import { MAX_POWER, powerMult, upgradeCost } from '../../data/power';
 import { sfx } from '../../audio/sfx';
@@ -117,7 +117,9 @@ export function createFighterDetailScreen(ctx: AppContext) {
     skinBar.hidden = list.length === 0;
     if (!list.length) return;
     const chip = (id: string | undefined, name: string) => {
-      const b = button('skin-chip', [txt(name, 'skin-name'), txt(skinState(id), 'skin-state')], () => tapSkin(id, name));
+      const rarity = getSkin(id)?.rarity;
+      const b = button('skin-chip', [rarity ? txt(RARITY_LABEL[rarity], `skin-rarity is-${rarity}`) : '', txt(name, 'skin-name'), txt(skinState(id), 'skin-state')], () => tapSkin(id, name));
+      if (rarity) b.classList.add(`is-${rarity}`);
       b.classList.toggle('is-preview', preview === id);
       b.classList.toggle('is-locked', !!id && !ownsSkin(getProfile(), id));
       return b;

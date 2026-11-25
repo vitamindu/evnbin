@@ -230,6 +230,9 @@ export class BattleView {
         const owner = sim.getUnit(p.ownerId);
         const obj = this.buildShot(owner, p.isSuper);
         obj.rotation.y = -Math.atan2(p.vel.y, p.vel.x);
+        // 넓은 탄(REAPER 궁극기 등): 판정 반지름에 맞춰 키운다
+        const base = p.isSuper ? 0.24 : 0.18;
+        if (p.radius > base + 0.01) obj.scale.setScalar(p.radius / base);
         this.scene.add(obj);
         s = { obj, prev: { ...p.pos }, curr: { ...p.pos } };
         this.shots.set(p.id, s);

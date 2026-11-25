@@ -1,7 +1,7 @@
 import { el } from '../../core/dom';
 import type { Screen } from '../../core/screens';
 import { sfx } from '../../audio/sfx';
-import { getSkin } from '../../data/skins';
+import { RARITY_LABEL, getSkin } from '../../data/skins';
 import { SHOP_ITEMS, shopDay, type ShopItem } from '../../data/shop';
 import { getProfile, onProfileChange, ownsSkin } from '../../state/profile';
 import { accountErrorCode, accountErrorText, buyShopItem, getAccount } from '../account/accountApi';
@@ -58,7 +58,7 @@ export function createShopScreen(ctx: AppContext): Screen {
           ? '열면 코인·다이아 3~10개'
           : item.kind === 'coins'
             ? '레벨 업에 써요'
-            : `${getSkin(item.skinId)!.fighterId.toUpperCase()} 스킨`;
+            : `${RARITY_LABEL[getSkin(item.skinId)!.rarity]} · ${getSkin(item.skinId)!.fighterId.toUpperCase()} 스킨`;
     const btn = button(`shop-buy is-${st}`, priceEl(item), () => tap(item), false);
     const c = el('div', `shop-card is-${item.kind} is-${st}`, [
       item.kind !== 'daily' && 'tag' in item && item.tag ? txt(item.tag, 'shop-tag') : '',

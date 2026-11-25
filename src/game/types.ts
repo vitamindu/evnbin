@@ -73,7 +73,7 @@ export interface Fighter extends UnitBase {
 
 export type FighterAction =
   | { kind: 'burst'; remaining: number; nextTick: number; dir: number; isSuper: boolean }
-  | { kind: 'dash'; dir: number; remaining: number; speed: number; hitIds: EntityId[] }
+  | { kind: 'dash'; dir: number; remaining: number; speed: number; hitIds: EntityId[]; /** 없으면 궁극기(옛 스냅샷 호환) */ isSuper?: boolean }
   | { kind: 'knockback'; vx: number; vy: number; untilTick: number }
   | { kind: 'leap'; from: Vec2; to: Vec2; startTick: number; endTick: number };
 

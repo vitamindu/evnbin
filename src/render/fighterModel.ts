@@ -615,6 +615,65 @@ function buildHinako(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
+// ───────────────────────── REAPER: 밤의 장의사(오리지널 임시 모델) ─────────────────────────
+function buildReaper(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.42, torsoH: 0.62, torsoD: 0.34, headR: 0.32, headLift: 0.9,
+    legR: 0.09, legLen: 0.26, legX: 0.11, armR: 0.075, armLen: 0.34, shoeH: 0.1,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.primary, legs: c.dark, shoes: c.dark, skin: c.skin, hands: c.secondary });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.18, spread: 0.3, y: 0.02 });
+  // 뾰족한 두건
+  const hood = part(g.add(new THREE.ConeGeometry(r * 1.15, r * 2.1, 18, 1, true)), toon(c.primary));
+  hood.position.set(0, r * 0.55, -r * 0.12);
+  hood.rotation.x = -0.18;
+  rig.head.add(hood);
+  // 긴 망토 자락
+  const cape = part(g.add(new THREE.ConeGeometry(p.torsoW * 0.95, p.torsoH * 1.25, 16, 1, true)), toon(c.dark));
+  cape.position.set(0, rig.torso.position.y - 0.04, -0.06);
+  rig.body.add(cape);
+  // 초승달 낫(빛나는 날)
+  rig.armR.rotation.set(-0.6, 0, 0.15);
+  const pole = part(g.add(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 8)), toon(METAL));
+  pole.position.copy(rig.handR.position);
+  rig.armR.add(pole);
+  const blade = new THREE.Mesh(g.add(new THREE.TorusGeometry(0.22, 0.035, 6, 18, Math.PI * 0.9)), new THREE.MeshBasicMaterial({ color: c.accent }));
+  blade.position.set(rig.handR.position.x, rig.handR.position.y + 0.42, 0.12);
+  blade.rotation.y = Math.PI / 2;
+  rig.armR.add(blade);
+  return rig;
+}
+
+// ───────────────────────── FISTER: 거리 싸움꾼(오리지널 임시 모델) ─────────────────────────
+function buildFister(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.46, torsoH: 0.5, torsoD: 0.36, headR: 0.33, headLift: 0.88,
+    legR: 0.1, legLen: 0.24, legX: 0.12, armR: 0.085, armLen: 0.28, shoeH: 0.12,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.primary, legs: c.dark, shoes: c.secondary, skin: c.skin, hands: c.secondary });
+  const r = p.headR;
+  addEyes(rig.head, g, r, { size: 0.2, spread: 0.32, y: 0.0 });
+  // 이마 띠
+  const band = part(g.add(new THREE.TorusGeometry(r * 0.98, r * 0.09, 8, 28)), toon(c.secondary), { outline: false });
+  band.rotation.x = Math.PI / 2;
+  band.position.y = r * 0.42;
+  rig.head.add(band);
+  // 큰 권투 장갑
+  const glove = g.add(new THREE.SphereGeometry(p.armR * 2.1, 16, 12));
+  for (const hand of [rig.handL, rig.handR]) {
+    const gl = part(glove, toon(c.secondary));
+    gl.position.copy(hand.position);
+    gl.scale.set(1, 0.9, 1.15);
+    hand.parent!.add(gl);
+  }
+  rig.armL.rotation.x = -0.9;
+  rig.armR.rotation.x = -0.9;
+  return rig;
+}
+
 const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
@@ -624,6 +683,8 @@ const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g
   shard: buildShard,
   grizzle: buildGrizzle,
   prism: buildPrism,
+  reaper: buildReaper,
+  fister: buildFister,
 };
 
 /** 캐릭터마다 다른 대기 동작 속도 */
