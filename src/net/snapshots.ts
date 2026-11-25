@@ -7,7 +7,7 @@
  *  - lob: startTick ≤ 틱 < endTick 인 것.
  *  - 가장 최근 snap보다 뒤를 물으면 조금만(maxExtrapolate 틱) 앞질러 그린다.
  */
-import type { EntityId, Lob, MatchState, Projectile, SimEvent, SimView, Unit, Vec2 , Crystal, Zone } from '../game/types';
+import type { Ball, EntityId, Lob, MatchState, Projectile, SimEvent, SimView, Unit, Vec2 , Crystal, Zone } from '../game/types';
 import { TICK_DT } from '../game/types';
 
 export interface BufferedSnap {
@@ -19,6 +19,8 @@ export interface BufferedSnap {
   crystals?: readonly Crystal[];
   /** 바닥 장판(움직이지 않는다) */
   zones?: readonly Zone[];
+  /** 파이터 볼의 공 */
+  ball?: Ball | null;
   match: MatchState;
   /** 이 snap에 실려 온 사건(직전 snap 이후) */
   events: readonly SimEvent[];
@@ -35,6 +37,7 @@ export class NetSimView implements SimView {
     readonly match: MatchState,
     readonly crystals: Crystal[] = [],
     readonly zones: Zone[] = [],
+    readonly ball: Ball | null = null,
   ) {
     for (const u of units) this.byId.set(u.id, u);
   }
@@ -112,6 +115,14 @@ export class SnapshotBuffer {
   }
 }
 
+/** 공: 두 snap 사이를 보간(들고 있는 공은 렌더러가 든 사람 위치에 붙인다) */
+function lerpBall(a: Ball | null, b: Ball | null, dt: number, span: number): Ball | null {
+  if (!b) return null;
+  if (!a || a.carrierId !== b.carrierId) return { ...b, pos: { ...b.pos } };
+  const k = Math.max(0, Math.min(1, dt / span));
+  return { ...b, pos: { x: a.pos.x + (b.pos.x - a.pos.x) * k, y: a.pos.y + (b.pos.y - a.pos.y) * k } };
+}
+
 function fromSnap(s: BufferedSnap, tick: number): NetSimView {
   return new NetSimView(
     tick,
@@ -121,6 +132,7 @@ function fromSnap(s: BufferedSnap, tick: number): NetSimView {
     s.match,
     (s.crystals ?? []).map((c) => ({ ...c })),
     (s.zones ?? []).map((z) => ({ ...z })),
+    s.ball ? { ...s.ball, pos: { ...s.ball.pos } } : null,
   );
 }
 
@@ -193,7 +205,7 @@ function interpolate(a: BufferedSnap, b: BufferedSnap, t: number): NetSimView {
     if (l.startTick <= t && t < l.endTick) lobs.push({ ...l });
   }
 
-  return new NetSimView(t, units, projectiles, lobs, a.match, (b.crystals ?? []).map((c) => ({ ...c })), (b.zones ?? []).map((z) => ({ ...z })));
+  return new NetSimView(t, units, projectiles, lobs, a.match, (b.crystals ?? []).map((c) => ({ ...c })), (b.zones ?? []).map((z) => ({ ...z })), lerpBall(a.ball ?? null, b.ball ?? null, t - a.tick, span));
 }
 
 function extrapolate(prev: BufferedSnap | null, last: BufferedSnap, t: number): NetSimView {

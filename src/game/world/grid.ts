@@ -32,6 +32,8 @@ export enum Ground {
  *  .  바닥(흙 마당)   ,  바닥(풀밭)   =  바닥(사격장 레인)  — 셋 다 로직에서는 같은 바닥
  *  #  벽(부서짐)      X  단단한 벽    B  수풀              W  물
  *  C  크리스탈 생성 지점(바닥, 크리스탈 러시)
+ *  O  공 놓는 자리(바닥, 파이터 볼)
+ *  g  팀0이 지키는 골대 칸(바닥, 보통 아래)   h  팀1이 지키는 골대 칸(바닥, 보통 위) — 공이 상대 골대 칸에 들어가면 골
  *  A  팀0 출발 지점(바닥)       Z  팀1 출발 지점(바닥)
  *  d  더미(가만히)  p  더미(좌우 왕복)  q  더미(위아래 왕복)  t  더미(마주 쏨)   — 모두 바닥 위
  * 출발 지점·더미 칸의 바닥 무늬는 왼쪽 칸의 바닥 무늬를 따른다.
@@ -40,6 +42,8 @@ export interface MapDef {
   id: string;
   name: string;
   rows: string[];
+  /** 겉모습(렌더러만 읽는다). 없으면 봄 */
+  theme?: 'spring' | 'winter';
 }
 
 export interface DummySpawn {
@@ -59,6 +63,9 @@ const CHAR_TILE: Record<string, Tile> = {
   W: Tile.Water,
   A: Tile.Floor,
   C: Tile.Floor,
+  O: Tile.Floor,
+  g: Tile.Floor,
+  h: Tile.Floor,
   Z: Tile.Floor,
   d: Tile.Floor,
   p: Tile.Floor,
@@ -83,6 +90,11 @@ export class Grid {
   readonly dummySpawns: DummySpawn[] = [];
   /** 크리스탈 러시: 크리스탈이 생기는 곳('C') */
   readonly crystalSpawns: Vec2[] = [];
+  /** 파이터 볼: 공 놓는 자리('O') */
+  ballSpawn: Vec2 | null = null;
+  /** 파이터 볼: 팀별로 지키는 골대 칸 [팀0('g'), 팀1('h')]. 공이 팀 t의 골대 칸에 들어가면 상대 팀 득점 */
+  readonly goalTiles: [Vec2[], Vec2[]] = [[], []];
+  private readonly goalOwner: Int8Array;
   /** 타일이 바뀔 때마다 1씩 증가(렌더러가 다시 그릴지 판단) */
   version = 0;
 
@@ -92,6 +104,7 @@ export class Grid {
     this.width = Math.max(...def.rows.map((r) => r.length));
     this.tiles = new Uint8Array(this.width * this.height);
     this.grounds = new Uint8Array(this.width * this.height);
+    this.goalOwner = new Int8Array(this.width * this.height).fill(-1);
     def.rows.forEach((row, ty) => {
       for (let tx = 0; tx < this.width; tx++) {
         const ch = row[tx] ?? 'X';
@@ -106,8 +119,23 @@ export class Grid {
         const b = DUMMY_CHAR[ch];
         if (b) this.dummySpawns.push({ pos: center, behavior: b, ...(ch === 'q' ? { axis: 'y' as const } : {}) });
         if (ch === 'C') this.crystalSpawns.push(center);
+        if (ch === 'O') this.ballSpawn = center;
+        if (ch === 'g' || ch === 'h') {
+          const team = ch === 'g' ? 0 : 1;
+          this.goalTiles[team].push({ x: tx, y: ty });
+          this.goalOwner[i] = team;
+        }
       }
     });
+  }
+
+  /** 이 위치가 어느 팀의 골대 칸인가(아니면 null) */
+  goalAt(x: number, y: number): 0 | 1 | null {
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (!this.inBounds(tx, ty)) return null;
+    const t = this.goalOwner[ty * this.width + tx]!;
+    return t < 0 ? null : (t as 0 | 1);
   }
 
   inBounds(tx: number, ty: number): boolean {

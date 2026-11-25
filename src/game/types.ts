@@ -168,6 +168,10 @@ export type SimEvent =
   | { type: 'score'; team: Team; score: [number, number]; killerId: EntityId; victimId: EntityId }
   | { type: 'matchEnd'; winner: Team | -1; score: [number, number] }
   | { type: 'crystalSpawn'; id: EntityId; pos: Vec2 }
+  | { type: 'goal'; team: Team; score: [number, number]; scorerId: EntityId | null }
+  | { type: 'ballPickup'; unitId: EntityId }
+  | { type: 'ballKick'; unitId: EntityId; isSuper: boolean; dir: number }
+  | { type: 'ballDrop'; unitId: EntityId; pos: Vec2 }
   | { type: 'crystalPickup'; unitId: EntityId; crystalId: EntityId; carried: number }
   | { type: 'crystalDrop'; unitId: EntityId; pos: Vec2; count: number }
   | { type: 'countdown'; team: Team | null; ticks: number };
@@ -184,7 +188,7 @@ export interface SpawnFighter {
 }
 
 /** 경기 방식. training: 연습장(끝 없음), teamfight: 3대3 쓰러뜨리기 대결 */
-export type MatchMode = 'training' | 'teamfight' | 'crystal';
+export type MatchMode = 'training' | 'teamfight' | 'crystal' | 'ball';
 
 /** 바닥에 일정 시간 남는 지대(SHARD 궁극기 등): 안의 적을 느리게 하고 초당 피해 */
 export interface Zone {
@@ -198,6 +202,20 @@ export interface Zone {
   /** 이동 속도 감소 비율(0~1) */
   slow: number;
   dps: number;
+}
+
+/**
+ * 파이터 볼: 공 하나. 누군가 들고 있으면(carrierId) 그 사람과 같이 움직이고, 아니면 굴러간다(vel, 마찰로 멈춤, 벽에 튕김).
+ */
+export interface Ball {
+  id: EntityId;
+  type: 'ball';
+  pos: Vec2;
+  vel: Vec2;
+  carrierId: EntityId | null;
+  /** 이 틱 전에는 kickerId가 다시 주울 수 없다(찬 직후 바로 다시 줍지 않게) */
+  noPickupUntil: number;
+  kickerId: EntityId | null;
 }
 
 /** 크리스탈 러시: 바닥에 놓인 크리스탈 */
@@ -223,6 +241,8 @@ export interface MatchState {
   /** crystal: 승리 카운트다운 남은 틱(-1이면 진행 안 함)과 그 팀 */
   countdownTicks?: number;
   countdownTeam?: Team | null;
+  /** ball: 골이 들어간 뒤 다시 시작(킥오프)까지 남은 틱. 0보다 크면 모두 멈춘다 */
+  kickoffTicks?: number;
 }
 
 /** 시뮬레이션 상태 조회(렌더러·UI는 이 인터페이스만 쓴다) */
@@ -236,5 +256,7 @@ export interface SimView {
   readonly crystals: readonly Crystal[];
   /** 지대(서리 지대 등). 없으면 빈 배열 */
   readonly zones: readonly Zone[];
+  /** 파이터 볼의 공(다른 모드는 null) */
+  readonly ball: Ball | null;
   getUnit(id: EntityId): Unit | undefined;
 }

@@ -176,6 +176,7 @@ export class Match {
       lobs: this.sim.lobs,
       crystals: this.sim.crystals ?? [],
       zones: this.sim.zones ?? [],
+      ball: this.sim.ball ?? null,
       match: this.sim.match,
     };
     const body = JSON.stringify({ ...state, events: this.events }, roundReplacer).slice(1);

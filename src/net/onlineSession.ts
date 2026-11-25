@@ -207,6 +207,7 @@ export class OnlineSession implements BattleLike {
       lobs: snap.lobs,
       crystals: snap.crystals ?? [],
       zones: snap.zones ?? [],
+      ball: snap.ball ?? null,
       match: snap.match,
       events: snap.events,
     };

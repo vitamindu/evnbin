@@ -45,6 +45,15 @@ export const MODES: Record<MatchMode, ModeInfo> = {
     blurb: '가운데 크리스탈을 모아 끝까지 지켜요',
     facts: ['3 대 3', '10개 + 12초 버티기'],
   },
+  ball: {
+    id: 'ball',
+    name: '파이터 볼',
+    map: 'MEADOW PITCH',
+    icon: 'modeBall',
+    online: true,
+    blurb: '공을 몰고 가서 상대 골대에 넣어요',
+    facts: ['3 대 3', '2골 선승', '2:30'],
+  },
 };
 
 /** 모드 선택 팝업: 두 장의 큰 카드. 고르면 설정에 저장하고 닫는다 */

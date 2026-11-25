@@ -54,6 +54,7 @@ import {
 } from './rules';
 import { isHittable } from './status';
 import {
+  type Ball,
   TICK_DT,
   TICK_RATE,
   type Aim,
@@ -236,6 +237,8 @@ export class Sim implements SimView {
   /** 경기 진행 상태(점수·시간). teamfight 규칙은 Gameplay 담당 */
   /** 크리스탈 러시: 바닥의 크리스탈(규칙은 Gameplay 담당) */
   crystals: Crystal[] = [];
+  /** 파이터 볼의 공(다른 모드는 null) */
+  ball: Ball | null = null;
   /** 지대(서리 지대 등). 규칙은 Gameplay 담당 */
   zones: Zone[] = [];
   match: MatchState = { mode: 'training', score: [0, 0], targetScore: 0, ticksLeft: -1, winner: null };

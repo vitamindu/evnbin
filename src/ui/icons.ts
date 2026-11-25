@@ -3,6 +3,11 @@ const S = 'stroke="var(--ink)" stroke-width="3" stroke-linejoin="round" stroke-l
 const svg = (body: string) => `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 
 export const ICONS = {
+  modeBall: svg(
+    `<circle cx="24" cy="24" r="18" fill="#ffffff" ${S}/>` +
+      `<path d="M24 14l7 5-3 8h-8l-3-8z" fill="#2b2f6b" ${S}/>` +
+      `<path d="M24 6v8M31 19l9-3M28 27l5 8M20 27l-5 8M17 19l-9-3" fill="none" ${S}/>`,
+  ),
   box: svg(
     `<path d="M6 18l18-8 18 8v20l-18 7-18-7z" fill="#ffb347" ${S}/>` +
       `<path d="M6 18l18 7 18-7M24 25v20" fill="none" ${S}/>` +
