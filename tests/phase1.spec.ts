@@ -167,13 +167,13 @@ test('T-07 detail arrows cycle through every fighter and wrap to RIVET', async (
 
   const next = page.locator('.arrow-next');
   const prev = page.locator('.arrow-prev');
-  for (const expected of ['VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'RIVET']) {
+  for (const expected of ['VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER', 'RIVET']) {
     await next.tap();
     await expect(name).toHaveText(expected);
     // SELECT label tracks whether the shown fighter is the selected one (RIVET by default).
     await expect(selectBtn).toHaveText(expected === 'RIVET' ? '선택됨' : '선택');
   }
-  for (const expected of ['PRISM', 'GRIZZLE', 'SHARD', 'FUSE', 'HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
+  for (const expected of ['FISTER', 'REAPER', 'PRISM', 'GRIZZLE', 'SHARD', 'FUSE', 'HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
     await prev.tap();
     await expect(name).toHaveText(expected);
   }
