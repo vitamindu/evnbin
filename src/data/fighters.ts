@@ -115,10 +115,24 @@ export interface FighterPalette {
   dark: string;
 }
 
+/** glb 무기를 손에 쥐는 방법. 없으면 HINAKO 총 기준 */
+export interface WeaponFit {
+  /** 원본에서 무기가 길게 놓인 축 */
+  axis: 'x' | 'y';
+  /** 무기 길이(캐릭터 키 1.75 기준) */
+  length: number;
+  /** 쥐는 위치: 그 축 방향으로 -1(아래/총구) ~ 1(위/개머리판) */
+  grip: number;
+  /** 손 위치(발바닥 y=0, 정면 +z) */
+  hand: [number, number, number];
+  /** 쥔 자세(라디안) */
+  rot: [number, number, number];
+}
+
 export interface FighterDef {
   id: FighterId;
   /** 3D 모델: 기본 도형으로 만든 임시 모델 또는 glb 파일(public/models/) */
-  model: { type: 'primitive' } | { type: 'glb'; body: string; weapon?: string };
+  model: { type: 'primitive' } | { type: 'glb'; body: string; weapon?: string; weaponFit?: WeaponFit };
   name: string;
   role: Role;
   roleLabel: string;

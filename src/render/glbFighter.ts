@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { FIGHTERS, getFighter, type FighterDef } from '../data/fighters';
+import { FIGHTERS, getFighter, type FighterDef, type WeaponFit } from '../data/fighters';
 import { SKINS } from '../data/skins';
 import type { FighterModel } from './fighterModel';
 import { blobShadow, toon, toonTextured } from './toon';
@@ -54,11 +54,28 @@ function normalizeBody(scene: THREE.Object3D): THREE.Object3D {
   return wrap;
 }
 
-/** 총: 원본은 x축을 따라 놓여 있고 총구가 -x. 정면(+z)을 향하게 돌려서 손에 쥐어 준다 */
-function normalizeWeapon(scene: THREE.Object3D): THREE.Object3D {
+/**
+ * 무기를 손에 쥐어 준다. 기본(fit 없음)은 HINAKO 총: 원본은 x축을 따라 놓여 있고 총구가 -x, 정면(+z)을 향하게 돌린다.
+ * fit.axis === 'y': 세로로 선 무기(낫 등). 날이 -x 쪽이면 정면(+z)으로 돌아간다.
+ */
+function normalizeWeapon(scene: THREE.Object3D, fit?: WeaponFit): THREE.Object3D {
   const box = new THREE.Box3().setFromObject(scene);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
+  if (fit?.axis === 'y') {
+    const s = fit.length / size.y;
+    scene.position.set(-center.x * s, -center.y * s, -center.z * s);
+    scene.scale.multiplyScalar(s);
+    const pivot = new THREE.Group();
+    pivot.add(scene);
+    pivot.rotation.y = Math.PI / 2;
+    pivot.position.y = (-fit.grip * fit.length) / 2;
+    const holder = new THREE.Group();
+    holder.add(pivot);
+    holder.position.set(...fit.hand);
+    holder.rotation.set(...fit.rot);
+    return holder;
+  }
   const s = GUN_LENGTH / size.x;
   scene.position.set(-center.x * s, -center.y * s, -center.z * s);
   scene.scale.multiplyScalar(s);
@@ -83,7 +100,7 @@ async function load(def: FighterDef): Promise<Loaded> {
   ]);
   toToon(b.scene);
   if (w) toToon(w.scene);
-  const loaded = { body: normalizeBody(b.scene), weapon: w ? normalizeWeapon(w.scene) : null };
+  const loaded = { body: normalizeBody(b.scene), weapon: w ? normalizeWeapon(w.scene, def.model.weaponFit) : null };
   ready.set(keyOf(def), loaded);
   return loaded;
 }

@@ -40,7 +40,7 @@ test('lobby: no 소식 button; 상점 opens the shop', async ({ page }) => {
   await expect(page.locator('.side-btn[data-btn="news"]')).toHaveCount(0);
   await page.locator('.side-btn[data-btn="shop"]').tap();
   await expect(page.locator('.shop-screen')).toBeVisible();
-  await expect(page.locator('.shop-card')).toHaveCount(6);
+  await expect(page.locator('.shop-card')).toHaveCount(7);
   // 코인·다이아 표시를 눌러도 상점
   for (const i of [0, 1]) {
     await page.locator('.hdr .btn-back').tap();

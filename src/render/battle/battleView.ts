@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../../config';
 import { getFighter } from '../../data/fighters';
+import { getSkin, type SkinEffects } from '../../data/skins';
 import type { EntityId, Fighter, SimEvent, SimView, Team, Unit, Vec2 } from '../../game/types';
 import type { Grid } from '../../game/world';
 import { isVisibleTo } from '../../game/visibility';
@@ -228,7 +229,8 @@ export class BattleView {
       let s = this.shots.get(p.id);
       if (!s) {
         const owner = sim.getUnit(p.ownerId);
-        const obj = this.buildShot(owner, p.isSuper);
+        const fxSuper = p.isSuper ? this.skinFx(p.ownerId)?.superShot : undefined;
+        const obj = fxSuper ? this.buildFxShot(owner, fxSuper) : this.buildShot(owner, p.isSuper);
         obj.rotation.y = -Math.atan2(p.vel.y, p.vel.x);
         // 넓은 탄(REAPER 궁극기 등): 판정 반지름에 맞춰 키운다
         const base = p.isSuper ? 0.24 : 0.18;
@@ -423,13 +425,22 @@ export class BattleView {
   applyEvents(events: readonly SimEvent[]) {
     for (const e of events) {
       switch (e.type) {
-        case 'attack':
-          this.units.get(e.unitId)?.model.attack();
+        case 'attack': {
+          const v = this.units.get(e.unitId);
+          v?.model.attack();
+          const trail = this.skinFx(e.unitId)?.trail;
+          if (trail && v && v.unit.type === 'fighter') {
+            const spec = e.isSuper ? getFighter(v.unit.fighterId).super : getFighter(v.unit.fighterId).attack;
+            if (spec.kind === 'dash') this.fxTrail(trail, this.shotColor(v.unit), v.curr, e.dir, spec.range);
+          }
           break;
+        }
         case 'hit': {
           const v = this.units.get(e.targetId);
           if (v && 'hit' in v.model) v.model.hit();
-          this.spark(e.pos, e.isSuper ? '#ffe14d' : '#ffffff', e.isSuper ? 0.7 : 0.45);
+          const hitFx = this.skinFx(e.sourceId)?.hit;
+          if (hitFx) this.fxHit(hitFx, this.shotColor(this.units.get(e.sourceId)?.unit), e.pos, e.isSuper);
+          else this.spark(e.pos, e.isSuper ? '#ffe14d' : '#ffffff', e.isSuper ? 0.7 : 0.45);
           break;
         }
         case 'death':
@@ -735,6 +746,76 @@ export class BattleView {
   }
 
   // ───────────── 효과 ─────────────
+
+  // ───────────── 전설 스킨 이펙트(흑백 이미지 × 팀 색) ─────────────
+
+  private fxTextures = new Map<string, THREE.Texture>();
+  private fxMats = new Map<string, THREE.MeshBasicMaterial>();
+
+  /** 이 유닛(파이터)이 입은 스킨의 이펙트. 없으면 undefined */
+  private skinFx(id: EntityId): SkinEffects | undefined {
+    return getSkin(this.skinOf(id))?.effects;
+  }
+
+  private fxTexture(path: string): THREE.Texture {
+    let t = this.fxTextures.get(path);
+    if (!t) {
+      t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}${path}`);
+      t.colorSpace = THREE.SRGBColorSpace;
+      this.fxTextures.set(path, t);
+    }
+    return t;
+  }
+
+  /** 팀 색으로 칠한 이펙트 재질(공유). 규칙: 우리 팀 파랑, 상대 빨강 */
+  private fxMat(path: string, color: string): THREE.MeshBasicMaterial {
+    const key = `${path}|${color}`;
+    let m = this.fxMats.get(key);
+    if (!m) {
+      const c = new THREE.Color(color).multiplyScalar(1.6);
+      m = new THREE.MeshBasicMaterial({ map: this.fxTexture(path), color: c, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+      this.fxMats.set(key, m);
+    }
+    return m;
+  }
+
+  /** 이미지 탄: 바닥과 나란한 판. 크기는 snapshot에서 판정 반지름에 맞춰 키운다 */
+  private buildFxShot(owner: Unit | undefined, path: string): THREE.Group {
+    const g = new THREE.Group();
+    const size = 0.24 * 2 * 1.5;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(size * 1.36, size).rotateX(-Math.PI / 2), this.fxMat(path, this.shotColor(owner)));
+    plane.renderOrder = 3;
+    g.add(plane);
+    return g;
+  }
+
+  /** 돌진 잔상: 출발점에서 dir 방향으로 len 길이의 띠, 서서히 사라진다 */
+  private fxTrail(path: string, color: string, from: Vec2, dir: number, len: number) {
+    const mat = this.fxMat(path, color).clone();
+    const geo = new THREE.PlaneGeometry(len * 1.15, len * 0.5).rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(from.x + Math.cos(dir) * len * 0.5, 0.25, from.y + Math.sin(dir) * len * 0.5);
+    m.rotation.y = -dir;
+    m.renderOrder = 2;
+    this.addEffect(m, 0.7, (k) => {
+      mat.opacity = k < 0.1 ? k / 0.1 : 1 - Math.pow((k - 0.1) / 0.9, 2);
+    }, () => (geo.dispose(), mat.dispose()));
+  }
+
+  /** 적중: 맞은 자리에서 솟아오르는 이미지(카메라를 향함) */
+  private fxHit(path: string, color: string, pos: Vec2, big: boolean) {
+    const mat = new THREE.SpriteMaterial({ map: this.fxTexture(path), color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, depthWrite: false, depthTest: false });
+    const s = new THREE.Sprite(mat);
+    const w = big ? 2.2 : 1.5;
+    s.center.set(0.5, 0.15);
+    s.position.set(pos.x, 0.1, pos.y);
+    s.renderOrder = 4;
+    this.addEffect(s, 0.4, (k) => {
+      const g = 0.7 + Math.min(1, k * 3) * 0.5;
+      s.scale.set(w * g, w * 0.57 * g, 1);
+      mat.opacity = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
+    }, () => mat.dispose());
+  }
 
   private addEffect(obj: THREE.Object3D, dur: number, step: (k: number) => void, dispose: () => void) {
     this.scene.add(obj);

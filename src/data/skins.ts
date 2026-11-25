@@ -45,6 +45,24 @@ export const SKINS: readonly SkinDef[] = [
     rarity: 'epic',
     model: { type: 'glb', body: 'models/hinako.glb', weapon: 'models/hinako_gun.glb' },
   },
+  {
+    id: 'reaper_trueform',
+    fighterId: 'reaper',
+    name: 'TRUE FORM REAPER',
+    price: RARITY_PRICE.legendary,
+    rarity: 'legendary',
+    model: {
+      type: 'glb',
+      body: 'models/reaper.glb',
+      weapon: 'models/reaper_scythe.glb',
+      weaponFit: { axis: 'y', length: 1.7, grip: -0.15, hand: [-0.42, 0.85, 0.12], rot: [0.15, 0, 0.12] },
+    },
+    effects: {
+      trail: 'effects/reaper/trail.png',
+      superShot: 'effects/reaper/super.png',
+      hit: 'effects/reaper/hit.png',
+    },
+  },
 ];
 
 export const getSkin = (id: string | null | undefined): SkinDef | undefined => (id ? SKINS.find((s) => s.id === id) : undefined);
