@@ -43,6 +43,18 @@ import {
   LOB_SPACING,
   ZONE_HIT_TICKS,
   ZONE_MIN_DIST,
+  BALL_BOUNCE_DAMP,
+  BALL_CARRY_OFFSET,
+  BALL_FRICTION,
+  BALL_KICKOFF_TICKS,
+  BALL_KICK_SPEED,
+  BALL_MATCH_TICKS,
+  BALL_POWER_KICK_SPEED,
+  BALL_RADIUS,
+  BALL_REPICK_TICKS,
+  BALL_STOP_SPEED,
+  BALL_TARGET_SCORE,
+  BALL_WATER_MIN_SPEED,
   TURRET_DAMAGE,
   TURRET_INTERVAL_TICKS,
   TURRET_RANGE,
@@ -86,6 +98,7 @@ import {
   isInBush,
   moveCircle,
   sweepCircle,
+  Tile,
   type MapDef,
 } from './world';
 
@@ -284,6 +297,10 @@ export class Sim implements SimView {
         countdownTicks: -1,
         countdownTeam: null,
       };
+    } else if (opts.mode === 'ball') {
+      this.match = { mode: 'ball', score: [0, 0], targetScore: BALL_TARGET_SCORE, ticksLeft: BALL_MATCH_TICKS, winner: null, kickoffTicks: 0 };
+      const at = this.grid.ballSpawn;
+      if (at) this.ball = { id: this.nextId++, type: 'ball', pos: { ...at }, vel: { x: 0, y: 0 }, carrierId: null, noPickupUntil: 0, kickerId: null };
     }
     for (const spec of opts.fighters) {
       const spawns = this.grid.teamSpawns[spec.team];
@@ -317,7 +334,7 @@ export class Sim implements SimView {
       if (this.match.mode === 'crystal') f.crystals = 0;
       this.addUnit(f);
     }
-    if (opts.dummies) {
+    if (opts.dummies && this.match.mode !== 'ball') {
       for (const d of this.grid.dummySpawns) {
         const dummy: SimDummy = {
           id: this.nextId++,
@@ -357,6 +374,11 @@ export class Sim implements SimView {
     this.events = [];
     this.broken = [];
     this.knockAcc.clear();
+    // 파이터 볼 킥오프 대기: 모두(탄·지대 포함) 멈춘다
+    if ((this.match.kickoffTicks ?? 0) > 0) {
+      this.stepKickoff();
+      return this.events;
+    }
     // 경기가 끝난 뒤: 입력·부활·회복·더미 행동은 멈추고, 이미 시작된 행동(연사·돌진·점프)과
     // 날아가는 탄은 끝까지 진행하되 피해·넉백·충전은 없다(over 확인)
     const over = this.over;
@@ -368,6 +390,7 @@ export class Sim implements SimView {
     this.stepLobs();
     if (!over) this.stepZones();
     if (!over && this.match.mode === 'crystal') this.stepCrystals();
+    if (!over && this.ball) this.stepBall();
     if (!over) for (const u of this.units) if (u.alive) this.regen(u);
     if (this.broken.length) this.events.push({ type: 'wallsBroken', tiles: dedupeTiles(this.broken) });
     if (!this.over) this.stepMatchClock();
@@ -500,6 +523,166 @@ export class Sim implements SimView {
     this.events.push({ type: 'matchEnd', winner, score: [this.match.score[0], this.match.score[1]] });
   }
 
+  // ───────────── 파이터 볼 ─────────────
+
+  /** 강슛으로 굴러가는 중(지나가는 부서지는 벽을 부순다). 멈추거나 누가 주우면 끝 */
+  private ballPower = false;
+
+  /**
+   * 한 틱: 굴러가는 공 이동(마찰·벽 튕김) → 줍기 → 든 공은 운반자를 따라감 → 골 판정.
+   * 골: 놓인 공의 중심이 팀 T의 골대 칸이거나, 운반자가 상대 팀 T의 골대 칸에 들어가면 T의 상대 팀 득점.
+   */
+  private stepBall() {
+    const b = this.ball!;
+    if (b.carrierId === null) this.rollBall(b);
+
+    if (b.carrierId === null) {
+      for (const u of this.units) {
+        if (u.type !== 'fighter' || !isHittable(u)) continue;
+        if (u.id === b.kickerId && this.tick < b.noPickupUntil) continue;
+        const r = u.radius + BALL_RADIUS;
+        const dx = b.pos.x - u.pos.x;
+        const dy = b.pos.y - u.pos.y;
+        if (dx * dx + dy * dy > r * r) continue;
+        b.carrierId = u.id;
+        b.vel = { x: 0, y: 0 };
+        this.ballPower = false;
+        if (u.action?.kind === 'burst') u.action = null;
+        this.events.push({ type: 'ballPickup', unitId: u.id });
+        break;
+      }
+    }
+
+    const carrier = b.carrierId !== null ? this.getUnit(b.carrierId) : undefined;
+    if (carrier) {
+      b.pos = { x: carrier.pos.x + Math.cos(carrier.facing) * BALL_CARRY_OFFSET, y: carrier.pos.y + Math.sin(carrier.facing) * BALL_CARRY_OFFSET };
+      const g = this.grid.goalAt(carrier.pos.x, carrier.pos.y);
+      if (g !== null && g !== carrier.team) this.scoreGoal(g, carrier.id);
+    } else {
+      const g = this.grid.goalAt(b.pos.x, b.pos.y);
+      if (g !== null) this.scoreGoal(g, b.kickerId);
+    }
+  }
+
+  /** 놓인 공 한 틱: 이번 틱 속도로 움직이며 벽에 튕기고(감쇠), 그 뒤 마찰로 느려진다. 물·수풀 위는 지나간다 */
+  private rollBall(b: Ball) {
+    let speed = len(b.vel);
+    if (speed <= 0) return;
+    let budget = speed * TICK_DT;
+    for (let i = 0; i < 4 && budget > 1e-9; i++) {
+      const to = { x: b.pos.x + (b.vel.x / speed) * budget, y: b.pos.y + (b.vel.y / speed) * budget };
+      const sweep = sweepCircle(this.grid, b.pos, to, BALL_RADIUS, this.ballPower ? { breakWalls: true } : {});
+      if (sweep.broken.length) this.broken.push(...sweep.broken);
+      if (!sweep.hit) {
+        b.pos = to;
+        break;
+      }
+      budget -= dist(b.pos, sweep.point);
+      b.pos = { ...sweep.point };
+      const r = reflectOffWalls(this.grid, b.pos, b.vel, BALL_RADIUS);
+      b.vel = { x: r.x * BALL_BOUNCE_DAMP, y: r.y * BALL_BOUNCE_DAMP };
+      speed = len(b.vel);
+      budget *= BALL_BOUNCE_DAMP;
+    }
+    let next = Math.max(0, speed - BALL_FRICTION * TICK_DT);
+    if (this.grid.get(Math.floor(b.pos.x), Math.floor(b.pos.y)) === Tile.Water) next = Math.max(next, BALL_WATER_MIN_SPEED);
+    else if (next < BALL_STOP_SPEED) next = 0;
+    if (next === 0 || speed < 1e-9) {
+      b.vel = { x: 0, y: 0 };
+      this.ballPower = false;
+    } else {
+      b.vel = { x: (b.vel.x / speed) * next, y: (b.vel.y / speed) * next };
+    }
+  }
+
+  /** 팀 team의 골대 가운데(골대가 없으면 null) */
+  goalCenter(team: Team): Vec2 | null {
+    const tiles = this.grid.goalTiles[team];
+    if (!tiles.length) return null;
+    let x = 0;
+    let y = 0;
+    for (const t of tiles) {
+      x += t.x + 0.5;
+      y += t.y + 0.5;
+    }
+    return { x: x / tiles.length, y: y / tiles.length };
+  }
+
+  /**
+   * 공 차기. aim이 있으면 그 방향, 없으면(자동 조준) 상대 골대 가운데 쪽(골대가 없으면 바라보는 방향).
+   * power: 강슛(게이지 소모, 더 빠르고 부서지는 벽을 부순다). 탄창은 쓰지 않는다.
+   */
+  private kickBall(f: Fighter, aim: Aim, power: boolean) {
+    const b = this.ball!;
+    let dir = f.facing;
+    if (aim && len(aim) > 1e-3) dir = angleOf(aim);
+    else {
+      const goal = this.goalCenter(f.team === 0 ? 1 : 0);
+      if (goal && dist(goal, f.pos) > 1e-6) dir = angleOf({ x: goal.x - f.pos.x, y: goal.y - f.pos.y });
+    }
+    if (power) f.superCharge = 0;
+    f.facing = dir;
+    f.revealedUntil = this.tick + REVEAL_TICKS;
+    b.carrierId = null;
+    b.pos = { ...f.pos };
+    b.vel = fromAngle(dir, power ? BALL_POWER_KICK_SPEED : BALL_KICK_SPEED);
+    b.kickerId = f.id;
+    b.noPickupUntil = this.tick + BALL_REPICK_TICKS;
+    this.ballPower = power;
+    this.events.push({ type: 'ballKick', unitId: f.id, isSuper: power, dir });
+  }
+
+  /** 운반자가 쓰러졌다: 그 자리에 공을 내려놓는다 */
+  private dropBall(f: Fighter | Unit) {
+    const b = this.ball!;
+    b.carrierId = null;
+    b.pos = { ...f.pos };
+    b.vel = { x: 0, y: 0 };
+    this.ballPower = false;
+    this.events.push({ type: 'ballDrop', unitId: f.id, pos: { ...b.pos } });
+  }
+
+  /** 팀 goalOf의 골대에 골: 상대 팀 득점. 목표 점수면 경기 끝, 아니면 킥오프 대기 */
+  private scoreGoal(goalOf: Team, scorerId: EntityId | null) {
+    const m = this.match;
+    if (this.over) return;
+    const team: Team = goalOf === 0 ? 1 : 0;
+    m.score[team]++;
+    const b = this.ball!;
+    b.carrierId = null;
+    b.vel = { x: 0, y: 0 };
+    this.ballPower = false;
+    this.events.push({ type: 'goal', team, score: [m.score[0], m.score[1]], scorerId });
+    if (m.targetScore > 0 && m.score[team] >= m.targetScore) this.endMatch(team);
+    else m.kickoffTicks = BALL_KICKOFF_TICKS;
+  }
+
+  /** 킥오프 대기 한 틱. 끝나면 모두 출발 지점에서 가득 찬 상태로, 탄·지대는 지우고, 공은 가운데로 */
+  private stepKickoff() {
+    const m = this.match;
+    m.kickoffTicks = (m.kickoffTicks ?? 0) - 1;
+    for (const u of this.units) if (u.type === 'fighter') u.moving = false;
+    if (m.kickoffTicks > 0) return;
+    m.kickoffTicks = 0;
+    this.projectiles = [];
+    this.lobs = [];
+    this.zones = [];
+    this.splitters.clear();
+    this.lobKnock.clear();
+    this.zoneAcc.clear();
+    this.knockedBy.clear();
+    for (const u of this.units) this.respawn(u);
+    const b = this.ball;
+    const at = this.grid.ballSpawn;
+    if (b && at) {
+      b.pos = { ...at };
+      b.vel = { x: 0, y: 0 };
+      b.carrierId = null;
+      b.kickerId = null;
+      b.noPickupUntil = 0;
+    }
+  }
+
   // ───────────── 파이터 ─────────────
 
   private stepFighter(f: Fighter, input: FighterInput | undefined) {
@@ -534,6 +717,13 @@ export class Sim implements SimView {
       f.facing = angleOf(move);
     }
     f.inBush = isInBush(this.grid, f.pos);
+
+    // 공을 든 파이터: 공격 입력 = 차기, 궁극기 입력 = 강슛(게이지가 찼을 때). 보통 공격·궁극기는 못 쓴다
+    if (this.ball?.carrierId === f.id) {
+      if (input?.super && f.superCharge >= 1 - EPS) this.kickBall(f, input.super.aim, true);
+      else if (input?.attack) this.kickBall(f, input.attack.aim, false);
+      return;
+    }
 
     // 새 공격: 진행 중인 행동(연사 포함)이 없을 때만. 궁극기가 나가면 같은 틱의 기본 공격은 무시
     if (!f.action && input) {
@@ -1201,6 +1391,7 @@ export class Sim implements SimView {
     }
     this.events.push({ type: 'death', unitId: u.id, pos: { ...u.pos } });
     if (u.type === 'fighter') this.dropCrystals(u);
+    if (this.ball?.carrierId === u.id) this.dropBall(u);
     this.scoreKo(u, sourceId);
   }
 

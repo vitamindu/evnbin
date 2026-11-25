@@ -5,6 +5,7 @@ import { isVisibleTo } from './visibility';
 import type { Sim } from './sim';
 import { TICK_DT, type Aim, type EntityId, type Fighter, type FighterInput, type Unit, type Vec2 } from './types';
 import { circleBlocked, hasLineOfSight } from './world';
+import { BALL_RADIUS } from './rules';
 
 /**
  * 봇 조종. Gameplay 담당. 서버(빈자리 채우기)와 오프라인 모두에서 쓴다.
@@ -21,6 +22,9 @@ import { circleBlocked, hasLineOfSight } from './world';
  * - 궁극기: 게이지가 차면 쓸모 있을 때 쓴다. leap은 체력이 낮고 적이 가까울 때 적 반대쪽으로(내려찍기 leap은 사거리 안의 표적 위로),
  *   dash는 표적 쪽으로, 나머지(산탄·연사 등)는 궁극기 사거리 안의 표적 쪽으로.
  * - 후퇴: 체력이 RETREAT_HP 미만이면 출발 지점으로 돌아가 회복(RECOVERED_HP까지). 그동안은 가까운 적만 쏜다.
+ * - 파이터 볼: 공이 놓여 있으면 팀마다 공에 가장 가까운 봇 하나가 주우러 간다(나머지는 평소대로 싸운다).
+ *   공을 들면 상대 골대로 가서 BALL_SHOOT_DIST 안에서 길이 트이면 차고(게이지가 차 있으면 강슛), 적이 BALL_PRESSURE_DIST 안이면 앞으로 차 낸다.
+ *   상대가 들고 있으면 운반자를 쫓아가 공격한다.
  * - 벽: 가려는 방향 앞이 막혔으면 조금씩 꺾어 본다. 그래도 몇 틱 동안 못 움직이면 옆으로 비켜 간다.
  */
 
@@ -67,6 +71,12 @@ export const CHASE_CARRIER_DIST = 12;
 export const ENGAGE_MARGIN = 2;
 /** 우리 팀 카운트다운 중 운반자가 아닌 봇은 가장 가까운 우리 운반자 이 거리 안에 머문다 */
 export const ESCORT_DIST = 2.5;
+
+// ── 파이터 볼 ──
+/** 공을 든 봇: 상대 골대 가운데까지 이 거리 안이고 길이 트였으면 찬다 */
+export const BALL_SHOOT_DIST = 6;
+/** 공을 든 봇: 적이 이 거리 안이면 앞(상대 골대 쪽)으로 차 낸다 */
+export const BALL_PRESSURE_DIST = 1.8;
 
 /** 웨이포인트에 이만큼 가까우면 다음으로 */
 const WAYPOINT_REACHED = 1.5;
@@ -216,6 +226,45 @@ function crystalErrand(sim: Sim, f: Fighter, ourCountdown: boolean): Vec2 | null
   return spawn && dist(f.pos, spawn) > WAYPOINT_REACHED ? spawn : null;
 }
 
+/** 파이터 볼: 팀 f.team에서 살아 있는 파이터 중 공에 가장 가까운 파이터인가(같으면 id가 작은 쪽) */
+function isBallChaser(sim: Sim, f: Fighter, ball: Vec2): boolean {
+  const mine = dist(f.pos, ball);
+  for (const u of sim.units) {
+    if (u.type !== 'fighter' || u.id === f.id || u.team !== f.team || !isHittable(u)) continue;
+    const d = dist(u.pos, ball);
+    if (d < mine || (d === mine && u.id < f.id)) return false;
+  }
+  return true;
+}
+
+/** 공을 든 봇의 입력: 상대 골대로 몰고 가다가 가까우면 찬다 */
+function carrierInput(sim: Sim, f: Fighter, m: BotMemory): FighterInput {
+  const goal = sim.goalCenter(f.team === 0 ? 1 : 0) ?? { x: sim.grid.width / 2, y: f.team === 0 ? 0 : sim.grid.height };
+  let want = dirTo(f.pos, goal);
+  if (m.stuck >= STUCK_TICKS) {
+    m.steerSign = m.steerSign === 1 ? -1 : 1;
+    m.sidestepDir = Math.atan2(want.y, want.x) + m.steerSign * (Math.PI / 2 + (sim.rng.next() - 0.5) * 0.6);
+    m.sidestepUntil = sim.tick + SIDESTEP_TICKS;
+    m.stuck = 0;
+  }
+  if (sim.tick < m.sidestepUntil) want = { x: Math.cos(m.sidestepDir), y: Math.sin(m.sidestepDir) };
+  const move = steer(sim, f, want, m);
+  m.lastMoveLen = Math.sqrt(move.x * move.x + move.y * move.y);
+  const input: FighterInput = { move };
+  const d = dist(f.pos, goal);
+  const clear = d <= BALL_SHOOT_DIST && hasLineOfSight(sim.grid, f.pos, goal, BALL_RADIUS * 0.5);
+  let pressed = false;
+  for (const u of sim.units) {
+    if (u.type === 'fighter' && u.team !== f.team && isHittable(u) && dist(u.pos, f.pos) <= BALL_PRESSURE_DIST) pressed = true;
+  }
+  if (clear || pressed) {
+    const aim = jitteredAim(sim, f.pos, goal);
+    if (clear && f.superCharge >= 1) input.super = { aim };
+    else input.attack = { aim };
+  }
+  return input;
+}
+
 /** 가려는 방향 앞이 막혔으면 조금씩 꺾어 본다. 다 막혔으면 원래 방향 */
 function steer(sim: Sim, f: Fighter, want: Vec2, m: BotMemory): Vec2 {
   const l = Math.sqrt(want.x * want.x + want.y * want.y);
@@ -286,12 +335,33 @@ export function botInput(sim: Sim, id: EntityId): FighterInput {
     m.strafeUntil = tick + randInt(sim, STRAFE_MIN_TICKS, STRAFE_MAX_TICKS);
   }
 
+  // ── 파이터 볼 ──
+  const ballMode = sim.match.mode === 'ball';
+  const ball = ballMode ? sim.ball : null;
+  if (ballMode && (sim.match.kickoffTicks ?? 0) > 0) {
+    m.lastMoveLen = 0;
+    return IDLE;
+  }
+  if (ball && ball.carrierId === f.id) return carrierInput(sim, f, m);
+  const ballCarrier = ball && ball.carrierId !== null ? sim.getUnit(ball.carrierId) : undefined;
+  const enemyBallCarrier = ballCarrier && ballCarrier.team !== f.team ? ballCarrier : undefined;
+  /** 갈 곳: 놓인 공(우리 팀에서 가장 가까우면) 또는 공을 든 적 */
+  const ballGoal: Vec2 | null = ball
+    ? enemyBallCarrier
+      ? enemyBallCarrier.pos
+      : ball.carrierId === null && isBallChaser(sim, f, ball.pos)
+        ? ball.pos
+        : null
+    : null;
+  if (ballGoal) m.retreating = false;
+
   const crystalMode = sim.match.mode === 'crystal';
   const carried = f.crystals ?? 0;
   const ourCountdown = crystalMode && sim.match.countdownTeam === f.team;
   if (crystalMode && ((carried >= CAREFUL_CARRY && hp < CAREFUL_HP) || (ourCountdown && carried > 0))) m.retreating = true;
 
-  const target = (crystalMode ? enemyCarrier(sim, f) : null) ?? nearestVisibleEnemy(sim, f);
+  const carrierTarget = enemyBallCarrier && isVisibleTo(sim, enemyBallCarrier, f.team) ? enemyBallCarrier : null;
+  const target = carrierTarget ?? (crystalMode ? enemyCarrier(sim, f) : null) ?? nearestVisibleEnemy(sim, f);
   if ((target?.id ?? null) !== m.targetId) {
     m.targetId = target?.id ?? null;
     if (target) m.reactTick = tick + randInt(sim, REACT_MIN_TICKS, REACT_MAX_TICKS);
@@ -302,7 +372,9 @@ export function botInput(sim: Sim, id: EntityId): FighterInput {
   // ── 이동 ──
   let want: Vec2 = { x: 0, y: 0 };
   const crystalGoal = crystalMode && !m.retreating && (!target || d > range + ENGAGE_MARGIN) ? crystalErrand(sim, f, ourCountdown) : null;
-  if (m.retreating) {
+  if (ballGoal) {
+    want = dirTo(f.pos, ballGoal);
+  } else if (m.retreating) {
     if (dist(f.pos, f.spawn) > 1) want = dirTo(f.pos, f.spawn);
   } else if (crystalGoal) {
     want = dirTo(f.pos, crystalGoal);
