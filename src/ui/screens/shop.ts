@@ -27,7 +27,7 @@ export function createShopScreen(ctx: AppContext): Screen {
     if (item.kind === 'coins') return el('span', 'shop-art', [iconEl('coin')]);
     const skin = getSkin(item.skinId)!;
     const img = el('img');
-    img.src = ctx.portraits[skin.fighterId];
+    img.src = ctx.skinPortraits[skin.id] ?? ctx.portraits[skin.fighterId];
     img.alt = '';
     img.draggable = false;
     return el('span', 'shop-art is-skin', [img]);

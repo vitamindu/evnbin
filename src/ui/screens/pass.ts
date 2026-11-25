@@ -45,7 +45,7 @@ export function createPassScreen(ctx: AppContext): Screen {
     if (r.skin) {
       const skin = getSkin(r.skin)!;
       const img = el('img', 'ps-skin');
-      img.src = ctx.portraits[skin.fighterId];
+      img.src = ctx.skinPortraits[skin.id] ?? ctx.portraits[skin.fighterId];
       img.alt = '';
       img.draggable = false;
       return [img, txt('스킨', 'ps-amt')];

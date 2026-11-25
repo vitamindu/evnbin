@@ -87,7 +87,7 @@ async function boot() {
   title.setProgress(0.6);
   await nextFrame();
 
-  const portraits = renderPortraits();
+  const { fighters: portraits, skins: skinPortraits } = renderPortraits();
   title.setProgress(0.8);
   await nextFrame();
 
@@ -96,6 +96,7 @@ async function boot() {
     screens,
     overlayLayer,
     portraits,
+    skinPortraits,
     go: {
       login: () => screens.show(login),
       lobby: () => screens.show(lobby),

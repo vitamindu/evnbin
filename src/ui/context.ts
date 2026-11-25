@@ -19,6 +19,8 @@ export interface AppContext {
   /** 오버레이(토스트, 팝업)를 붙이는 층. 화면 전환과 무관하게 유지된다. */
   overlayLayer: HTMLElement;
   portraits: Record<FighterId, string>;
+  /** 스킨 id → 그 스킨 모델로 그린 초상화 */
+  skinPortraits: Record<string, string>;
   go: {
     /** 로그인 / 회원가입(저장된 토큰이 있으면 자동 로그인 후 로비) */
     login(): void;
