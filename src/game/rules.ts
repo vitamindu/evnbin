@@ -13,8 +13,10 @@ export const secToTicks = (sec: number): number => Math.round(sec * TICK_RATE);
 // ── 몸체 ──
 /** 파이터 충돌 원 반지름(기본) */
 export const FIGHTER_RADIUS = 0.4;
-/** 파이터별 반지름 예외 (docs/03: BOULDER 0.5) */
-export const FIGHTER_RADIUS_BY_ID: Partial<Record<FighterId, number>> = { boulder: 0.5 };
+/** 파이터별 반지름 예외 (docs/03: BOULDER 0.45). 1칸(1타일) 통로를 지나가야 하므로 0.5보다 작아야 한다 */
+export const FIGHTER_RADIUS_BY_ID: Partial<Record<FighterId, number>> = { boulder: 0.45 };
+/** 어떤 파이터도 이보다 크면 안 된다(1칸 통로) */
+export const MAX_FIGHTER_RADIUS = 0.46;
 export const fighterRadius = (id: FighterId): number => FIGHTER_RADIUS_BY_ID[id] ?? FIGHTER_RADIUS;
 
 // ── 투사체 ──

@@ -97,15 +97,16 @@ export class KoFeed {
   onEvents(events: readonly SimEvent[], state: SimView, myId: EntityId, nameOf: NameOf) {
     const me = state.getUnit(myId);
     if (!me) return;
+    // 모든 모드: 누군가를 쓰러뜨린 피해(hit.killed)마다 한 줄(연습장 허수아비 포함)
     for (const e of events) {
-      if (e.type !== 'score') continue;
-      const killer = state.getUnit(e.killerId);
-      const victim = state.getUnit(e.victimId);
+      if (e.type !== 'hit' || !e.killed) continue;
+      const killer = state.getUnit(e.sourceId);
+      const victim = state.getUnit(e.targetId);
       const side = (team: Team | undefined) => (team === me.team ? 'is-blue' : 'is-red');
-      const row = el('div', `kf-row${e.killerId === myId || e.victimId === myId ? ' is-me' : ''}`, [
-        txt(nameOf(e.killerId), `kf-name ${side(killer?.team ?? e.team)}`),
+      const row = el('div', `kf-row${e.sourceId === myId || e.targetId === myId ? ' is-me' : ''}`, [
+        txt(nameOf(e.sourceId), `kf-name ${side(killer?.team)}`),
         iconEl('attack', 'ico kf-ico'),
-        txt(nameOf(e.victimId), `kf-name ${side(victim?.team ?? (e.team === 0 ? 1 : 0))}`),
+        txt(nameOf(e.targetId), `kf-name ${side(victim?.team)}`),
       ]);
       this.el.prepend(row);
       this.rows.unshift({ el: row, at: performance.now() });

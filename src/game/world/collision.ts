@@ -146,6 +146,31 @@ export function resolveCircle(grid: Grid, pos: Vec2, r: number): Vec2 {
  * 원을 (dx, dy)만큼 움직인다. 벽·물에 막히면 벽을 따라 미끄러지고, 모서리에 살짝 걸리면 돌아서 지나간다.
  * 시작 위치가 벽과 겹쳐 있으면 먼저 가장 가까운 빈 곳으로 꺼낸다.
  */
+/**
+ * 모서리 미끄러지기: 주로 한 방향으로 가다가 벽 모서리에 걸리면(1칸 통로 입구에서 살짝 비껴 있을 때)
+ * 그 옆 방향으로 통로 가운데 쪽으로 조금 밀어 준다. 한 걸음에 최대 |이동|만큼.
+ */
+function slideIntoGap(grid: Grid, p: Vec2, r: number, sx: number, sy: number) {
+  const ax = Math.abs(sx);
+  const ay = Math.abs(sy);
+  const step = Math.max(ax, ay);
+  if (step < 1e-9) return;
+  if (ay >= ax) {
+    // 세로로 가는 중: 앞쪽 칸의 가운데로 x를 맞춘다
+    const cx = Math.floor(p.x) + 0.5;
+    const off = cx - p.x;
+    if (Math.abs(off) < 1e-6 || Math.abs(off) > 0.5 - 1e-6) return;
+    const nx = p.x + Math.sign(off) * Math.min(Math.abs(off), step);
+    if (!circleBlocked(grid, nx, p.y, r)) p.x = nx;
+  } else {
+    const cy = Math.floor(p.y) + 0.5;
+    const off = cy - p.y;
+    if (Math.abs(off) < 1e-6 || Math.abs(off) > 0.5 - 1e-6) return;
+    const ny = p.y + Math.sign(off) * Math.min(Math.abs(off), step);
+    if (!circleBlocked(grid, p.x, ny, r)) p.y = ny;
+  }
+}
+
 export function moveCircle(grid: Grid, pos: Vec2, r: number, dx: number, dy: number): Vec2 {
   const p = resolveCircle(grid, pos, r);
   const dist = Math.sqrt(dx * dx + dy * dy);
@@ -166,6 +191,7 @@ export function moveCircle(grid: Grid, pos: Vec2, r: number, dx: number, dy: num
     // 밀어내기로 못 푸는 좁은 곳: 축별로 따로 시도
     if (!circleBlocked(grid, p.x + sx, p.y, r)) p.x += sx;
     else if (!circleBlocked(grid, p.x, p.y + sy, r)) p.y += sy;
+    else slideIntoGap(grid, p, r, sx, sy);
   }
   return p;
 }

@@ -172,7 +172,7 @@ export function createBattleScreen(ctx: AppContext) {
     label.hidden = teamfight;
     scoreboard.el.hidden = !teamfight || crystal;
     crystalBoard.el.hidden = !crystal;
-    feed.el.hidden = !teamfight;
+    feed.el.hidden = false; // KO 알림은 모든 모드
     crystalBoard.reset();
     ping.el.hidden = !m;
     scoreboard.reset();
@@ -200,16 +200,16 @@ export function createBattleScreen(ctx: AppContext) {
         void lowHp.offsetWidth; // 애니메이션 다시 시작
         lowHp.classList.add('is-on');
       }
-      if (teamfight) feed.onEvents(events, s.state, s.playerId, nameOf);
+      feed.onEvents(events, s.state, s.playerId, nameOf);
     };
     s.onFrame = () => {
       input.frame();
       hud.frame();
       feedback.superCharge(s.player.superCharge);
+      feed.frame();
       if (teamfight) {
         if (crystal) crystalBoard.update(s.match, s.player.team);
         else scoreboard.update(s.match, s.player.team);
-        feed.frame();
         const w = s.match.winner;
         if (w !== null && !ended) markEnded(w, s.match.score);
       }
