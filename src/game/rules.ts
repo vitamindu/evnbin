@@ -122,3 +122,29 @@ export const LOB_SPACING = 0.7;
 export const ZONE_MIN_DIST = 1;
 /** 지대 피해를 모아서 주는 간격(틱). 30틱/초 기준 초당 5번 */
 export const ZONE_HIT_TICKS = 6;
+
+// ── FIGHTER BALL ──
+/** 이 골 수에 먼저 닿는 팀이 이긴다 */
+export const BALL_TARGET_SCORE = 2;
+/** 경기 시간. 끝나면 골이 많은 팀 승리, 같으면 무승부 */
+export const BALL_MATCH_TICKS = secToTicks(150);
+/** 골 뒤 다시 시작(킥오프)까지 모두 멈추는 시간. 끝나면 모두 출발 지점에서 가득 찬 상태로 다시 시작 */
+export const BALL_KICKOFF_TICKS = secToTicks(2.5);
+/** 공 몸 반지름: 파이터 원과 이 원이 닿으면 줍는다. 벽 충돌도 이 반지름 */
+export const BALL_RADIUS = 0.3;
+/** 들고 있을 때 공이 파이터 중심에서 바라보는 방향으로 떨어진 거리(표시용) */
+export const BALL_CARRY_OFFSET = 0.3;
+/** 차기(기본 공격 입력) 초속(타일/초) */
+export const BALL_KICK_SPEED = 11;
+/** 강슛(궁극기 입력, 게이지 소모) 초속. 지나가는 부서지는 벽을 부순다 */
+export const BALL_POWER_KICK_SPEED = 16;
+/** 굴러가는 공의 감속(타일/초²) */
+export const BALL_FRICTION = 7;
+/** 이 속도(타일/초)보다 느려지면 멈춘다 */
+export const BALL_STOP_SPEED = 0.3;
+/** 벽에 튕기면 속도에 곱한다 */
+export const BALL_BOUNCE_DAMP = 0.6;
+/** 물 위에서는 멈추지 않고 적어도 이 속도로 계속 굴러간다(아무도 못 줍는 곳에 서지 않게) */
+export const BALL_WATER_MIN_SPEED = 1.5;
+/** 찬 사람은 이 시간 동안 공을 다시 줍지 못한다 */
+export const BALL_REPICK_TICKS = secToTicks(0.3);
