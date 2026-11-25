@@ -124,7 +124,7 @@ describe('FIGHTER BALL 규칙', () => {
     expect(sim.ball!.pos.x).toBeLessThan(maxX - 0.5);
   });
 
-  it('물·수풀 위는 지나가고 부서지는 벽에 막힌다. 강슛은 벽을 부순다', () => {
+  it('물·수풀 위는 지나가고 부서지는 벽에 막힌다. 강슛도 벽을 부수지 않는다', () => {
     const marks: Array<[number, number, string]> = [[2, 2, 'A'], [3, 2, 'O'], [1, 1, 'g'], [1, 3, 'h'], [6, 2, 'W'], [7, 2, 'B'], [9, 2, '#']];
     const sim = ballSim(testMap(16, 5, marks), [{ team: 0 }]);
     const [me] = fighters(sim);
@@ -147,8 +147,9 @@ describe('FIGHTER BALL 규칙', () => {
     expect(ofType(ev, 'ballKick')[0]).toMatchObject({ isSuper: true });
     expect(me2!.superCharge).toBe(0);
     const all = run(sim2, 40);
-    expect(sim2.grid.get(9, 2)).toBe(Tile.Floor);
-    expect(ofType(all, 'wallsBroken').flatMap((e) => e.tiles)).toContainEqual({ x: 9, y: 2 });
+    expect(sim2.grid.get(9, 2)).toBe(Tile.Wall);
+    expect(ofType(all, 'wallsBroken')).toHaveLength(0);
+    expect(sim2.ball!.pos.x).toBeLessThanOrEqual(9 - BALL_RADIUS + 1e-6);
   });
 
   it('운반자가 쓰러지면 그 자리에 공을 떨어뜨리고, 쓰러뜨려도 점수는 없다', () => {
@@ -213,16 +214,32 @@ describe('FIGHTER BALL 규칙', () => {
     expect(me!.pos).toEqual(pos);
   });
 
-  it('제 골대에 공이 들어가면 상대 득점, 제 골대에 들고 들어가면 아무 일 없음', () => {
+  it('자책골 없음: 제 골대로 찬 공은 골대 입구에서 튕겨 나오고, 들고 들어가도 아무 일 없음', () => {
     const sim = ballSim();
     const [me] = fighters(sim);
     pickUp(sim, me!.id);
     const ev = run(sim, 150, { [me!.id]: { move: { x: 0, y: 1 } } });
     expect(ofType(ev, 'goal')).toHaveLength(0);
     expect(sim.grid.goalAt(me!.pos.x, me!.pos.y)).toBe(0);
-    run(sim, 5, { [me!.id]: { move: { x: 0, y: -1 } } });
-    const ev2 = [...tick(sim, { [me!.id]: attack({ x: 0, y: 1 }) }), ...runUntil(sim, () => sim.match.score[1] > 0, 60)];
-    expect(ofType(ev2, 'goal')).toEqual([{ type: 'goal', team: 1, score: [0, 1], scorerId: me!.id }]);
+    run(sim, 40, { [me!.id]: { move: { x: 0, y: -1 } } }); // 골대 밖 경기장으로 나온다
+    expect(sim.grid.goalAt(me!.pos.x, me!.pos.y)).toBeNull();
+    // 아래(우리 골대)로 세게 찬다
+    const ev2 = [...tick(sim, { [me!.id]: attack({ x: 0, y: 1 }) }), ...run(sim, 60)];
+    expect(ofType(ev2, 'goal')).toHaveLength(0);
+    expect(sim.match.score).toEqual([0, 0]);
+    expect(sim.grid.goalAt(sim.ball!.pos.x, sim.ball!.pos.y)).toBeNull(); // 골대 칸 밖
+  });
+
+  it('상대가 찬 공이 우리 골대에 들어가면 상대 득점', () => {
+    const sim = ballSim();
+    const [me, foe] = fighters(sim);
+    me!.pos = { x: 1.5, y: 2.5 }; // 우리 선수는 멀리(공을 가로채지 않게)
+    // 상대(팀1)가 우리(팀0) 골대 바로 앞에서 공을 들고 아래로 찬다
+    const goal = sim.goalCenter(0)!;
+    foe!.pos = { x: goal.x, y: goal.y - 3 };
+    sim.ball!.carrierId = foe!.id;
+    const ev = [...tick(sim, { [foe!.id]: attack({ x: 0, y: 1 }) }), ...runUntil(sim, () => sim.match.score[1] > 0, 60)];
+    expect(ofType(ev, 'goal')).toEqual([{ type: 'goal', team: 1, score: [0, 1], scorerId: foe!.id }]);
   });
 
   it('시간이 끝나면 골이 많은 팀 승리, 같으면 무승부', () => {

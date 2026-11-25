@@ -529,7 +529,6 @@ export class Sim implements SimView {
   // ───────────── 파이터 볼 ─────────────
 
   /** 강슛으로 굴러가는 중(지나가는 부서지는 벽을 부순다). 멈추거나 누가 주우면 끝 */
-  private ballPower = false;
 
   /**
    * 한 틱: 굴러가는 공 이동(마찰·벽 튕김) → 줍기 → 든 공은 운반자를 따라감 → 골 판정.
@@ -549,7 +548,6 @@ export class Sim implements SimView {
         if (dx * dx + dy * dy > r * r) continue;
         b.carrierId = u.id;
         b.vel = { x: 0, y: 0 };
-        this.ballPower = false;
         if (u.action?.kind === 'burst') u.action = null;
         this.events.push({ type: 'ballPickup', unitId: u.id });
         break;
@@ -563,20 +561,36 @@ export class Sim implements SimView {
       if (g !== null && g !== carrier.team) this.scoreGoal(g, carrier.id);
     } else {
       const g = this.grid.goalAt(b.pos.x, b.pos.y);
-      if (g !== null) this.scoreGoal(g, b.kickerId);
+      // 자책골은 없다: 찬 사람 팀의 골대에는 공이 들어가지 않는다(rollBall에서 튕겨 나간다)
+      if (g !== null && g !== this.kickerTeam(b)) this.scoreGoal(g, b.kickerId);
     }
   }
 
-  /** 놓인 공 한 틱: 이번 틱 속도로 움직이며 벽에 튕기고(감쇠), 그 뒤 마찰로 느려진다. 물·수풀 위는 지나간다 */
+  /** 마지막으로 찬 사람의 팀(없으면 null) */
+  private kickerTeam(b: Ball): Team | null {
+    const k = b.kickerId !== null ? this.getUnit(b.kickerId) : undefined;
+    return k ? k.team : null;
+  }
+
+  /**
+   * 놓인 공 한 틱: 이번 틱 속도로 움직이며 벽에 튕기고(감쇠), 그 뒤 마찰로 느려진다. 물·수풀 위는 지나간다.
+   * 강슛도 벽은 부수지 않는다. 찬 사람 팀의 골대 칸은 벽처럼 튕겨 낸다(자책골 없음).
+   */
   private rollBall(b: Ball) {
     let speed = len(b.vel);
     if (speed <= 0) return;
+    const own = this.kickerTeam(b);
     let budget = speed * TICK_DT;
     for (let i = 0; i < 4 && budget > 1e-9; i++) {
       const to = { x: b.pos.x + (b.vel.x / speed) * budget, y: b.pos.y + (b.vel.y / speed) * budget };
-      const sweep = sweepCircle(this.grid, b.pos, to, BALL_RADIUS, this.ballPower ? { breakWalls: true } : {});
-      if (sweep.broken.length) this.broken.push(...sweep.broken);
+      const sweep = sweepCircle(this.grid, b.pos, to, BALL_RADIUS, {});
       if (!sweep.hit) {
+        if (own !== null && this.grid.goalAt(to.x, to.y) === own) {
+          // 우리 골대 입구에서 튕겨 나온다(골대는 맵 위·아래 끝이라 세로 방향을 뒤집는다)
+          b.vel = { x: b.vel.x * BALL_BOUNCE_DAMP, y: -b.vel.y * BALL_BOUNCE_DAMP };
+          speed = len(b.vel);
+          break;
+        }
         b.pos = to;
         break;
       }
@@ -592,7 +606,6 @@ export class Sim implements SimView {
     else if (next < BALL_STOP_SPEED) next = 0;
     if (next === 0 || speed < 1e-9) {
       b.vel = { x: 0, y: 0 };
-      this.ballPower = false;
     } else {
       b.vel = { x: (b.vel.x / speed) * next, y: (b.vel.y / speed) * next };
     }
@@ -631,7 +644,6 @@ export class Sim implements SimView {
     b.vel = fromAngle(dir, power ? BALL_POWER_KICK_SPEED : BALL_KICK_SPEED);
     b.kickerId = f.id;
     b.noPickupUntil = this.tick + BALL_REPICK_TICKS;
-    this.ballPower = power;
     this.events.push({ type: 'ballKick', unitId: f.id, isSuper: power, dir });
   }
 
@@ -641,7 +653,6 @@ export class Sim implements SimView {
     b.carrierId = null;
     b.pos = { ...f.pos };
     b.vel = { x: 0, y: 0 };
-    this.ballPower = false;
     this.events.push({ type: 'ballDrop', unitId: f.id, pos: { ...b.pos } });
   }
 
@@ -654,7 +665,6 @@ export class Sim implements SimView {
     const b = this.ball!;
     b.carrierId = null;
     b.vel = { x: 0, y: 0 };
-    this.ballPower = false;
     this.events.push({ type: 'goal', team, score: [m.score[0], m.score[1]], scorerId });
     if (m.targetScore > 0 && m.score[team] >= m.targetScore) this.endMatch(team);
     else m.kickoffTicks = BALL_KICKOFF_TICKS;
