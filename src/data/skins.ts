@@ -25,7 +25,7 @@ export interface SkinDef {
 export type SkinRarity = 'epic' | 'legendary';
 export const RARITY_LABEL: Record<SkinRarity, string> = { epic: '서사', legendary: '전설' };
 /** 등급별 기본 가격(다이아) */
-export const RARITY_PRICE: Record<SkinRarity, number> = { epic: 100, legendary: 300 };
+export const RARITY_PRICE: Record<SkinRarity, number> = { epic: 100, legendary: 1000 };
 
 /** 이펙트 이미지 경로(public/ 기준). 없는 항목은 기본 이펙트 */
 export interface SkinEffects {
