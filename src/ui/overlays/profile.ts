@@ -10,6 +10,7 @@ import { toast } from './toast';
 import { openHistory, summarize } from './history';
 import { getHistory } from '../account/historyApi';
 import { button, iconEl, roleChip, txt } from '../widgets';
+import { myPortraitSrc } from '../portraits';
 
 /**
  * 프로필 창(로비의 프로필 카드를 누르면 열린다).
@@ -97,7 +98,7 @@ export function openProfile(ctx: AppContext) {
     rankIco.replaceChildren(icon(rankEmblemSvg(r.tier.id), 'ico pf-emblem'));
     rankName.textContent = rankLabel(r);
     rankPts.textContent = `${r.points} RP`;
-    fImg.src = ctx.portraits[best.id];
+    fImg.src = myPortraitSrc(ctx, best.id);
     fImg.alt = best.name;
     fName.textContent = best.name;
     fRole.replaceChildren(roleChip(best.id));

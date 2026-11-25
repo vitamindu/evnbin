@@ -6,7 +6,7 @@ import { getMap } from '../../data/maps';
 import type { Team } from '../../game/types';
 import type { OnlineClient } from '../../net/api';
 import type { RoomPlayer, RoomState } from '../../net/protocol';
-import { updateProfile } from '../../state/profile';
+import { equippedSkin, getProfile, updateProfile } from '../../state/profile';
 import type { AppContext } from '../context';
 import { openFighterPicker } from '../overlays/fighterPicker';
 import { toast } from '../overlays/toast';
@@ -203,7 +203,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     if (p.bot) tags.push(el('span', 'slot-tag tag-bot', [iconEl('bot'), txt('봇')]));
     if (!p.connected) tags.push(txt('끊김', 'slot-tag tag-off'));
     const pf = el('span', 'slot-pf', [
-      portrait(ctx, p.fighterId, 'portrait'),
+      portrait(ctx, p.fighterId, 'portrait', mine ? equippedSkin(getProfile(), p.fighterId) : undefined),
       p.host ? iconEl('crown', 'ico slot-crown') : null,
       mine ? el('span', 'slot-edit', [iconEl('pencil')]) : null,
     ]);

@@ -3,6 +3,7 @@ import { getFighter } from '../../data/fighters';
 import { getProfile } from '../../state/profile';
 import type { AppContext } from '../context';
 import { button, txt } from '../widgets';
+import { myPortraitSrc } from '../portraits';
 
 /**
  * 매칭 대기 화면(흐름 확인용 임시). 전투·서버가 붙으면 실제 매칭 상태로 바뀐다.
@@ -12,7 +13,7 @@ export function openMatchmaking(ctx: AppContext) {
   const f = getFighter(p.selected);
   const me = el('span', 'mm-slot mm-me');
   const img = el('img');
-  img.src = ctx.portraits[f.id];
+  img.src = myPortraitSrc(ctx, f.id);
   img.alt = f.name;
   me.append(img);
   me.style.setProperty('--c', f.palette.primary);

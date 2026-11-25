@@ -5,6 +5,7 @@ import { getProfile, onProfileChange } from '../../state/profile';
 import type { AppContext } from '../context';
 import { comingSoon } from '../overlays/toast';
 import { button, currencyBar, header, iconEl, roleChip, txt } from '../widgets';
+import { myPortraitSrc } from '../portraits';
 
 /** 캐릭터 목록 화면 */
 export function createFightersScreen(ctx: AppContext): Screen {
@@ -14,7 +15,7 @@ export function createFightersScreen(ctx: AppContext): Screen {
     const p = getProfile();
     const prog = p.fighters[f.id];
     const img = el('img');
-    img.src = ctx.portraits[f.id];
+    img.src = myPortraitSrc(ctx, f.id);
     img.alt = f.name;
     img.draggable = false;
     const c = button(

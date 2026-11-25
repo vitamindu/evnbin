@@ -4,13 +4,14 @@ import { FIGHTERS, type FighterId } from '../../data/fighters';
 import type { AppContext } from '../context';
 import { portrait } from '../online/widgets';
 import { button, iconEl, roleChip, txt } from '../widgets';
+import { equippedSkin, getProfile } from '../../state/profile';
 
 /** 캐릭터 고르기 팝업(온라인 방·이름 카드에서). 고르면 onPick 후 닫는다 */
 export function openFighterPicker(ctx: AppContext, current: FighterId, onPick: (id: FighterId) => void) {
   const cards = FIGHTERS.map((f) => {
     const c = button(
       `fp-card${f.id === current ? ' is-selected' : ''}`,
-      [portrait(ctx, f.id, 'portrait fp-portrait'),txt(f.name, 'fp-name'), roleChip(f.id)],
+      [portrait(ctx, f.id, 'portrait fp-portrait', equippedSkin(getProfile(), f.id)),txt(f.name, 'fp-name'), roleChip(f.id)],
       () => {
         close();
         if (f.id !== current) onPick(f.id);

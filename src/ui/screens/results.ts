@@ -52,7 +52,7 @@ export function createResultsScreen(ctx: AppContext) {
       const f = getFighter(p.fighterId);
       return el('div', `rs-row ${side}${p.playerId === myId ? ' is-me' : ''}`, [
         el('span', 'rs-who', [
-          portrait(ctx, p.fighterId, 'portrait rs-pf'),
+          portrait(ctx, p.fighterId, 'portrait rs-pf', p.playerId === myId ? equippedSkin(getProfile(), p.fighterId) : undefined),
           el('span', 'rs-names', [
             el('span', 'rs-name-row', [txt(p.name, 'rs-name'), p.playerId === myId ? txt('나', 'slot-tag tag-you') : null, p.playerId === mvp ? iconEl('star', 'ico rs-star') : null]),
             txt(f.name, 'rs-fighter'),

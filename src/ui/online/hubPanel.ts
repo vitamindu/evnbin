@@ -1,7 +1,7 @@
 import { el } from '../../core/dom';
 import { getFighter } from '../../data/fighters';
 import { getServerUrl } from '../../net/config';
-import { getProfile, updateProfile } from '../../state/profile';
+import { equippedSkin, getProfile, updateProfile } from '../../state/profile';
 import type { AppContext } from '../context';
 import { getAccount } from '../account/accountApi';
 import { openFighterPicker } from '../overlays/fighterPicker';
@@ -151,7 +151,7 @@ export function createHubPanel(ctx: AppContext, actions: HubActions) {
     acctName.textContent = acct?.profile.name ?? '';
     if (document.activeElement !== nameInput) nameInput.value = p.name;
     const f = getFighter(p.selected);
-    pfBox.replaceChildren(portrait(ctx, f.id, 'portrait hub-portrait'));
+    pfBox.replaceChildren(portrait(ctx, f.id, 'portrait hub-portrait', equippedSkin(p, f.id)));
     fighterName.textContent = f.name;
     fighterRole.replaceChildren(roleChip(f.id));
     serverText.textContent = getServerUrl();

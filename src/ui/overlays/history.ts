@@ -11,6 +11,7 @@ import { summarize, timeAgo } from './historyMath';
 
 export { summarize, timeAgo } from './historyMath';
 import { button, iconEl, txt } from '../widgets';
+import { myPortraitSrc } from '../portraits';
 
 const OUTCOME: Record<MatchRecord['outcome'], string> = { win: '승리', draw: '무승부', loss: '패배' };
 
@@ -35,7 +36,7 @@ export function openHistory(ctx: AppContext) {
 
   const portrait = (id: MatchRecord['fighterId'], cls: string) => {
     const img = el('img', cls);
-    img.src = ctx.portraits[id];
+    img.src = myPortraitSrc(ctx, id);
     img.alt = '';
     img.draggable = false;
     return img;
@@ -72,7 +73,7 @@ export function openHistory(ctx: AppContext) {
       /* 없어진 맵 */
     }
     const img = el('img', 'hs-fighter');
-    img.src = ctx.portraits[r.fighterId];
+    img.src = myPortraitSrc(ctx, r.fighterId);
     img.alt = f.name;
     img.draggable = false;
     const head = button(`hs-row is-${r.outcome}`, [

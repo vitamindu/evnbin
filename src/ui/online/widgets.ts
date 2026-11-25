@@ -5,6 +5,7 @@ import type { MatchMode } from '../../game/types';
 import type { OnlineClient, OnlineStatus } from '../../net/api';
 import type { AppContext } from '../context';
 import { txt } from '../widgets';
+import { portraitSrc } from '../portraits';
 
 /** 핑 품질: 좋음(초록 3칸) / 보통(노랑 2칸) / 나쁨(빨강 1칸) */
 export function pingLevel(ms: number): 'good' | 'ok' | 'bad' {
@@ -51,10 +52,10 @@ export function sideClass(team: Team, myTeam: Team): 'is-blue' | 'is-red' {
 }
 
 /** 캐릭터 초상화 칸(캐릭터 색 배경 + 렌더한 초상화) */
-export function portrait(ctx: AppContext, id: FighterId, className = 'portrait') {
+export function portrait(ctx: AppContext, id: FighterId, className = 'portrait', skin?: string) {
   const f = getFighter(id);
   const img = el('img');
-  img.src = ctx.portraits[id];
+  img.src = portraitSrc(ctx, id, skin);
   img.alt = f.name;
   img.draggable = false;
   const box = el('span', className, [img]);

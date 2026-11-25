@@ -9,6 +9,7 @@ import { avatarEl } from '../avatar';
 import type { AppContext } from '../context';
 import { rankEmblemSvg } from '../rankEmblem';
 import { button, header, iconEl, txt } from '../widgets';
+import { myPortraitSrc } from '../portraits';
 
 /**
  * 랭킹 화면(로비 오른쪽 "랭킹"). 서버의 모든 사람을 랭크 점수 순으로(위 100명), 내 순위는 아래에 고정.
@@ -30,7 +31,7 @@ export function createRankingScreen(ctx: AppContext): Screen {
   const row = (e: RankingEntry, isMe: boolean) => {
     const r = rankOf(e.rankPoints);
     const img = el('img', 'rkg-fighter');
-    img.src = ctx.portraits[e.fighterId];
+    img.src = isMe ? myPortraitSrc(ctx, e.fighterId) : ctx.portraits[e.fighterId];
     img.alt = getFighter(e.fighterId).name;
     img.draggable = false;
     const medal = e.rank <= 3 ? ` is-top${e.rank}` : '';
