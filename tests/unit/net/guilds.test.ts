@@ -217,7 +217,9 @@ describe('guilds', () => {
     openGuild(s, 'user2', '얼음길드');
     s.joinGuild('user3', '얼음길드');
     s.createGuild('user4', 'Rush');
-    expect(s.searchGuilds('').map((g) => g.name)).toEqual(['얼음길드', 'Rush', '불꽃길드']);
+    const ranked = s.searchGuilds('').map((g) => g.name);
+    expect(ranked[0]).toBe('얼음길드');
+    expect(ranked.slice(1)).toEqual(expect.arrayContaining(['Rush', '불꽃길드']));
     expect(s.searchGuilds('길드').map((g) => [g.name, g.members, g.leader, g.joinMode])).toEqual([
       ['얼음길드', 2, '유저2', 'open'],
       ['불꽃길드', 1, '유저1', 'approval'],

@@ -244,6 +244,11 @@ export class BattleHud {
     if (u.hp !== b.hp || u.maxHp !== b.maxHp) {
       const k = Math.max(0, Math.min(1, u.hp / u.maxHp));
       const snap = b.hp < 0 || u.hp > b.hp;
+      if (b.hp >= 0 && u.hp < b.hp) {
+        b.root.classList.remove('is-hit');
+        void b.root.offsetWidth;
+        b.root.classList.add('is-hit');
+      }
       b.fill.style.transform = `scaleX(${k.toFixed(4)})`;
       // 꼬리(lag)는 피해일 때만 천천히 따라오고, 회복·처음 표시는 바로 맞춘다
       b.lag.classList.toggle('is-snap', snap);

@@ -632,7 +632,7 @@ export class Sim implements SimView {
 
   /**
    * 공 차기. aim이 있으면 그 방향, 없으면(자동 조준) 상대 골대 가운데 쪽(골대가 없으면 바라보는 방향).
-   * power: 강슛(게이지 소모, 더 빠르고 부서지는 벽을 부순다). 탄창은 쓰지 않는다.
+   * power: 강슛(궁극기 게이지 소모). 기본 슛은 탄창 한 칸을 쓴다.
    */
   private kickBall(f: Fighter, aim: Aim, power: boolean) {
     const b = this.ball!;
@@ -748,7 +748,14 @@ export class Sim implements SimView {
     // 공을 든 파이터: 공격 입력 = 차기, 궁극기 입력 = 강슛(게이지가 찼을 때). 보통 공격·궁극기는 못 쓴다
     if (this.ball?.carrierId === f.id) {
       if (input?.super && f.superCharge >= 1 - EPS) this.kickBall(f, input.super.aim, true);
-      else if (input?.attack) this.kickBall(f, input.attack.aim, false);
+      else if (input?.attack) {
+        if (f.ammo >= 1 - EPS) {
+          f.ammo = Math.max(0, f.ammo - 1);
+          this.kickBall(f, input.attack.aim, false);
+        } else {
+          this.events.push({ type: 'noAmmo', unitId: f.id });
+        }
+      }
       return;
     }
 

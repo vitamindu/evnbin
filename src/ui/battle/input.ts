@@ -305,11 +305,12 @@ export class BattleInput {
       s?.view.setAim(null);
       return;
     }
+    const ballCarrier = !!s && s.state.ball?.carrierId === s.playerId;
     const manual = t.aimed && !t.cancel && !t.dead;
     view.setState(t.dead ? 'idle' : t.cancel ? 'cancel' : t.aimed ? 'aiming' : 'held');
     view.setKnob(t.aim.x * STICK_R, t.aim.y * STICK_R);
     // 화면 오른쪽 = +x, 아래 = +y. 전투 카메라는 회전(yaw) 없이 북쪽을 보므로 그대로 바닥 방향이 된다.
-    if (s) s.view.setAim(manual ? { unitId: s.playerId, which: t.which, aim: t.aim } : null);
+    if (s) s.view.setAim((manual || ballCarrier) && !t.cancel && !t.dead ? { unitId: s.playerId, which: t.which, aim: t.aim } : null);
   }
 
   // ───────────── 발사 ─────────────

@@ -9,6 +9,7 @@ import { buildFighterModel, type FighterModel } from '../fighterModel';
 import { addStandardLights, toon } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
 import { buildDummyModel, type DummyModel } from './dummyModel';
+import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED } from '../../game/rules';
 
 /**
  * 전투 화면의 3D 표현. Lead 담당.
@@ -162,6 +163,16 @@ export class BattleView {
   private aim: AimSpec | null = null;
   private readonly aimRoot = new THREE.Group();
   private readonly aimShapes = new Map<string, THREE.Object3D>();
+  private readonly ballAimGroup = new THREE.Group();
+  private readonly ballAimLineGeo = new THREE.PlaneGeometry(1, 0.12).rotateX(-Math.PI / 2).translate(0.5, 0, 0);
+  private readonly ballAimLineMat = new THREE.MeshBasicMaterial({ color: '#79e8ff', transparent: true, opacity: 0.68, depthWrite: false, side: THREE.DoubleSide });
+  private readonly ballAimEndGeo = new THREE.RingGeometry(0.2, 0.28, 24).rotateX(-Math.PI / 2);
+  private readonly ballAimEndMat = new THREE.MeshBasicMaterial({ color: '#79e8ff', transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+  private readonly ballAimDotGeo = new THREE.CircleGeometry(0.055, 8).rotateX(-Math.PI / 2);
+  private readonly ballAimDots: THREE.Mesh[] = [];
+  private readonly ballAimDotMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
+  private readonly ballHaloGeo = new THREE.TorusGeometry(0.53, 0.055, 8, 32);
+  private readonly ballHaloMat = new THREE.MeshBasicMaterial({ color: '#ffe14d', transparent: true, opacity: 0.9, depthWrite: false });
   private readonly raycaster = new THREE.Raycaster();
   readonly followId: EntityId;
   /** 보는 사람의 팀(발밑 원·탄환 색 기준) */
@@ -178,6 +189,23 @@ export class BattleView {
     this.scene.background = new THREE.Color('#1c2a52');
     addStandardLights(this.scene);
     this.map = new MapRenderer(grid, viewerTeam);
+    const line = new THREE.Mesh(this.ballAimLineGeo, this.ballAimLineMat);
+    line.position.y = 0.09;
+    line.renderOrder = 5;
+    const end = new THREE.Mesh(this.ballAimEndGeo, this.ballAimEndMat);
+    end.name = 'ball-aim-end';
+    end.position.y = 0.1;
+    end.renderOrder = 6;
+    this.ballAimGroup.add(line, end);
+    for (let i = 0; i < 14; i++) {
+      const dot = new THREE.Mesh(this.ballAimDotGeo, this.ballAimDotMat);
+      dot.position.y = 0.11;
+      dot.renderOrder = 7;
+      this.ballAimDots.push(dot);
+      this.ballAimGroup.add(dot);
+    }
+    this.ballAimGroup.visible = false;
+    this.aimRoot.add(this.ballAimGroup);
     this.scene.add(this.map.object, this.aimRoot);
   }
 
@@ -440,7 +468,8 @@ export class BattleView {
           if (v && 'hit' in v.model) v.model.hit();
           const hitFx = this.skinFx(e.sourceId)?.hit;
           if (hitFx) this.fxHit(hitFx, this.shotColor(this.units.get(e.sourceId)?.unit), e.pos, e.isSuper);
-          else this.spark(e.pos, e.isSuper ? '#ffe14d' : '#ffffff', e.isSuper ? 0.7 : 0.45);
+          const color = e.targetId === this.followId ? '#ff3658' : e.sourceId === this.followId ? '#ffe14d' : e.isSuper ? '#ff9d37' : '#ffffff';
+          this.hitImpact(e.pos, color, e.targetId === this.followId ? 1.45 : e.sourceId === this.followId ? 1.2 : e.isSuper ? 1 : 0.72);
           break;
         }
         case 'death':
@@ -454,6 +483,14 @@ export class BattleView {
         case 'crystalDrop':
           this.ring(e.pos, 1.2, '#c48bff');
           break;
+        case 'ballPickup': {
+          const v = this.units.get(e.unitId);
+          const pos = v ? { x: v.model.root.position.x, y: v.model.root.position.z } : { x: 0, y: 0 };
+          this.ring(pos, 1.8, '#ffe14d');
+          this.ring(pos, 1.05, '#ffffff');
+          this.spark({ x: pos.x, y: pos.y }, '#fff4aa', 0.9);
+          break;
+        }
         case 'explode':
           this.ring(e.pos, e.radius, e.isSuper ? '#ffe14d' : '#ff9a3c');
           break;
@@ -496,6 +533,12 @@ export class BattleView {
       const outline = new THREE.Mesh(new THREE.SphereGeometry(0.33, 20, 14), new THREE.MeshBasicMaterial({ color: '#1a1530', side: THREE.BackSide }));
       body.add(outline);
       root.add(body);
+      const halo = new THREE.Mesh(this.ballHaloGeo, this.ballHaloMat);
+      halo.name = 'ball-halo';
+      halo.rotation.x = Math.PI / 2;
+      halo.position.y = 0.08;
+      halo.visible = false;
+      root.add(halo);
       const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.25, depthWrite: false }));
       shadow.rotation.x = -Math.PI / 2;
       shadow.position.y = 0.02;
@@ -563,6 +606,14 @@ export class BattleView {
         const yaw = carrier.model.root.rotation.y;
         bv.root.position.set(p.x + Math.sin(yaw) * 0.55, 0, p.z + Math.cos(yaw) * 0.55);
         body.position.y = 0.32 + Math.abs(Math.sin(t * 9)) * 0.08;
+        body.scale.setScalar(1.12 + 0.06 * (0.5 + 0.5 * Math.sin(t * 8)));
+        const halo = bv.root.getObjectByName('ball-halo') as THREE.Mesh | undefined;
+        if (halo) {
+          halo.visible = true;
+          halo.rotation.y = t * 1.8;
+          halo.scale.setScalar(1 + 0.12 * Math.sin(t * 8));
+          this.ballHaloMat.opacity = 0.72 + 0.2 * (0.5 + 0.5 * Math.sin(t * 8));
+        }
       } else {
         const x = lerp(bv.prev.x, bv.curr.x, alpha);
         const y = lerp(bv.prev.y, bv.curr.y, alpha);
@@ -570,7 +621,10 @@ export class BattleView {
         bv.spin += moved / 0.3;
         bv.root.position.set(x, 0, y);
         body.position.y = 0.3;
+        body.scale.setScalar(1);
         body.rotation.x = bv.spin;
+        const halo = bv.root.getObjectByName('ball-halo') as THREE.Mesh | undefined;
+        if (halo) halo.visible = false;
       }
       bv.root.visible = !carrier?.hidden;
     }
@@ -694,10 +748,36 @@ export class BattleView {
 
   private updateAim(me: UnitVisual | undefined) {
     for (const o of this.aimShapes.values()) o.visible = false;
+    this.ballAimGroup.visible = false;
     const a = this.aim;
     if (!a) return;
     const v = this.units.get(a.unitId) ?? me;
     if (!v || v.unit.type !== 'fighter' || !v.unit.alive) return;
+    if (this.ballView?.carrierId === v.unit.id) {
+      const manual = Math.hypot(a.aim.x, a.aim.y) > 0.02;
+      let dir = manual ? Math.atan2(a.aim.y, a.aim.x) : v.unit.facing;
+      if (!manual) {
+        const goal = this.grid.goalTiles[v.unit.team === 0 ? 1 : 0];
+        if (goal.length) {
+          const x = goal.reduce((sum, tile) => sum + tile.x + 0.5, 0) / goal.length;
+          const y = goal.reduce((sum, tile) => sum + tile.y + 0.5, 0) / goal.length;
+          dir = Math.atan2(y - v.unit.pos.y, x - v.unit.pos.x);
+        }
+      }
+      const power = a.which === 'super';
+      const color = power ? '#ffd34d' : '#79e8ff';
+      const distance = this.ballTravelDistance(power ? BALL_POWER_KICK_SPEED : BALL_KICK_SPEED);
+      this.ballAimLineMat.color.set(color);
+      this.ballAimEndMat.color.set(color);
+      this.ballAimGroup.position.set(this.ballView.root.position.x, 0, this.ballView.root.position.z);
+      this.ballAimGroup.rotation.y = -dir;
+      this.ballAimGroup.getObjectByName('ball-aim-end')!.position.x = distance;
+      const line = this.ballAimGroup.children[0] as THREE.Mesh;
+      line.scale.x = distance;
+      for (let i = 0; i < this.ballAimDots.length; i++) this.ballAimDots[i]!.position.x = (distance * (i + 1)) / (this.ballAimDots.length + 1);
+      this.ballAimGroup.visible = true;
+      return;
+    }
     const shape = this.aimShape(v.unit.fighterId, a.which);
     shape.visible = true;
     const p = v.model.root.position;
@@ -712,6 +792,18 @@ export class BattleView {
       shape.position.set(p.x, 0.03, p.z);
       shape.rotation.y = -dir;
     }
+  }
+
+  /** 바닥에서 멈출 때까지 공이 굴러갈 대략적인 거리를 틱 단위로 계산한다. */
+  private ballTravelDistance(initialSpeed: number) {
+    let speed = initialSpeed;
+    let distance = 0;
+    for (let i = 0; i < 180 && speed > 0; i++) {
+      distance += speed / 30;
+      speed = Math.max(0, speed - BALL_FRICTION / 30);
+      if (speed < BALL_STOP_SPEED) speed = 0;
+    }
+    return distance;
   }
 
   // ───────────── 좌표 변환(UI용) ─────────────
@@ -834,6 +926,14 @@ export class BattleView {
     }, () => (geo.dispose(), mat.dispose()));
   }
 
+  /** 맞은 위치에 역할별 색의 큰 충격 고리와 밝은 중심광을 표시한다. */
+  private hitImpact(pos: Vec2, color: string, size: number) {
+    this.ring(pos, size, color);
+    this.spark(pos, color, size * 0.9);
+    this.spark({ x: pos.x - size * 0.25, y: pos.y + size * 0.12 }, '#ffffff', size * 0.36);
+    this.spark({ x: pos.x + size * 0.2, y: pos.y - size * 0.2 }, color, size * 0.42);
+  }
+
   private shotColorFromMarker(l: { shell: THREE.Mesh }): string {
     return (l.shell.userData.baseColor as string) ?? '#ff2f92';
   }
@@ -925,6 +1025,14 @@ export class BattleView {
     this.crystalMat.dispose();
     this.crystalRingGeo.dispose();
     this.crystalRingMat.dispose();
+    this.ballAimLineGeo.dispose();
+    this.ballAimLineMat.dispose();
+    this.ballAimEndGeo.dispose();
+    this.ballAimEndMat.dispose();
+    this.ballAimDotGeo.dispose();
+    this.ballAimDotMat.dispose();
+    this.ballHaloGeo.dispose();
+    this.ballHaloMat.dispose();
     this.dotTex.dispose();
     this.shadowMat.dispose();
     this.scene.clear();

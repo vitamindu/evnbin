@@ -135,9 +135,9 @@ export const BALL_RADIUS = 0.3;
 /** 들고 있을 때 공이 파이터 중심에서 바라보는 방향으로 떨어진 거리(표시용) */
 export const BALL_CARRY_OFFSET = 0.3;
 /** 차기(기본 공격 입력) 초속(타일/초) */
-export const BALL_KICK_SPEED = 11;
-/** 강슛(궁극기 입력, 게이지 소모) 초속. 지나가는 부서지는 벽을 부순다 */
-export const BALL_POWER_KICK_SPEED = 16;
+export const BALL_KICK_SPEED = 8.8;
+/** 강슛(궁극기 입력, 게이지 소모) 초속. 벽은 부수지 않는다 */
+export const BALL_POWER_KICK_SPEED = 12.8;
 /** 굴러가는 공의 감속(타일/초²) */
 export const BALL_FRICTION = 7;
 /** 이 속도(타일/초)보다 느려지면 멈춘다 */

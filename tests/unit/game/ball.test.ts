@@ -72,7 +72,7 @@ describe('FIGHTER BALL 규칙', () => {
     expect(Math.hypot(sim.ball!.pos.x - me!.pos.x, sim.ball!.pos.y - me!.pos.y)).toBeLessThanOrEqual(me!.radius);
   });
 
-  it('차기: 탄창을 쓰지 않고, 마찰로 멈추며, 찬 사람은 바로 다시 줍지 못한다', () => {
+  it('차기: 탄창 한 칸을 쓰고, 마찰로 멈추며, 찬 사람은 바로 다시 줍지 못한다', () => {
     const map = testMap(30, 7, [[2, 3, 'A'], [3, 3, 'O'], [2, 1, 'g'], [2, 5, 'h']]);
     const sim = ballSim(map, [{ team: 0 }]);
     const [me] = fighters(sim);
@@ -83,7 +83,7 @@ describe('FIGHTER BALL 규칙', () => {
     expect(ofType(ev, 'ballKick')).toEqual([{ type: 'ballKick', unitId: me!.id, isSuper: false, dir: 0 }]);
     expect(ofType(ev, 'attack')).toHaveLength(0);
     expect(sim.projectiles).toHaveLength(0);
-    expect(me!.ammo).toBe(ammo);
+    expect(me!.ammo).toBe(ammo - 1);
     expect(sim.ball!.carrierId).toBeNull();
     runUntil(sim, () => sim.ball!.vel.x === 0, 120);
     expect(sim.ball!.vel).toEqual({ x: 0, y: 0 });
@@ -173,7 +173,8 @@ describe('FIGHTER BALL 규칙', () => {
     const sim = ballSim();
     const [me, foe] = fighters(sim);
     pickUp(sim, me!.id);
-    run(sim, 30, { [me!.id]: up() });
+    // 기본 킥의 이동 거리가 줄어도 골까지 닿는 위치에서 차도록 더 전진한다.
+    run(sim, 75, { [me!.id]: up() });
     foe!.pos = { x: 1.5, y: 3.5 };
     const kick = tick(sim, { [me!.id]: attack({ x: 0, y: -1 }) });
     expect(ofType(kick, 'ballKick')).toHaveLength(1);
