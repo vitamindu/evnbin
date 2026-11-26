@@ -58,9 +58,9 @@ npx playwright test tests/shop.spec.ts --trace off      E2E 일부만 (먼저 np
 - 모드: 연습장, TEAM FIGHT, 크리스탈 러시, FIGHTER BALL. 맵 3개(blossom-arena, frost-hollow, meadow-pitch).
 - 계정/경제: 코인·다이아, 파이터 상자, 상점, 시즌 패스, 길드, 파티, 전적, 랭크·랭킹, 관리자(`mineack991`).
 - **할 일:**
-  - FISTER 전설 스킨: 모델(glb)과 이펙트 이미지를 사용자가 줄 예정. 받으면 REAPER와 같은 방식으로 넣는다.
+  - FISTER 전설 스킨은 **취소됨**(계획 없음). 기본 도형 모델만 쓴다.
   - 남의 스킨 초상화: 서버가 상대가 입은 스킨을 화면에 안 보내서 방·결과·랭킹의 남 칸은 기본 모습이다(필요하면 서버+프로토콜 수정).
-  - 이펙트 이미지 자리: REAPER 돌진 잔상·궁극기 탄·적중은 연결됨. FISTER는 아직 없음.
+  - 이펙트 이미지: REAPER 돌진 잔상·궁극기 탄·적중은 연결됨.
   - REAPER·FISTER 수치는 첫 안이라 플레이 테스트로 조정.
 
 ## 6. 모델 한계에 대비한 습관
