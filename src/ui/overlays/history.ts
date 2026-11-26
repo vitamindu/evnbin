@@ -11,7 +11,7 @@ import { summarize, timeAgo } from './historyMath';
 
 export { summarize, timeAgo } from './historyMath';
 import { button, iconEl, txt } from '../widgets';
-import { myPortraitSrc } from '../portraits';
+import { myPortraitSrc, portraitSrc } from '../portraits';
 
 const OUTCOME: Record<MatchRecord['outcome'], string> = { win: '승리', draw: '무승부', loss: '패배' };
 
@@ -34,9 +34,9 @@ export function openHistory(ctx: AppContext) {
   });
   ctx.overlayLayer.append(overlay);
 
-  const portrait = (id: MatchRecord['fighterId'], cls: string) => {
+  const portrait = (id: MatchRecord['fighterId'], cls: string, skin?: string) => {
     const img = el('img', cls);
-    img.src = myPortraitSrc(ctx, id);
+    img.src = skin ? portraitSrc(ctx, id, skin) : myPortraitSrc(ctx, id);
     img.alt = '';
     img.draggable = false;
     return img;
@@ -53,7 +53,7 @@ export function openHistory(ctx: AppContext) {
           .sort((a, b) => b.kills - a.kills || b.damage - a.damage)
           .map((p) =>
             el('div', `hs-player${p.me ? ' is-me' : ''}`, [
-              portrait(p.fighterId, 'hs-p-img'),
+              portrait(p.fighterId, 'hs-p-img', p.skin),
               txt(p.bot ? `${p.name} (봇)` : p.name, 'hs-p-name'),
               txt(`${p.kills} / ${p.deaths}`, 'hs-p-kd'),
               txt(p.damage.toLocaleString('en-US'), 'hs-p-dmg'),
@@ -73,7 +73,7 @@ export function openHistory(ctx: AppContext) {
       /* 없어진 맵 */
     }
     const img = el('img', 'hs-fighter');
-    img.src = myPortraitSrc(ctx, r.fighterId);
+    img.src = r.skin ? portraitSrc(ctx, r.fighterId, r.skin) : myPortraitSrc(ctx, r.fighterId);
     img.alt = f.name;
     img.draggable = false;
     const head = button(`hs-row is-${r.outcome}`, [

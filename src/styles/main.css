@@ -697,8 +697,8 @@ img {
   left: 50%;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, 214px);
-  gap: 16px;
+  grid-template-columns: repeat(6, 170px);
+  gap: 12px;
 }
 .fcard {
   height: 292px;

@@ -22,6 +22,7 @@ export interface BattleLike extends View {
   nameOf(id: EntityId): string | undefined;
   queueAttack(aim: Aim): void;
   queueSuper(aim: Aim): void;
+  queueSkill(aim: Aim): void;
   onFrame: (() => void) | null;
   onEvents: ((events: readonly SimEvent[]) => void) | null;
   dispose(): void;

@@ -43,12 +43,13 @@ export class AimStickView {
   readonly el: HTMLElement;
   private readonly knob: HTMLElement;
   private readonly ringFill: SVGCircleElement | null = null;
+  private readonly tag: HTMLElement | null;
   private state: StickState = 'idle';
   private charge = -1;
   private ready: boolean | null = null;
 
-  constructor(kind: 'attack' | 'super') {
-    const face = el('div', 'knob-face', [iconEl(kind, 'ico knob-ico'), el('i', 'knob-x')]);
+  constructor(kind: 'attack' | 'super' | 'skill') {
+    const face = el('div', 'knob-face', [iconEl(kind === 'skill' ? 'chain' : kind, 'ico knob-ico'), el('i', 'knob-x')]);
     this.knob = el('div', 'stick-knob', [face]);
     const parts: HTMLElement[] = [el('div', 'stick-base')];
     if (kind === 'super') {
@@ -62,7 +63,17 @@ export class AimStickView {
       parts.push(el('div', 'super-glow'), ring);
     }
     parts.push(this.knob);
+    this.tag = kind === 'skill' || kind === 'super' ? el('span', 'stick-tag', [kind === 'skill' ? 'E' : '']) : null;
+    if (this.tag) parts.push(this.tag);
     this.el = el('div', `stick stick-${kind}`, parts);
+  }
+
+  setTag(text: string) {
+    if (this.tag && this.tag.textContent !== text) this.tag.textContent = text;
+  }
+
+  setWReady(ready: boolean) {
+    this.el.classList.toggle('is-w-ready', ready);
   }
 
   setKnob(dx: number, dy: number) {

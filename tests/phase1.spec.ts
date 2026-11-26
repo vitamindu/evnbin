@@ -76,18 +76,18 @@ test('T-02 tap title goes to lobby with default fighter RIVET', async ({ page },
   await shot(page, testInfo, '02-lobby');
 });
 
-test('T-03 FIGHTERS button opens list: 4 cards + MORE SOON, RIVET SELECTED', async ({ page }, testInfo) => {
+test('T-03 FIGHTERS button opens list: 11 fighters + MORE SOON, RIVET SELECTED', async ({ page }, testInfo) => {
   await gotoLobby(page);
   await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fighters')).toBeVisible();
   await expect(page.locator('#app')).toHaveAttribute('data-bg', 'fighters');
 
   const cards = page.locator('.fighter-grid .fcard');
-  await expect(cards).toHaveCount(10);
-  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(10);
-  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER']);
-  await expect(page.locator('.fcard-soon')).toHaveCount(0);
-  await expect(page.locator('.fighters-count')).toHaveText('10 / 10 보유');
+  await expect(cards).toHaveCount(12);
+  await expect(page.locator('.fcard[data-fighter]')).toHaveCount(11);
+  await expect(page.locator('.fcard[data-fighter] .fcard-name')).toHaveText(['RIVET', 'VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER', 'CHAINER']);
+  await expect(page.locator('.fcard-soon')).toHaveCount(1);
+  await expect(page.locator('.fighters-count')).toHaveText('11 / 11 보유');
 
   const rivet = page.locator('.fcard[data-fighter="rivet"]');
   await expect(rivet).toHaveClass(/is-selected/);
@@ -167,13 +167,13 @@ test('T-07 detail arrows cycle through every fighter and wrap to RIVET', async (
 
   const next = page.locator('.arrow-next');
   const prev = page.locator('.arrow-prev');
-  for (const expected of ['VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER', 'RIVET']) {
+  for (const expected of ['VOLLEY', 'BOULDER', 'HINAKO', 'FUSE', 'SHARD', 'GRIZZLE', 'PRISM', 'REAPER', 'FISTER', 'CHAINER', 'RIVET']) {
     await next.tap();
     await expect(name).toHaveText(expected);
     // SELECT label tracks whether the shown fighter is the selected one (RIVET by default).
     await expect(selectBtn).toHaveText(expected === 'RIVET' ? '선택됨' : '선택');
   }
-  for (const expected of ['FISTER', 'REAPER', 'PRISM', 'GRIZZLE', 'SHARD', 'FUSE', 'HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
+  for (const expected of ['CHAINER', 'FISTER', 'REAPER', 'PRISM', 'GRIZZLE', 'SHARD', 'FUSE', 'HINAKO', 'BOULDER', 'VOLLEY', 'RIVET']) {
     await prev.tap();
     await expect(name).toHaveText(expected);
   }

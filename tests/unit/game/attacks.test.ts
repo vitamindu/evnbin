@@ -225,7 +225,7 @@ describe('궁극기 충전', () => {
     expect(p.superCharge).toBe(0.96);
   });
 
-  it('궁극기를 쓰면 0이 되고, 궁극기 적중은 게이지를 채우지 않는다', () => {
+  it('궁극기를 쓰면 0이 되고, 적중하면 기본 공격 기준으로 게이지가 찬다', () => {
     const sim = makeSim(rangeMap(2), [{ id: 'rivet' }]);
     const p = fighters(sim)[0]!;
     p.superCharge = 1;
@@ -234,7 +234,7 @@ describe('궁극기 충전', () => {
     const hits = ofType(events, 'hit');
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.every((h) => h.isSuper && h.damage === RIVET.super.damage)).toBe(true);
-    expect(p.superCharge).toBe(0);
+    expect(p.superCharge).toBeCloseTo(hits.length * RIVET.attack.superChargePerHit, 9);
     expect(ofType(events, 'superReady')).toHaveLength(0);
   });
 

@@ -188,6 +188,7 @@ function fakeModule(): AccountModule {
         prism: { trophies: 0, power: 1 },
         reaper: { trophies: 0, power: 1 },
         fister: { trophies: 0, power: 1 },
+        chainer: { trophies: 0, power: 1 },
       },
     };
   };

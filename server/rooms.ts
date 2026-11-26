@@ -258,19 +258,23 @@ export class Room {
     return out;
   }
 
-  toState(): RoomState {
+  toState(skinFor?: (account: string, fighterId: FighterId) => string | undefined): RoomState {
     const players: RoomPlayer[] = [...this.members]
       .sort((a, b) => a.order - b.order)
-      .map((m) => ({
-        id: m.id,
-        name: m.name,
-        fighterId: m.fighterId,
-        team: m.team,
-        ready: m.ready,
-        host: m.id === this.hostId,
-        connected: m.connected,
-        bot: false,
-      }));
+      .map((m) => {
+        const skin = m.account ? skinFor?.(m.account, m.fighterId) : undefined;
+        return {
+          id: m.id,
+          name: m.name,
+          fighterId: m.fighterId,
+          team: m.team,
+          ready: m.ready,
+          host: m.id === this.hostId,
+          connected: m.connected,
+          bot: false,
+          ...(skin ? { skin } : {}),
+        };
+      });
     for (const b of this.bots()) {
       players.push({ id: b.playerId, name: b.name, fighterId: b.fighterId, team: b.team, ready: true, host: false, connected: true, bot: true });
     }

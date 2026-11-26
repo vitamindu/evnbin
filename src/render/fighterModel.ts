@@ -674,6 +674,39 @@ function buildFister(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
   return rig;
 }
 
+// ───────────────────────── CHAINER: 족쇄를 끊고 탈출한 도주범 ─────────────────────────
+function buildChainer(def: FighterDef, root: THREE.Group, g: GeoBag): Rig {
+  const c = def.palette;
+  const p: Proportions = {
+    torsoW: 0.48, torsoH: 0.56, torsoD: 0.34, headR: 0.32, headLift: 0.9,
+    legR: 0.095, legLen: 0.27, legX: 0.12, armR: 0.085, armLen: 0.31, shoeH: 0.11,
+  };
+  const rig = buildHumanoid(root, g, p, { top: c.primary, legs: c.dark, shoes: c.secondary, skin: c.skin, hands: c.secondary });
+  addEyes(rig.head, g, p.headR, { size: 0.19, spread: 0.3, y: 0.02 });
+  // 해진 죄수 조끼와 팔목의 부러진 족쇄
+  const stripe = part(g.add(new RoundedBoxGeometry(p.torsoW * 0.76, 0.11, 0.035, 3, 0.025)), toon(c.accent), { outline: false });
+  stripe.position.set(0, rig.torso.position.y + 0.08, p.torsoD / 2 + 0.025);
+  rig.body.add(stripe);
+  for (const hand of [rig.handL, rig.handR]) {
+    const cuff = part(g.add(new THREE.TorusGeometry(0.105, 0.045, 8, 18)), toon(c.secondary));
+    cuff.rotation.x = Math.PI / 2;
+    cuff.position.copy(hand.position);
+    hand.parent!.add(cuff);
+  }
+  // 끊어진 사슬 끝을 몸 앞에 드리운다
+  const link = part(g.add(new THREE.TorusGeometry(0.075, 0.025, 6, 12)), toon('#c3c7ce'));
+  link.position.set(0.15, rig.torso.position.y - 0.22, p.torsoD / 2 + 0.06);
+  link.rotation.set(0.4, 0.3, 0.5);
+  rig.body.add(link);
+  const loose = part(g.add(new THREE.TorusGeometry(0.065, 0.022, 6, 12)), toon('#c3c7ce'));
+  loose.position.set(0.24, rig.torso.position.y - 0.33, p.torsoD / 2 + 0.055);
+  loose.rotation.set(-0.45, 0.2, -0.7);
+  rig.body.add(loose);
+  rig.armL.rotation.x = -0.35;
+  rig.armR.rotation.x = -0.75;
+  return rig;
+}
+
 const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g: GeoBag) => Rig>> = {
   rivet: buildRivet,
   volley: buildVolley,
@@ -685,6 +718,7 @@ const BUILDERS: Partial<Record<FighterId, (def: FighterDef, root: THREE.Group, g
   prism: buildPrism,
   reaper: buildReaper,
   fister: buildFister,
+  chainer: buildChainer,
 };
 
 /** 캐릭터마다 다른 대기 동작 속도 */

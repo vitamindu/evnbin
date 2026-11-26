@@ -16,6 +16,7 @@ export interface QueuedInput {
   move: Vec2;
   attack?: Aim;
   super?: Aim;
+  skill?: Aim;
 }
 
 export interface InputQueueOptions {
@@ -35,6 +36,7 @@ export class InputQueue {
   private queue: QueuedInput[] = [];
   private attacks: Aim[] = [];
   private supers: Aim[] = [];
+  private skills: Aim[] = [];
   private lastMove: Vec2 = ZERO;
   private idleTicks = 0;
   private debt = 0;
@@ -62,6 +64,7 @@ export class InputQueue {
     this.queue = [];
     this.attacks = [];
     this.supers = [];
+    this.skills = [];
     this.lastMove = ZERO;
     this.idleTicks = 0;
     this.debt = 0;
@@ -105,6 +108,7 @@ export class InputQueue {
     }
     const input: FighterInput = { move: { x: move.x, y: move.y } };
     if (this.supers.length) input.super = { aim: this.supers.shift()! };
+    else if (this.skills.length) input.skill = { aim: this.skills.shift()! };
     else if (this.attacks.length) input.attack = { aim: this.attacks.shift()! };
     return input;
   }
@@ -114,5 +118,6 @@ export class InputQueue {
     this.ack = Math.max(this.ack, e.seq);
     if (e.attack !== undefined && this.attacks.length < this.maxOneShots) this.attacks.push(e.attack);
     if (e.super !== undefined && this.supers.length < this.maxOneShots) this.supers.push(e.super);
+    if (e.skill !== undefined && this.skills.length < this.maxOneShots) this.skills.push(e.skill);
   }
 }

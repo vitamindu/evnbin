@@ -282,6 +282,8 @@ export interface MatchRecord {
   /** [우리 팀, 상대 팀] 점수 */
   score: [number, number];
   fighterId: FighterId;
+  /** 내 파이터가 경기 당시 입은 스킨 */
+  skin?: string;
   kills: number;
   deaths: number;
   damage: number;
@@ -290,7 +292,7 @@ export interface MatchRecord {
   rankDelta?: number;
   /** 이 판 최고 활약(KO 최다, 같으면 피해량) */
   mvp: boolean;
-  players: { name: string; fighterId: FighterId; ally: boolean; me: boolean; bot: boolean; kills: number; deaths: number; damage: number }[];
+  players: { name: string; fighterId: FighterId; skin?: string; ally: boolean; me: boolean; bot: boolean; kills: number; deaths: number; damage: number }[];
 }
 
 /** 지금까지 전체 합계(기록 개수와 상관없이 쌓인다) */
@@ -322,6 +324,8 @@ export interface RankingEntry {
   guild?: string;
   /** 가장 많이 쓴 캐릭터 */
   fighterId: FighterId;
+  /** 가장 많이 쓴 캐릭터에 현재 입은 스킨 */
+  skin?: string;
 }
 
 export interface RankingResponse {

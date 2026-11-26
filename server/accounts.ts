@@ -880,13 +880,16 @@ export class AccountStore {
       }
       if (i >= RANKING_SIZE && k !== key) return;
       const g = u.guild ? this.data.guilds?.[u.guild] : undefined;
+      const fighterId = mainFighter(u.profile);
+      const skin = this.skinFor(k, fighterId);
       const e: RankingEntry = {
         rank,
         nickname: u.nickname,
         rankPoints: rp,
         ...(u.profile.avatar ? { avatar: u.profile.avatar } : {}),
         ...(g && g.members.includes(k) ? { guild: g.name } : {}),
-        fighterId: mainFighter(u.profile),
+        fighterId,
+        ...(skin ? { skin } : {}),
       };
       if (i < RANKING_SIZE) entries.push(e);
       if (k === key) mine = e;

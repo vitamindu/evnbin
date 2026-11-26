@@ -86,6 +86,28 @@ test('leader: PLAY in an online mode creates the room right away', async ({ page
   await expect(page.locator('.room')).toBeVisible({ timeout: 15_000 });
 });
 
+test('fighter picker scrolls vertically so bottom-row fighters can be selected', async ({ page }) => {
+  await signup(page, 'pickscroll', '선택테스트');
+  await page.locator('.mode-card').tap();
+  await page.locator('.mp-card[data-mode="teamfight"]').tap();
+  await page.locator('.btn-play').tap();
+  await expect(page.locator('.hub')).toBeVisible();
+  await page.locator('.hc-create-btn').tap();
+  await expect(page.locator('.room')).toBeVisible({ timeout: 15_000 });
+  await page.locator('.slot.is-me').tap();
+  const list = page.locator('.fp-cards');
+  await expect(list).toBeVisible();
+  const box = (await list.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height - 30);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + 30, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await page.locator('.fp-card[data-fighter="chainer"]').tap();
+  await expect(page.locator('.fp-panel')).toHaveCount(0);
+  await expect(page.locator('.slot.is-me .slot-sub')).toHaveText('CHAINER');
+});
+
 test('guests are asked to log in', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.title-tap')).toBeVisible({ timeout: 30_000 });

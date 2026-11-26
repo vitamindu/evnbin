@@ -18,6 +18,8 @@ export interface RoomPlayer {
   id: string;
   name: string;
   fighterId: FighterId;
+  /** 입은 스킨 id. 없으면 기본 외형 */
+  skin?: string;
   team: Team;
   ready: boolean;
   host: boolean;
@@ -82,6 +84,8 @@ export interface PlayerStats {
   playerId: string;
   name: string;
   fighterId: FighterId;
+  /** 경기 당시 입은 스킨 */
+  skin?: string;
   team: Team;
   kills: number;
   deaths: number;
@@ -115,7 +119,7 @@ export type ClientMsg =
   | { t: 'setMap'; mapId: string }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
-  | { t: 'input'; seq: number; move: Vec2; attack?: WireAim; super?: WireAim }
+  | { t: 'input'; seq: number; move: Vec2; attack?: WireAim; super?: WireAim; skill?: WireAim }
   | { t: 'ping'; at: number };
 
 // ───────────── 서버 → 클라이언트 ─────────────

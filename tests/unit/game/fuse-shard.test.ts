@@ -76,7 +76,7 @@ describe('FUSE', () => {
     expect(ofType(ev, 'wallsBroken').flatMap((e) => e.tiles)).toContainEqual({ x: 8, y: 4 });
     expect(sim.grid.get(8, 4)).toBe(Tile.Floor);
     expect(d.pos.x - x0).toBeCloseTo(FUSE.super.knockback, 2);
-    expect(p.superCharge).toBe(0);
+    expect(p.superCharge).toBeCloseTo(getFighter('fuse').attack.superChargePerHit, 9);
   });
 });
 

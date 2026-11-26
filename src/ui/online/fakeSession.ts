@@ -50,6 +50,7 @@ export class FakeOnlineSession implements BattleLike {
   private finished = false;
   private pendingAttack: { aim: Aim } | null = null;
   private pendingSuper: { aim: Aim } | null = null;
+  private pendingSkill: { aim: Aim } | null = null;
 
   nameOf(id: EntityId): string | undefined {
     return this.names.get(id);
@@ -134,6 +135,9 @@ export class FakeOnlineSession implements BattleLike {
   queueSuper(aim: Aim) {
     this.pendingSuper = { aim };
   }
+  queueSkill(aim: Aim) {
+    this.pendingSkill = { aim };
+  }
 
   resize(w: number, h: number) {
     this.view.resize(w, h);
@@ -169,8 +173,10 @@ export class FakeOnlineSession implements BattleLike {
       const mine: FighterInput = { move: { ...this.controls.move } };
       if (this.pendingAttack) mine.attack = this.pendingAttack;
       if (this.pendingSuper) mine.super = this.pendingSuper;
+      if (this.pendingSkill) mine.skill = this.pendingSkill;
       this.pendingAttack = null;
       this.pendingSuper = null;
+      this.pendingSkill = null;
       inputs.set(this.playerId, mine);
       for (const u of this.sim.units) if (u.type === 'fighter' && u.id !== this.playerId && u.alive) inputs.set(u.id, botInput(this.sim, u.id));
       const events = this.sim.step(inputs);

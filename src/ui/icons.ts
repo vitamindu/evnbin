@@ -3,6 +3,10 @@ const S = 'stroke="var(--ink)" stroke-width="3" stroke-linejoin="round" stroke-l
 const svg = (body: string) => `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 
 export const ICONS = {
+  chain: svg(
+    `<path d="M19 29l-5 5a8 8 0 0 1-11-11l8-8a8 8 0 0 1 11 0M29 19l5-5a8 8 0 0 1 11 11l-8 8a8 8 0 0 1-11 0M17 31l14-14" fill="none" stroke="var(--ink)" stroke-width="9" stroke-linecap="round"/>` +
+      `<path d="M19 29l-5 5a8 8 0 0 1-11-11l8-8a8 8 0 0 1 11 0M29 19l5-5a8 8 0 0 1 11 11l-8 8a8 8 0 0 1-11 0M17 31l14-14" fill="none" stroke="#e4e8f0" stroke-width="4" stroke-linecap="round"/>`,
+  ),
   modeBall: svg(
     `<circle cx="24" cy="24" r="18" fill="#ffffff" ${S}/>` +
       `<path d="M24 14l7 5-3 8h-8l-3-8z" fill="#2b2f6b" ${S}/>` +

@@ -4,7 +4,7 @@
  * 거리 단위는 타일(1타일 = 월드 1유닛), 시간 단위는 초.
  */
 
-export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard' | 'grizzle' | 'prism' | 'reaper' | 'fister';
+export type FighterId = 'rivet' | 'volley' | 'boulder' | 'hinako' | 'fuse' | 'shard' | 'grizzle' | 'prism' | 'reaper' | 'fister' | 'chainer';
 export type Role = 'scatter' | 'marksman' | 'tank' | 'sniper' | 'thrower' | 'control' | 'brawler' | 'bouncer' | 'assassin';
 
 /** 기본 공격 형태. 새 캐릭터는 가능하면 이 조합으로 표현하고, 부족할 때만 종류를 추가한다. */
@@ -14,13 +14,15 @@ export type AttackKind =
   | 'burst' // 같은 방향으로 여러 발을 짧은 간격으로 연사
   | 'melee' // 전방 부채꼴 범위 즉시 판정
   | 'lob' // 지점 조준, 벽을 넘는 포물선
-  | 'radial'; // 자기 주변 360도로 발사
+  | 'radial' // 자기 주변 360도로 발사
+  | 'chain'; // 직선 사슬과 지연 폭발
 
 export type SuperKind =
   | AttackKind
   | 'dash' // 조준 방향으로 긴 돌진
   | 'leap' // 조준 지점으로 높이 뛰어 벽을 넘어 이동, 뛴 자리에 폭탄을 떨어뜨림
-  | 'zone'; // 조준 지점(포물선)에 일정 시간 남는 지대: 안의 적을 느리게 하고 계속 피해
+  | 'zone' // 조준 지점(포물선)에 일정 시간 남는 지대: 안의 적을 느리게 하고 계속 피해
+  | 'steal'; // 직선 사슬로 첫 파이터의 궁극기를 복사
 
 export interface AttackDef {
   name: string;
@@ -62,6 +64,8 @@ export interface AttackDef {
   fuse?: number;
   /** 흡혈: 준 피해의 이 비율만큼 내 체력 회복(0~1) */
   lifesteal?: number;
+  /** chain: 첫 적중 지점에서 delay 뒤 터지는 두 번째 범위 피해 */
+  chainExplosion?: { damage: number; radius: number; delay: number };
 }
 
 export interface SuperDef {
@@ -143,6 +147,22 @@ export interface FighterDef {
   moveSpeed: number;
   attack: AttackDef;
   super: SuperDef;
+  /** Chainer 고유 동작 */
+  chainKit?: {
+    passiveRadius: number;
+    passiveDamage: number;
+    passiveMaxStacks: number;
+    skillCooldown: number;
+    dashRange: number;
+    chainRange: number;
+    chainDamage: number;
+    stunDuration: number;
+    wRange: number;
+    wMaxHpDamage: number;
+    wHealFraction: number;
+    stealRange: number;
+    copiedSuperDuration: number;
+  };
   /** 시간이 지나면 궁극기가 저절로 차는 양(초당, 0~1). FISTER */
   superChargePerSec?: number;
 }
@@ -553,7 +573,61 @@ export const FIGHTERS: readonly FighterDef[] = [
       moveOnly: true,
       leapTime: 0.6,
     },
-  }
+  },
+  {
+    id: 'chainer',
+    model: { type: 'primitive' },
+    name: 'CHAINER',
+    role: 'brawler',
+    roleLabel: '난투형',
+    tagline: '쇠사슬과 족쇄를 끊고 탈출한 도주범.',
+    palette: { primary: '#8f492d', secondary: '#3b4554', accent: '#ffc45b', skin: '#d6a782', dark: '#25232a' },
+    hp: 4200,
+    moveSpeed: 2.5,
+    attack: {
+      name: 'Chain Burst',
+      description: '사슬을 던져 1000 피해를 주고, 0.5초 뒤 반경 1칸에 1500 피해를 줘요.',
+      kind: 'chain',
+      damage: 1000,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      range: 3,
+      projectileSpeed: 8,
+      ammo: 3,
+      reload: 1.2,
+      superChargePerHit: 0.05,
+      chainExplosion: { damage: 1500, radius: 1, delay: 0.5 },
+    },
+    super: {
+      name: 'Stolen Force',
+      description: '사거리 7칸의 사슬로 처음 맞힌 적의 궁극기를 빼앗아요. 복사한 궁극기는 15초 안에 한 번 써야 해요.',
+      kind: 'steal',
+      damage: 0,
+      count: 1,
+      spreadDeg: 0,
+      burstInterval: 0,
+      projectileSpeed: 11,
+      range: 7,
+      breaksWalls: false,
+      knockback: 0,
+    },
+    chainKit: {
+      passiveRadius: 1.5,
+      passiveDamage: 1000,
+      passiveMaxStacks: 3,
+      skillCooldown: 7,
+      dashRange: 1.5,
+      chainRange: 4.5,
+      chainDamage: 750,
+      stunDuration: 1,
+      wRange: 1.5,
+      wMaxHpDamage: 0.25,
+      wHealFraction: 1,
+      stealRange: 7,
+      copiedSuperDuration: 15,
+    },
+  },
 ];
 
 export function getFighter(id: FighterId): FighterDef {

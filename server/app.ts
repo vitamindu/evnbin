@@ -195,7 +195,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
   };
 
   const broadcastRoom = (room: Room) => {
-    const msg = JSON.stringify({ t: 'room', room: room.toState() } satisfies ServerMsg);
+    const msg = JSON.stringify({ t: 'room', room: room.toState((key, fighterId) => accounts.skinFor(key, fighterId)) } satisfies ServerMsg);
     for (const m of room.members) if (m.connected) byPlayer.get(m.id)?.sendRaw(msg);
   };
 
@@ -251,6 +251,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
           outcome,
           score: [result.score[s.team], result.score[s.team === 0 ? 1 : 0]],
           fighterId: s.fighterId,
+          ...(s.skin ? { skin: s.skin } : {}),
           kills: s.kills,
           deaths: s.deaths,
           damage: s.damage,
@@ -260,6 +261,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
           players: result.stats.map((o) => ({
             name: o.name,
             fighterId: o.fighterId,
+            ...(o.skin ? { skin: o.skin } : {}),
             ally: o.team === s.team,
             me: o.playerId === s.playerId,
             bot: !humanIds.has(o.playerId),
@@ -417,7 +419,7 @@ export async function startServer(opts: ServerOptions = {}): Promise<RunningServ
         return;
       }
       if (c.room === room && room.get(c.id)) {
-        c.send({ t: 'room', room: room.toState() });
+        c.send({ t: 'room', room: room.toState((key, fighterId) => accounts.skinFor(key, fighterId)) });
         return;
       }
       const again = room.findReconnect(c.name, c.account);

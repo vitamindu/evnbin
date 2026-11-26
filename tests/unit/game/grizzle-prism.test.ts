@@ -171,7 +171,7 @@ describe('GRIZZLE', () => {
     expect(sim.grid.get(wallX, 4)).toBe(Tile.Floor);
     const broken = ofType(landing, 'wallsBroken');
     expect(broken.some((e) => e.tiles.some((t) => t.x === wallX && t.y === 4))).toBe(true);
-    expect(p.superCharge).toBe(0);
+    expect(p.superCharge).toBeCloseTo(getFighter('grizzle').attack.superChargePerHit, 9);
 
     // 그 뒤로 폭탄이나 추가 피해는 없다
     const after = run(sim, 60);

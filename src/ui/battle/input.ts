@@ -27,7 +27,7 @@ const SUPER_HIT_R = 66;
 /** 손을 뗀 이동 조이스틱이 쉬는 자리(왼쪽 아래 모서리 기준) */
 const MOVE_IDLE_FROM_EDGE = { left: 190, bottom: 170 };
 
-type Which = 'attack' | 'super';
+type Which = 'attack' | 'super' | 'skill';
 
 interface MoveTrack {
   kind: 'move';
@@ -63,13 +63,14 @@ export interface InputFeedback {
 }
 
 const GAME_KEYS = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyE', 'KeyF',
 ]);
 
 export class BattleInput {
   readonly moveStick = new MoveStickView();
   readonly attackStick = new AimStickView('attack');
   readonly superStick = new AimStickView('super');
+  readonly skillStick = new AimStickView('skill');
 
   private session: BattleLike | null = null;
   private root: HTMLElement | null = null;
@@ -86,6 +87,7 @@ export class BattleInput {
     this.attackStick.setState('idle');
     this.superStick.setState('idle');
     this.superStick.setCharge(0);
+    this.skillStick.el.hidden = true;
     this.layout();
   }
 
@@ -137,6 +139,17 @@ export class BattleInput {
     if (!s) return;
     const p = s.player;
     this.superStick.setCharge(p.superCharge);
+    const chainer = p.fighterId === 'chainer' && s.state.ball?.carrierId !== s.playerId;
+    this.skillStick.el.hidden = !chainer;
+    if (chainer) {
+      const phase = p.chainSkillPhase;
+      const remaining = Math.max(0, (p.chainSkillReadyTick ?? 0) - s.state.tick);
+      this.skillStick.setTag(phase === 'w' ? 'W' : phase === 'chain' ? 'E2' : phase === 'chainFlight' ? '…' : remaining > 0 ? `${(remaining / 30).toFixed(1)}` : 'E');
+      this.skillStick.el.classList.toggle('is-cooldown', !phase && remaining > 0);
+      this.skillStick.setWReady(phase === 'w');
+    }
+    if (p.copiedSuperId && p.copiedSuperExpiresTick) this.superStick.setTag(`${Math.max(0, (p.copiedSuperExpiresTick - s.state.tick) / 30).toFixed(0)}s`);
+    else this.superStick.setTag('');
     const t = this.aimTrack;
     if (t && !t.dead && !p.alive) {
       t.dead = true;
@@ -154,14 +167,22 @@ export class BattleInput {
     return { x: this.metrics.width - SUPER_FROM_EDGE.right, y: this.metrics.height - SUPER_FROM_EDGE.bottom };
   }
 
+  private skillCenter() {
+    return { x: this.metrics.width - ATTACK_FROM_EDGE.right, y: this.metrics.height - 325 };
+  }
+
   /** 두 버튼의 판정 원이 겹치면 (거리 / 판정 반경)이 작은 쪽 */
   private hitControl(x: number, y: number): Which | null {
     const a = this.attackCenter();
     const s = this.superCenter();
+    const k = this.skillCenter();
     const ka = Math.hypot(x - a.x, y - a.y) / ATTACK_HIT_R;
     const ks = Math.hypot(x - s.x, y - s.y) / SUPER_HIT_R;
-    if (ka >= 1 && ks >= 1) return null;
-    return ka <= ks ? 'attack' : 'super';
+    const kk = Math.hypot(x - k.x, y - k.y) / SUPER_HIT_R;
+    const candidates: [Which, number][] = [['attack', ka], ['super', ks]];
+    if (this.session?.player.fighterId === 'chainer' && this.session.state.ball?.carrierId !== this.session.playerId) candidates.push(['skill', kk]);
+    const hit = candidates.filter(([, d]) => d < 1).sort((a, b) => a[1] - b[1])[0];
+    return hit?.[0] ?? null;
   }
 
   // ───────────── 포인터 ─────────────
@@ -183,6 +204,7 @@ export class BattleInput {
         this.feedback.denied();
         return;
       }
+      if (ctl === 'skill' && s.player.fighterId !== 'chainer') return;
       this.aimTrack = {
         kind: 'aim',
         id: e.pointerId,
@@ -298,7 +320,7 @@ export class BattleInput {
   private showAim(t: AimTrack | null, which?: Which) {
     const s = this.session;
     const w = t?.which ?? which ?? 'attack';
-    const view = w === 'attack' ? this.attackStick : this.superStick;
+    const view = w === 'attack' ? this.attackStick : w === 'super' ? this.superStick : this.skillStick;
     if (!t) {
       view.setState('idle');
       view.setKnob(0, 0);
@@ -310,7 +332,14 @@ export class BattleInput {
     view.setState(t.dead ? 'idle' : t.cancel ? 'cancel' : t.aimed ? 'aiming' : 'held');
     view.setKnob(t.aim.x * STICK_R, t.aim.y * STICK_R);
     // 화면 오른쪽 = +x, 아래 = +y. 전투 카메라는 회전(yaw) 없이 북쪽을 보므로 그대로 바닥 방향이 된다.
-    if (s) s.view.setAim((manual || ballCarrier) && !t.cancel && !t.dead ? { unitId: s.playerId, which: t.which, aim: t.aim } : null);
+    if (s) {
+      const sourceId = t.which === 'super' ? s.player.copiedSuperId : undefined;
+      const skillPhase = s.player.chainSkillPhase;
+      const skillKit = getFighter(s.player.fighterId).chainKit;
+      const range = t.which === 'skill' ? (skillPhase === 'w' ? skillKit?.wRange : skillPhase === 'chain' ? skillKit?.chainRange : skillKit?.dashRange) : undefined;
+      const kindOverride = t.which === 'skill' ? (skillPhase === 'w' ? 'melee' : skillPhase === 'chain' ? 'chain' : 'dash') : undefined;
+      s.view.setAim((manual || ballCarrier) && !t.cancel && !t.dead ? { unitId: s.playerId, which: t.which === 'super' ? 'super' : 'attack', aim: t.aim, ...(sourceId ? { superSourceId: sourceId } : {}), ...(range ? { range } : {}), ...(kindOverride ? { kindOverride } : {}) } : null);
+    }
   }
 
   // ───────────── 발사 ─────────────
@@ -323,6 +352,8 @@ export class BattleInput {
     if (which === 'attack') {
       if (p.ammo < 1) this.feedback.empty();
       s.queueAttack(aim);
+    } else if (which === 'skill') {
+      s.queueSkill(aim);
     } else {
       if (p.superCharge < 1) {
         this.superStick.shake();
@@ -342,7 +373,7 @@ export class BattleInput {
     if (!g) return;
     const p = s.player;
     const def = getFighter(p.fighterId);
-    const range = which === 'attack' ? def.attack.range : def.super.range;
+    const range = which === 'attack' ? def.attack.range : which === 'skill' ? (p.chainSkillPhase === 'chain' ? def.chainKit?.chainRange ?? 1 : def.chainKit?.dashRange ?? 1) : (p.copiedSuperId ? getFighter(p.copiedSuperId).super.range : def.super.range);
     const dx = (g.x - p.pos.x) / range;
     const dy = (g.y - p.pos.y) / range;
     const l = Math.hypot(dx, dy);
@@ -358,6 +389,7 @@ export class BattleInput {
     this.keys.add(e.code);
     if (e.code === 'Space') this.fire('attack', null, false);
     if (e.code === 'KeyE') this.fire('super', null, false);
+    if (e.code === 'KeyF') this.fire('skill', null, false);
     this.updateKeyMove();
   };
 

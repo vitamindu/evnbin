@@ -53,7 +53,7 @@ npx playwright test tests/shop.spec.ts --trace off      E2E 일부만 (먼저 np
 - 서버 JSON 저장소(`.data/`)는 커밋하지 않는다.
 
 ## 5. 현재 상태 (2026-11 기준)
-- 캐릭터 10종: RIVET, VOLLEY, BOULDER, HINAKO, FUSE, SHARD, GRIZZLE, PRISM, **REAPER**, **FISTER**(REAPER·FISTER는 암살자형).
+- 캐릭터 11종: RIVET, VOLLEY, BOULDER, HINAKO, FUSE, SHARD, GRIZZLE, PRISM, **REAPER**, **FISTER**, **CHAINER**.
 - 스킨: SAKURA HINAKO(서사), TRUE FORM REAPER(전설). 둘 다 사용자가 준 glb.
 - 모드: 연습장, TEAM FIGHT, 크리스탈 러시, FIGHTER BALL. 맵 3개(blossom-arena, frost-hollow, meadow-pitch).
 - 계정/경제: 코인·다이아, 파이터 상자, 상점, 시즌 패스, 길드, 파티, 전적, 랭크·랭킹, 관리자(`mineack991`).

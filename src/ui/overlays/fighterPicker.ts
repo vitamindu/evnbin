@@ -27,6 +27,34 @@ export function openFighterPicker(ctx: AppContext, current: FighterId, onPick: (
       el('div', 'fp-cards', cards),
     ]),
   ]);
+  const cardList = overlay.querySelector<HTMLElement>('.fp-cards')!;
+  let pointer: { id: number; startY: number; startScroll: number; moved: boolean } | null = null;
+  let suppressClickUntil = 0;
+  cardList.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    pointer = { id: e.pointerId, startY: e.clientY, startScroll: cardList.scrollTop, moved: false };
+  });
+  cardList.addEventListener('pointermove', (e) => {
+    if (!pointer || e.pointerId !== pointer.id) return;
+    const dy = e.clientY - pointer.startY;
+    if (!pointer.moved && Math.abs(dy) < 6) return;
+    pointer.moved = true;
+    if (!cardList.hasPointerCapture(e.pointerId)) cardList.setPointerCapture(e.pointerId);
+    cardList.scrollTop = pointer.startScroll - dy;
+    e.preventDefault();
+  });
+  const endScroll = (e: PointerEvent) => {
+    if (!pointer || e.pointerId !== pointer.id) return;
+    if (pointer.moved) suppressClickUntil = performance.now() + 350;
+    pointer = null;
+  };
+  cardList.addEventListener('pointerup', endScroll);
+  cardList.addEventListener('pointercancel', endScroll);
+  cardList.addEventListener('click', (e) => {
+    if (performance.now() > suppressClickUntil) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });

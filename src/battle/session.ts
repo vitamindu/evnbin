@@ -40,6 +40,7 @@ export class BattleSession implements BattleLike {
   private acc = 0;
   private pendingAttack: { aim: Aim } | null = null;
   private pendingSuper: { aim: Aim } | null = null;
+  private pendingSkill: { aim: Aim } | null = null;
 
   constructor(opts: BattleOptions) {
     this.sim = new Sim({
@@ -90,6 +91,11 @@ export class BattleSession implements BattleLike {
     this.pendingSuper = { aim };
   }
 
+  /** 다음 틱에 Chainer 스킬을 실행한다 */
+  queueSkill(aim: Aim) {
+    this.pendingSkill = { aim };
+  }
+
   resize(w: number, h: number) {
     this.view.resize(w, h);
   }
@@ -101,8 +107,10 @@ export class BattleSession implements BattleLike {
       const input: FighterInput = { move: { ...this.controls.move } };
       if (this.pendingAttack) input.attack = this.pendingAttack;
       if (this.pendingSuper) input.super = this.pendingSuper;
+      if (this.pendingSkill) input.skill = this.pendingSkill;
       this.pendingAttack = null;
       this.pendingSuper = null;
+      this.pendingSkill = null;
       const events = this.sim.step(new Map([[this.playerId, input]]));
       this.view.snapshot(this.sim);
       this.view.applyEvents(events);

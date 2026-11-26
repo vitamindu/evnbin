@@ -76,7 +76,7 @@ export function createBattleScreen(ctx: AppContext) {
 
   const exitBtn = button('btn-battle-exit', [iconEl('back')], () => exit(), 'back');
   const label = txt('TRAINING YARD', 'battle-label');
-  const controls = el('div', 'battle-controls', [input.moveStick.el, input.superStick.el, input.attackStick.el]);
+  const controls = el('div', 'battle-controls', [input.moveStick.el, input.superStick.el, input.skillStick.el, input.attackStick.el]);
   const root = el('div', 'battle', [lowHp, hud.el, controls, label, scoreboard.el, crystalBoard.el, crystalBoard.countdown, ping.el, feed.el, banner.el, exitBtn, netVeil]);
   if (navigator.maxTouchPoints > 0) root.classList.add('has-touch');
 

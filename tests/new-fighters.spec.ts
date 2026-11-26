@@ -1,12 +1,13 @@
 import { type QaWindow, waitBattleReady } from './battle-helpers';
 import { PROFILE_KEY, expect, gotoLobby, tapToLobby, test } from './fixtures';
 
-test('REAPER·FISTER: 캐릭터 목록 5열, 상세 화면', async ({ page }, testInfo) => {
+test('T-37 REAPER·FISTER·CHAINER: 6열 목록과 상세 화면', async ({ page }, testInfo) => {
   await gotoLobby(page);
   await page.locator('.side-btn[data-btn="fighters"]').tap();
   await expect(page.locator('.fcard[data-fighter="reaper"] .fcard-name')).toHaveText('REAPER');
   await expect(page.locator('.fcard[data-fighter="fister"] .fcard-name')).toHaveText('FISTER');
-  // 10장 모두 화면 안(1280×800)에 들어간다
+  await expect(page.locator('.fcard[data-fighter="chainer"] .fcard-name')).toHaveText('CHAINER');
+  // 11명과 곧 추가 카드를 포함해 모두 화면 안(1280×800)에 들어간다
   for (const card of await page.locator('.fcard').all()) {
     const b = (await card.boundingBox())!;
     expect(b.x).toBeGreaterThanOrEqual(0);
@@ -14,7 +15,13 @@ test('REAPER·FISTER: 캐릭터 목록 5열, 상세 화면', async ({ page }, te
     expect(b.y + b.height).toBeLessThanOrEqual(800);
   }
   await page.screenshot({ path: testInfo.outputPath('fighters-grid.png') });
-  await page.locator('.fcard[data-fighter="reaper"]').tap();
+  await page.locator('.fcard[data-fighter="chainer"]').tap();
+  await expect(page.locator('.detail-name')).toHaveText('CHAINER');
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: testInfo.outputPath('chainer.png') });
+  await page.locator('.arrow-prev').tap();
+  await page.locator('.arrow-prev').tap();
+  await expect(page.locator('.detail-name')).toHaveText('REAPER');
   await page.waitForTimeout(800);
   await page.screenshot({ path: testInfo.outputPath('reaper.png') });
 });

@@ -36,10 +36,12 @@ describe('REAPER', () => {
     tick(sim, { [me!.id]: superIn({ x: 1, y: 0 }) });
     expect(sim.projectiles[0]!.radius).toBe(R.super.projectileRadius);
     expect(sim.projectiles[0]!.radius).toBeGreaterThan(SUPER_PROJECTILE_RADIUS);
-    run(sim, 30);
+    const ev = run(sim, 30);
     const dealt = foe!.maxHp - foe!.hp;
     expect(dealt).toBe(R.super.damage);
-    expect(me!.hp).toBe(1000 + Math.round(dealt * R.super.lifesteal!));
+    const healed = Math.round(dealt * R.super.lifesteal!);
+    expect(me!.hp).toBe(1000 + healed);
+    expect(ofType(ev, 'heal')).toEqual([expect.objectContaining({ targetId: me!.id, amount: healed })]);
   });
 });
 
@@ -51,7 +53,10 @@ describe('FISTER', () => {
     const ev = [...tick(sim, { [me!.id]: attack({ x: 1, y: 0 }) }), ...run(sim, 20)];
     const hits = ofType(ev, 'hit').filter((h) => h.targetId === foe!.id);
     expect(hits).toHaveLength(2);
-    expect(me!.hp).toBe(1000 + 2 * Math.round(F.attack.damage * F.attack.lifesteal!));
+    const heals = ofType(ev, 'heal').filter((h) => h.targetId === me!.id);
+    expect(heals).toHaveLength(2);
+    expect(heals.reduce((sum, h) => sum + h.amount, 0)).toBe(2 * Math.round(F.attack.damage * F.attack.lifesteal!));
+    expect(me!.hp).toBe(1000 + heals.reduce((sum, h) => sum + h.amount, 0));
   });
 
   it('궁극기는 시간이 지나면 저절로 찬다', () => {

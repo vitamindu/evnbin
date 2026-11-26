@@ -87,7 +87,7 @@ export class Match {
     for (const r of cfg.roster) if (!r.bot && r.account) this.accounts.set(r.playerId, r.account);
     for (const h of this.humans) this.queues.set(h.playerId, new InputQueue(cfg.inputQueue));
     for (const r of this.roster) {
-      this.stats.set(r.entityId, { playerId: r.playerId, name: r.name, fighterId: r.fighterId, team: r.team, kills: 0, deaths: 0, damage: 0 });
+      this.stats.set(r.entityId, { playerId: r.playerId, name: r.name, fighterId: r.fighterId, ...(r.skin ? { skin: r.skin } : {}), team: r.team, kills: 0, deaths: 0, damage: 0 });
     }
     this.info = {
       seed: cfg.seed,
@@ -126,6 +126,7 @@ export class Match {
       move: quantizeMove(msg.move),
       ...(msg.attack !== undefined ? { attack: fromWireAim(msg.attack) } : {}),
       ...(msg.super !== undefined ? { super: fromWireAim(msg.super) } : {}),
+      ...(msg.skill !== undefined ? { skill: fromWireAim(msg.skill) } : {}),
     });
   }
 

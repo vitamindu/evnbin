@@ -120,9 +120,12 @@ export class BattleHud {
     const s = this.session;
     if (!s) return;
     for (const e of events) {
-      if (e.type !== 'hit' || e.damage <= 0) continue;
-      const kind = e.targetId === s.playerId ? 'taken' : e.isSuper ? 'super' : e.sourceId === s.playerId ? 'dealt' : 'other';
-      this.addPop(e.targetId, e.pos, e.damage, kind);
+      if (e.type === 'hit' && e.damage > 0) {
+        const kind = e.targetId === s.playerId ? 'taken' : e.isSuper ? 'super' : e.sourceId === s.playerId ? 'dealt' : 'other';
+        this.addPop(e.targetId, e.pos, e.damage, kind);
+      } else if (e.type === 'heal' && e.amount > 0) {
+        this.addPop(e.targetId, e.pos, e.amount, 'heal');
+      }
     }
   }
 
@@ -150,7 +153,7 @@ export class BattleHud {
       }
       p.root.hidden = false;
     }
-    p.label.textContent = String(Math.round(p.amount));
+    p.label.textContent = `${kind === 'heal' ? '+' : ''}${Math.round(p.amount)}`;
   }
 
   /** 탄이 없는데 쐈을 때 탄창 칸을 흔든다 */

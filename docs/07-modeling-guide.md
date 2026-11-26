@@ -69,7 +69,7 @@ weaponFit: { axis: 'y', length: 1.7, grip: -0.15, hand: [-0.42, 0.85, 0.12], rot
 ## 6. 초상화
 - `src/render/thumbnails.ts`가 부팅 때 파이터와 **스킨마다** 384px 초상화를 한 번 그려 둔다(`ctx.portraits`, `ctx.skinPortraits`). 카메라 위치(0.2, 1.35, 3.6)·시선(0,1.08,0)·몸 회전 -0.35가 모두 같다.
 - 모델이 넓거나(망토) 크면 카드에서 옆이 잘린다. REAPER 카드는 망토 끝이 살짝 잘렸다(허용). 크게 거슬리면 모델별 카메라 값을 따로 두는 식으로 고친다(아직 없음).
-- 화면에서 초상화는 `ui/portraits.ts`의 `portraitSrc`/`myPortraitSrc`로 고른다(입은 스킨 기준). **남의 스킨은 서버가 안 보내서 기본 모습**이다.
+- 화면에서 초상화는 `ui/portraits.ts`의 `portraitSrc`/`myPortraitSrc`로 고른다(입은 스킨 기준). 방·경기 결과·랭킹에서 다른 사람의 장착 스킨도 서버가 전달한다.
 
 ## 7. 스킨 데이터 (`src/data/skins.ts`)
 - 필수: `id`(소문자_밑줄), `fighterId`, `name`, `price`(`RARITY_PRICE[rarity]`), `rarity`('epic' 서사 100다이아 / 'legendary' 전설 1000다이아), `model`.
@@ -98,6 +98,6 @@ weaponFit: { axis: 'y', length: 1.7, grip: -0.15, hand: [-0.42, 0.85, 0.12], rot
 2. `src/ui/widgets.ts`의 `ROLE_ICON`(역할 아이콘)과 `accountApi.ts`의 오프라인 기본 진행도(현재 하드코딩 목록이라 **직접 추가**해야 한다).
 3. 새 공격 종류가 필요하면 `src/game/sim.ts`(`shotSpec`)와 단위 테스트.
 4. 기본 모델 빌더 + `BUILDERS` 등록.
-5. 캐릭터 목록 화면은 5열 2줄(최대 10장)이다. 11장째부터는 `.fighter-grid` 레이아웃을 다시 잡는다.
+5. 캐릭터 목록 화면은 6열 2줄(최대 12장)이다. 그보다 늘어나면 `.fighter-grid` 레이아웃을 다시 잡는다.
 6. 테스트: 단위 테스트, `tests/phase1.spec.ts`의 캐릭터 수·이름 순서·상세 화면 화살표 순서, `npm run check`.
 7. 화면 스크린샷으로 목록·상세·전투를 직접 본다.

@@ -54,6 +54,17 @@ export interface Fighter extends UnitBase {
   maxAmmo: number;
   /** 궁극기 게이지 0..1 */
   superCharge: number;
+  /** Chainer: 기본 공격에 쓸 사슬 원형 타격 중첩 */
+  passiveStacks?: number;
+  /** Chainer: E 재입력 사슬 대기, 사슬 비행, W 재입력 대기 */
+  chainSkillPhase?: 'chain' | 'chainFlight' | 'w';
+  /** Chainer E/W 공유 쿨타임 종료 틱 */
+  chainSkillReadyTick?: number;
+  /** Chainer 궁극기로 복사한 파이터. 만료 때 지운다 */
+  copiedSuperId?: FighterId;
+  copiedSuperExpiresTick?: number;
+  /** 기절 종료 틱 */
+  stunnedUntilTick?: number;
   /** 수풀 안에 있는가 */
   inBush: boolean;
   /** 이 틱까지는 수풀 안이어도 적에게 보인다(공격하면 잠깐 노출) */
@@ -72,10 +83,11 @@ export interface Fighter extends UnitBase {
 }
 
 export type FighterAction =
-  | { kind: 'burst'; remaining: number; nextTick: number; dir: number; isSuper: boolean }
-  | { kind: 'dash'; dir: number; remaining: number; speed: number; hitIds: EntityId[]; /** 없으면 궁극기(옛 스냅샷 호환) */ isSuper?: boolean }
+  | { kind: 'burst'; remaining: number; nextTick: number; dir: number; isSuper: boolean; superSourceId?: FighterId }
+  | { kind: 'dash'; dir: number; remaining: number; speed: number; hitIds: EntityId[]; /** 없으면 궁극기(옛 스냅샷 호환) */ isSuper?: boolean; superSourceId?: FighterId }
+  | { kind: 'chainDash'; dir: number; remaining: number; speed: number }
   | { kind: 'knockback'; vx: number; vy: number; untilTick: number }
-  | { kind: 'leap'; from: Vec2; to: Vec2; startTick: number; endTick: number };
+  | { kind: 'leap'; from: Vec2; to: Vec2; startTick: number; endTick: number; superSourceId?: FighterId };
 
 export interface Dummy extends UnitBase {
   type: 'dummy';
@@ -105,6 +117,15 @@ export interface Projectile {
   /** 남은 비행 거리(타일) */
   remaining: number;
   isSuper: boolean;
+  /** 복사한 궁극기의 출처. 후속 피해 특성(예: 흡혈)을 읽는다 */
+  superSourceId?: FighterId;
+  /** Chainer Q: 첫 적중/사거리 끝에서 예약되는 지연 폭발 */
+  chainExplosion?: { damage: number; radius: number; delayTicks: number };
+  chainExplosionDueTick?: number;
+  /** Chainer E 사슬: 적중 시 기절하고 W를 연다 */
+  chainSkill?: boolean;
+  /** Chainer 궁극기 사슬 */
+  stealsSuper?: boolean;
   breaksWalls: boolean;
   /** 넉백 거리(타일), 0이면 없음 */
   knockback: number;
@@ -137,6 +158,7 @@ export interface Lob {
   damage: number;
   aoeRadius: number;
   isSuper: boolean;
+  superSourceId?: FighterId;
   breaksWalls: boolean;
 }
 
@@ -151,6 +173,8 @@ export interface FighterInput {
   attack?: { aim: Aim };
   /** 이번 틱에 궁극기 발동 */
   super?: { aim: Aim };
+  /** 이번 틱에 Chainer E/W 스킬 발동 */
+  skill?: { aim: Aim };
 }
 
 /** 시뮬레이션이 매 틱 내보내는 사건(렌더링·효과음·HUD용) */
@@ -158,12 +182,16 @@ export type SimEvent =
   | { type: 'attack'; unitId: EntityId; isSuper: boolean; dir: number }
   | { type: 'melee'; unitId: EntityId; isSuper: boolean; dir: number; range: number; spreadDeg: number }
   | { type: 'hit'; targetId: EntityId; sourceId: EntityId; damage: number; pos: Vec2; isSuper: boolean; killed: boolean }
+  | { type: 'heal'; targetId: EntityId; amount: number; pos: Vec2 }
   | { type: 'death'; unitId: EntityId; pos: Vec2 }
   | { type: 'respawn'; unitId: EntityId }
   | { type: 'wallsBroken'; tiles: Vec2[] }
   | { type: 'explode'; pos: Vec2; radius: number; isSuper: boolean }
   | { type: 'projectileEnd'; id: EntityId; pos: Vec2; reason: 'wall' | 'range' | 'hit' }
   | { type: 'superReady'; unitId: EntityId }
+  | { type: 'superCopied'; unitId: EntityId; sourceId: EntityId; fighterId: FighterId; expiresTick: number }
+  | { type: 'superCopyExpired'; unitId: EntityId }
+  | { type: 'stun'; unitId: EntityId; untilTick: number }
   | { type: 'noAmmo'; unitId: EntityId }
   | { type: 'score'; team: Team; score: [number, number]; killerId: EntityId; victimId: EntityId }
   | { type: 'matchEnd'; winner: Team | -1; score: [number, number] }
@@ -202,6 +230,7 @@ export interface Zone {
   /** 이동 속도 감소 비율(0~1) */
   slow: number;
   dps: number;
+  superSourceId?: FighterId;
 }
 
 /**

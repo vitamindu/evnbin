@@ -203,7 +203,7 @@ export function createRoomPanel(ctx: AppContext, getClient: () => OnlineClient) 
     if (p.bot) tags.push(el('span', 'slot-tag tag-bot', [iconEl('bot'), txt('봇')]));
     if (!p.connected) tags.push(txt('끊김', 'slot-tag tag-off'));
     const pf = el('span', 'slot-pf', [
-      portrait(ctx, p.fighterId, 'portrait', mine ? equippedSkin(getProfile(), p.fighterId) : undefined),
+      portrait(ctx, p.fighterId, 'portrait', p.skin ?? (mine ? equippedSkin(getProfile(), p.fighterId) : undefined)),
       p.host ? iconEl('crown', 'ico slot-crown') : null,
       mine ? el('span', 'slot-edit', [iconEl('pencil')]) : null,
     ]);

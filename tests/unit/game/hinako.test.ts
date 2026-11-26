@@ -275,7 +275,7 @@ describe('HINAKO 궁극기: leap', () => {
     expect(hits).toHaveLength(inRange);
     expect(hits.every((h) => h.targetId === d.id && h.isSuper && h.damage === S.damage)).toBe(true);
     expect(sim.lobs).toHaveLength(0);
-    expect(p.superCharge).toBe(0); // 궁극기 적중은 충전하지 않는다
+    expect(p.superCharge).toBeCloseTo(inRange * getFighter('hinako').attack.superChargePerHit, 9);
   });
 
   it('점프 중에는 피해를 받지 않고, 투사체는 소모되지 않고 지나간다', () => {

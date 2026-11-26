@@ -1,5 +1,5 @@
 import { powerMult } from '../data/power';
-import { getFighter, type FighterDef, type SuperKind } from '../data/fighters';
+import { getFighter, type FighterDef, type FighterId, type SuperKind } from '../data/fighters';
 import { resolveAim, resolveLeapAim } from './aim';
 import { angleDiff, lerpVec, segmentCircle, segmentCircleT } from './geom';
 import { Rng } from './rng';
@@ -166,11 +166,15 @@ export interface ShotSpec {
   projectileRadius?: number;
   /** leap: 폭탄·내려찍기 없이 이동만 */
   moveOnly?: boolean;
+  /** Chainer Q: 지연 폭발 */
+  chainExplosion?: { damage: number; radius: number; delayTicks: number };
+  /** 복사 궁극기 효과 출처 */
+  superSourceId?: FighterId;
 }
 
-export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
+export function shotSpec(def: FighterDef, isSuper: boolean, superSourceId?: FighterId): ShotSpec {
   if (isSuper) {
-    const s = def.super;
+    const s = superSourceId ? getFighter(superSourceId).super : def.super;
     return {
       kind: s.kind,
       isSuper: true,
@@ -195,6 +199,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
       lobFuse: s.kind === 'lob' ? (s.fuse ?? 0) : 0,
       ...(s.projectileRadius ? { projectileRadius: s.projectileRadius } : {}),
       ...(s.moveOnly ? { moveOnly: true } : {}),
+      ...(superSourceId ? { superSourceId } : {}),
     };
   }
   const a = def.attack;
@@ -221,6 +226,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean): ShotSpec {
     leapTime: DEFAULT_LEAP_TIME,
     fuse: DEFAULT_FUSE,
     lobFuse: a.kind === 'lob' ? (a.fuse ?? 0) : 0,
+    ...(a.chainExplosion ? { chainExplosion: { ...a.chainExplosion, delayTicks: secToTicks(a.chainExplosion.delay) } } : {}),
   };
 }
 
@@ -246,6 +252,7 @@ interface KnockState {
  * (Lead에게 제안: Dummy 또는 UnitBase에 넉백 상태를 넣기)
  */
 type SimDummy = Dummy & { knock?: KnockState | null };
+interface DelayedExplosion { dueTick: number; pos: Vec2; ownerId: EntityId; team: Team; damage: number; radius: number }
 
 type BurstAction = Extract<FighterAction, { kind: 'burst' }>;
 type DashAction = Extract<FighterAction, { kind: 'dash' }>;
@@ -281,6 +288,7 @@ export class Sim implements SimView {
   private lastHitId: EntityId | null = null;
   /** 지대별·유닛별 아직 주지 않은 소수 피해 */
   private readonly zoneAcc = new Map<string, number>();
+  private delayedExplosions: DelayedExplosion[] = [];
   /** lob id → 넉백 거리 */
   private readonly lobKnock = new Map<EntityId, number>();
   /** 대상별로 이미 넉백을 준 탄 묶음 */
@@ -396,6 +404,7 @@ export class Sim implements SimView {
     for (const u of this.units) if (u.alive && u.type === 'fighter') this.stepFighter(u, over ? undefined : inputs.get(u.id));
     if (!over) for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
     this.stepProjectiles();
+    this.stepDelayedExplosions();
     this.stepLobs();
     if (!over) this.stepZones();
     if (!over && this.match.mode === 'crystal') this.stepCrystals();
@@ -720,6 +729,19 @@ export class Sim implements SimView {
       }
     }
 
+    if (f.copiedSuperId && this.tick >= (f.copiedSuperExpiresTick ?? 0)) {
+      f.copiedSuperId = undefined;
+      f.copiedSuperExpiresTick = undefined;
+      f.superCharge = 0;
+      this.events.push({ type: 'superCopyExpired', unitId: f.id });
+    }
+    if (f.stunnedUntilTick && this.tick < f.stunnedUntilTick) {
+      f.moving = false;
+      f.inBush = isInBush(this.grid, f.pos);
+      return;
+    }
+    if (f.stunnedUntilTick && this.tick >= f.stunnedUntilTick) f.stunnedUntilTick = undefined;
+
     // 점프·넉백(2단계에서 이미 밀려남)·돌진 중에는 이동·공격 입력을 받지 않는다
     if (f.action?.kind === 'leap') {
       this.stepLeap(f, f.action);
@@ -731,6 +753,11 @@ export class Sim implements SimView {
     }
     if (f.action?.kind === 'dash') {
       this.stepDash(f, f.action);
+      f.inBush = isInBush(this.grid, f.pos);
+      return;
+    }
+    if (f.action?.kind === 'chainDash') {
+      this.stepChainDash(f, f.action);
       f.inBush = isInBush(this.grid, f.pos);
       return;
     }
@@ -763,6 +790,8 @@ export class Sim implements SimView {
     if (!f.action && input) {
       if (input.super && f.superCharge >= 1 - EPS) {
         this.startAttack(f, def, true, input.super.aim);
+      } else if (input.skill && f.fighterId === 'chainer') {
+        this.useChainSkill(f, input.skill.aim);
       } else if (input.attack) {
         if (f.ammo >= 1 - EPS) this.startAttack(f, def, false, input.attack.aim);
         else this.events.push({ type: 'noAmmo', unitId: f.id });
@@ -773,9 +802,16 @@ export class Sim implements SimView {
   }
 
   private startAttack(f: Fighter, def: FighterDef, isSuper: boolean, aim: Aim) {
-    const spec = shotSpec(def, isSuper);
+    const superSourceId = isSuper && f.fighterId === 'chainer' ? f.copiedSuperId : undefined;
+    const spec = shotSpec(def, isSuper, superSourceId);
     const { dir, ratio } = spec.kind === 'leap' ? resolveLeapAim(this, f, aim, spec.slam ? spec.range : undefined) : resolveAim(this, f, aim, spec.range);
-    if (isSuper) f.superCharge = 0;
+    if (isSuper) {
+      f.superCharge = 0;
+      if (superSourceId) {
+        f.copiedSuperId = undefined;
+        f.copiedSuperExpiresTick = undefined;
+      }
+    }
     else f.ammo = Math.max(0, f.ammo - 1);
     f.facing = dir;
     this.markCombat(f);
@@ -787,14 +823,20 @@ export class Sim implements SimView {
       case 'radial':
         this.fireRadial(f, spec, dir);
         break;
+      case 'chain':
+        this.spawnShot(f, spec, dir, 0);
+        break;
+      case 'steal':
+        this.launchSuperSteal(f, spec, dir);
+        break;
       case 'burst': {
-        const act: BurstAction = { kind: 'burst', remaining: spec.count, nextTick: this.tick, dir, isSuper };
+        const act: BurstAction = { kind: 'burst', remaining: spec.count, nextTick: this.tick, dir, isSuper, ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}) };
         f.action = act;
         this.continueBurst(f, act);
         break;
       }
       case 'dash':
-        f.action = { kind: 'dash', dir, remaining: spec.range, speed: spec.projectileSpeed, hitIds: [], isSuper };
+        f.action = { kind: 'dash', dir, remaining: spec.range, speed: spec.projectileSpeed, hitIds: [], isSuper, ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}) };
         break;
       case 'melee':
         this.doMelee(f, spec, dir);
@@ -809,6 +851,94 @@ export class Sim implements SimView {
         this.placeZone(f, spec, dir, ratio);
         break;
     }
+    if (!isSuper && def.chainKit && f.passiveStacks && f.passiveStacks > 0) {
+      f.passiveStacks--;
+      const passive = shotSpec(def, false);
+      this.doMelee(f, { ...passive, kind: 'melee', damage: def.chainKit.passiveDamage, range: def.chainKit.passiveRadius, spreadDeg: 360 }, dir);
+    }
+  }
+
+  private addChainStack(f: Fighter) {
+    const kit = getFighter(f.fighterId).chainKit;
+    if (!kit) return;
+    f.passiveStacks = Math.min(kit.passiveMaxStacks, (f.passiveStacks ?? 0) + 1);
+  }
+
+  private useChainSkill(f: Fighter, aim: Aim) {
+    const def = getFighter(f.fighterId);
+    const kit = def.chainKit;
+    if (!kit || f.action) return;
+    if (f.chainSkillPhase === 'chainFlight') return;
+    if (f.chainSkillPhase === 'w') {
+      let target: Unit | undefined;
+      let best = Infinity;
+      for (const u of this.units) {
+        if (!isHittable(u) || u.team === f.team) continue;
+        const d = dist(f.pos, u.pos);
+        if (d - u.radius > kit.wRange || d >= best || !hasLineOfSight(this.grid, f.pos, u.pos)) continue;
+        target = u;
+        best = d;
+      }
+      if (!target) return;
+      this.markCombat(f);
+      const amount = Math.round(target.maxHp * kit.wMaxHpDamage);
+      const dealt = this.damage(target, amount, f.id, false);
+      if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
+      this.addChainStack(f);
+      f.chainSkillPhase = undefined;
+      this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24 });
+      return;
+    }
+    if (f.chainSkillPhase === 'chain') {
+      const { dir } = resolveAim(this, f, aim, kit.chainRange);
+      const spec = shotSpec(def, false);
+      this.markCombat(f);
+      f.facing = dir;
+      this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
+      this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange, chainExplosion: undefined }, dir, 0);
+      this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
+      f.chainSkillPhase = 'chainFlight';
+      return;
+    }
+    if (this.tick < (f.chainSkillReadyTick ?? 0)) return;
+    const { dir } = resolveAim(this, f, aim, kit.dashRange);
+    f.chainSkillReadyTick = this.tick + secToTicks(kit.skillCooldown);
+    f.chainSkillPhase = 'chain';
+    this.addChainStack(f);
+    f.facing = dir;
+    this.markCombat(f);
+    this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
+    f.action = { kind: 'chainDash', dir, remaining: kit.dashRange, speed: 9 };
+  }
+
+  private launchSuperSteal(f: Fighter, spec: ShotSpec, dir: number) {
+    this.spawnShot(f, { ...spec, damage: 0, pierce: false, chainExplosion: undefined }, dir, 0);
+    this.projectiles[this.projectiles.length - 1]!.stealsSuper = true;
+  }
+
+  private stepChainDash(f: Fighter, act: Extract<FighterAction, { kind: 'chainDash' }>) {
+    f.facing = act.dir;
+    const stepLen = Math.min(act.speed * TICK_DT, act.remaining);
+    const from = { ...f.pos };
+    const dx = Math.cos(act.dir);
+    const dy = Math.sin(act.dir);
+    const target = { x: from.x + dx * stepLen, y: from.y + dy * stepLen };
+    if (circleBlocked(this.grid, target.x, target.y, f.radius)) {
+      let to = from;
+      const n = Math.max(1, Math.ceil(stepLen / 0.02));
+      for (let i = 1; i <= n; i++) {
+        const p = { x: from.x + (dx * stepLen * i) / n, y: from.y + (dy * stepLen * i) / n };
+        if (circleBlocked(this.grid, p.x, p.y, f.radius)) break;
+        to = p;
+      }
+      f.pos = to;
+      f.action = null;
+      return;
+    }
+    f.pos = target;
+    f.moving = dist(from, target) > 1e-4;
+    act.remaining -= stepLen;
+    if (act.remaining <= 1e-6 && f.action === act) f.action = null;
   }
 
   /** 공격했다: 회복 대기 다시 시작, 수풀 노출 */
@@ -834,7 +964,7 @@ export class Sim implements SimView {
 
   /** 연사: 이번 틱까지 나가야 할 탄을 쏜다. 다 쏘면 행동 끝 */
   private continueBurst(f: Fighter, act: BurstAction) {
-    const spec = shotSpec(getFighter(f.fighterId), act.isSuper);
+    const spec = shotSpec(getFighter(f.fighterId), act.isSuper, act.superSourceId);
     const interval = Math.max(0, spec.burstInterval) * TICK_RATE;
     f.facing = act.dir;
     while (act.remaining > 0 && this.tick + 1e-6 >= act.nextTick) {
@@ -870,6 +1000,9 @@ export class Sim implements SimView {
       damage: spec.damage,
       remaining: spec.range,
       isSuper: spec.isSuper,
+      ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}),
+      ...(spec.chainExplosion ? { chainExplosion: spec.chainExplosion } : {}),
+      ...(spec.chainExplosion ? { chainExplosionDueTick: this.tick + spec.chainExplosion.delayTicks } : {}),
       breaksWalls: spec.breaksWalls,
       knockback: spec.knockback,
       ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
@@ -896,9 +1029,8 @@ export class Sim implements SimView {
       const tol = d > u.radius ? Math.asin(u.radius / d) : Math.PI;
       if (Math.abs(angleDiff(angleOf({ x: u.pos.x - f.pos.x, y: u.pos.y - f.pos.y }), dir)) > half + tol) continue;
       if (!hasLineOfSight(this.grid, f.pos, u.pos)) continue;
-      this.damage(u, spec.damage, f.id, spec.isSuper);
+      this.damage(u, spec.damage, f.id, spec.isSuper, spec.superSourceId);
       if (u.alive && spec.knockback > 0) this.applyKnockback(u, u.pos.x - f.pos.x, u.pos.y - f.pos.y, spec.knockback, dir);
-      if (!spec.isSuper) this.chargeFromHit(f);
     }
   }
 
@@ -932,6 +1064,7 @@ export class Sim implements SimView {
         damage: spec.damage,
         aoeRadius: spec.aoeRadius,
         isSuper: spec.isSuper,
+        ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}),
         breaksWalls: spec.breaksWalls,
       });
       if (spec.knockback > 0) this.lobKnock.set(id, spec.knockback);
@@ -946,7 +1079,7 @@ export class Sim implements SimView {
    */
   private stepDash(f: Fighter, act: DashAction) {
     const isSuper = act.isSuper ?? true;
-    const spec = shotSpec(getFighter(f.fighterId), isSuper);
+    const spec = shotSpec(getFighter(f.fighterId), isSuper, act.superSourceId);
     f.facing = act.dir;
     this.markCombat(f);
     const stepLen = Math.min(act.speed * TICK_DT, act.remaining);
@@ -976,8 +1109,7 @@ export class Sim implements SimView {
       if (!isHittable(u) || u.team === f.team || act.hitIds.includes(u.id)) continue;
       if (!segmentCircle(from, to, u.pos, f.radius + u.radius)) continue;
       act.hitIds.push(u.id);
-      this.damage(u, spec.damage, f.id, isSuper);
-      if (!isSuper) this.chargeFromHit(f);
+      this.damage(u, spec.damage, f.id, isSuper, spec.superSourceId);
       if (u.alive && spec.knockback > 0) this.applyKnockback(u, u.pos.x - to.x, u.pos.y - to.y, spec.knockback, act.dir);
     }
 
@@ -997,7 +1129,7 @@ export class Sim implements SimView {
     const raw = { x: from.x + Math.cos(dir) * d, y: from.y + Math.sin(dir) * d };
     const to = this.findLanding(from, raw, f.radius);
     const ticks = Math.max(1, secToTicks(spec.leapTime));
-    f.action = { kind: 'leap', from, to, startTick: this.tick, endTick: this.tick + ticks };
+    f.action = { kind: 'leap', from, to, startTick: this.tick, endTick: this.tick + ticks, ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}) };
     f.moving = false;
     f.inBush = false;
 
@@ -1067,7 +1199,7 @@ export class Sim implements SimView {
       f.pos = { ...act.to };
       if (f.action === act) f.action = null;
       f.inBush = isInBush(this.grid, f.pos);
-      const spec = shotSpec(getFighter(f.fighterId), true);
+      const spec = shotSpec(getFighter(f.fighterId), true, act.superSourceId);
       if (spec.slam) this.slamLand(f, spec, act);
     }
   }
@@ -1084,7 +1216,7 @@ export class Sim implements SimView {
     for (const u of this.units) {
       if (!isHittable(u) || u.team === f.team) continue;
       if (dist(u.pos, at) > spec.aoeRadius + u.radius) continue;
-      this.damage(u, spec.damage, f.id, true);
+      this.damage(u, spec.damage, f.id, true, spec.superSourceId);
       if (u.alive && spec.knockback > 0) this.applyKnockback(u, u.pos.x - at.x, u.pos.y - at.y, spec.knockback, leapDir);
     }
   }
@@ -1185,6 +1317,20 @@ export class Sim implements SimView {
         keep.push(p);
         continue;
       }
+      if (p.chainExplosion && !this.over) {
+        this.delayedExplosions.push({
+          dueTick: Math.max(this.tick, p.chainExplosionDueTick ?? this.tick + p.chainExplosion.delayTicks),
+          pos: { ...p.pos },
+          ownerId: p.ownerId,
+          team: p.team,
+          damage: p.chainExplosion.damage,
+          radius: p.chainExplosion.radius,
+        });
+      }
+      if (p.chainSkill) {
+        const owner = this.getUnit(p.ownerId);
+        if (owner?.type === 'fighter' && owner.chainSkillPhase === 'chainFlight') owner.chainSkillPhase = undefined;
+      }
       const split = this.splitters.get(p.id);
       if (split) {
         this.splitters.delete(p.id);
@@ -1192,6 +1338,24 @@ export class Sim implements SimView {
       }
     }
     this.projectiles = keep.concat(shards);
+  }
+
+  private stepDelayedExplosions() {
+    if (!this.delayedExplosions.length) return;
+    const keep: DelayedExplosion[] = [];
+    for (const e of this.delayedExplosions) {
+      if (this.tick < e.dueTick) {
+        keep.push(e);
+        continue;
+      }
+      this.events.push({ type: 'explode', pos: { ...e.pos }, radius: e.radius, isSuper: false });
+      for (const u of this.units) {
+        if (!isHittable(u) || u.team === e.team) continue;
+        if (dist(u.pos, e.pos) > e.radius + u.radius || !hasLineOfSight(this.grid, e.pos, u.pos)) continue;
+        this.damage(u, e.damage, e.ownerId, false);
+      }
+    }
+    this.delayedExplosions = keep;
   }
 
   /**
@@ -1238,6 +1402,7 @@ export class Sim implements SimView {
       untilTick: this.tick + Math.max(1, secToTicks(z.duration)),
       slow: z.slow,
       dps: z.dps,
+      ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}),
     });
   }
 
@@ -1254,7 +1419,7 @@ export class Sim implements SimView {
         if ((this.tick - z.id) % ZONE_HIT_TICKS === 0 && acc >= 1) {
           const dmg = Math.floor(acc);
           this.zoneAcc.set(key, acc - dmg);
-          this.damage(u, dmg, z.ownerId, true);
+          this.damage(u, dmg, z.ownerId, true, z.superSourceId);
         } else this.zoneAcc.set(key, acc);
       }
     }
@@ -1294,6 +1459,7 @@ export class Sim implements SimView {
       for (const u of this.units) {
         // 점프 중인 유닛은 투사체가 그대로 지나간다
         if (!isHittable(u) || u.team === p.team || p.hitIds.includes(u.id)) continue;
+        if (p.stealsSuper && u.type !== 'fighter') continue;
         const t = segmentCircleT(p.pos, to, u.pos, u.radius + p.radius);
         if (t >= 0) hits.push({ u, t });
       }
@@ -1347,7 +1513,32 @@ export class Sim implements SimView {
   private projectileHit(p: Projectile, u: Unit, traveled: number) {
     if (this.over) return; // 경기가 끝난 뒤의 탄은 아무 효과 없음
     this.lastHitId = u.id;
-    this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper);
+    const owner = this.getUnit(p.ownerId);
+    if (p.stealsSuper) {
+      if (u.type === 'fighter' && owner?.type === 'fighter') {
+        const sourceId = u.copiedSuperId ?? u.fighterId;
+        const kit = getFighter(owner.fighterId).chainKit;
+        if (kit) {
+          owner.copiedSuperId = sourceId;
+          owner.copiedSuperExpiresTick = this.tick + secToTicks(kit.copiedSuperDuration);
+          owner.superCharge = 1;
+          this.events.push({ type: 'superCopied', unitId: owner.id, sourceId: u.id, fighterId: sourceId, expiresTick: owner.copiedSuperExpiresTick });
+          this.events.push({ type: 'superReady', unitId: owner.id });
+        }
+      }
+      return;
+    }
+    this.damage(u, distanceDamage(p, traveled), p.ownerId, p.isSuper, p.superSourceId);
+    if (p.chainSkill) {
+      if (u.type === 'fighter') {
+        const untilTick = this.tick + secToTicks(getFighter('chainer').chainKit!.stunDuration);
+        u.stunnedUntilTick = Math.max(u.stunnedUntilTick ?? 0, untilTick);
+        u.action = null;
+        u.moving = false;
+        this.events.push({ type: 'stun', unitId: u.id, untilTick });
+      }
+      if (owner?.type === 'fighter') owner.chainSkillPhase = 'w';
+    }
     if (u.alive && p.knockback > 0) {
       // 같은 공격 묶음의 탄은 한 대상을 한 번만 밀어낸다(피해는 탄마다)
       let done = this.knockedBy.get(u.id);
@@ -1358,14 +1549,10 @@ export class Sim implements SimView {
           if (done.size > 32) done.delete(done.values().next().value as number);
         }
         // 묶음 넉백은 쏜 사람에서 대상으로 향하는 방향(가장 먼저 맞은 산탄의 비스듬한 방향이 아니라)
-        const owner = p.groupId !== undefined ? this.getUnit(p.ownerId) : undefined;
-        if (owner) this.applyKnockback(u, u.pos.x - owner.pos.x, u.pos.y - owner.pos.y, p.knockback, angleOf(p.vel));
+        const groupedOwner = p.groupId !== undefined ? this.getUnit(p.ownerId) : undefined;
+        if (groupedOwner) this.applyKnockback(u, u.pos.x - groupedOwner.pos.x, u.pos.y - groupedOwner.pos.y, p.knockback, angleOf(p.vel));
         else this.applyKnockback(u, p.vel.x, p.vel.y, p.knockback, angleOf(p.vel));
       }
-    }
-    if (!p.isSuper) {
-      const owner = this.getUnit(p.ownerId);
-      if (owner?.type === 'fighter') this.chargeFromHit(owner);
     }
   }
 
@@ -1379,14 +1566,12 @@ export class Sim implements SimView {
       }
       this.events.push({ type: 'explode', pos: { ...l.to }, radius: l.aoeRadius, isSuper: l.isSuper });
       if (l.breaksWalls) this.broken.push(...breakWallsInCircle(this.grid, l.to, l.aoeRadius));
-      const owner = this.getUnit(l.ownerId);
       for (const u of this.units) {
         if (!isHittable(u) || u.team === l.team) continue;
         if (dist(u.pos, l.to) > l.aoeRadius + u.radius) continue;
-        this.damage(u, l.damage, l.ownerId, l.isSuper);
+        this.damage(u, l.damage, l.ownerId, l.isSuper, l.superSourceId);
         const kb = this.lobKnock.get(l.id);
         if (kb && u.alive) this.applyKnockback(u, u.pos.x - l.to.x, u.pos.y - l.to.y, kb, angleOf({ x: l.to.x - l.from.x, y: l.to.y - l.from.y }));
-        if (!l.isSuper && owner?.type === 'fighter') this.chargeFromHit(owner);
       }
       this.lobKnock.delete(l.id);
     }
@@ -1395,7 +1580,7 @@ export class Sim implements SimView {
 
   // ───────────── 피해·넉백·충전·회복·부활 ─────────────
 
-  /** 기본 공격 적중 1회분 궁극기 충전. 1이 되는 순간 superReady */
+  /** 피해 적중 1회분 궁극기 충전(기본 공격·궁극기 모두). 1이 되는 순간 superReady */
   private chargeFromHit(f: Fighter) {
     if (f.superCharge >= 1 || this.over) return;
     f.superCharge = Math.min(1, f.superCharge + getFighter(f.fighterId).attack.superChargePerHit);
@@ -1405,23 +1590,33 @@ export class Sim implements SimView {
     }
   }
 
-  private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean) {
-    if (!isHittable(u) || amount <= 0 || this.over) return;
+  private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean, superSourceId?: FighterId): number {
+    if (!isHittable(u) || amount <= 0 || this.over) return 0;
     // 캐릭터 레벨: 모든 피해(공격·궁극기·폭탄·지대)에 같은 배율
     const src = this.getUnit(sourceId);
     if (src?.type === 'fighter' && src.power && src.power > 1) amount = Math.round(amount * powerMult(src.power));
     const dealt = Math.min(u.hp, amount);
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;
+    if (dealt > 0 && src?.type === 'fighter') this.chargeFromHit(src);
     // 흡혈: 실제로 깎은 체력의 비율만큼 공격한 파이터 회복
     if (src?.type === 'fighter' && src.alive) {
-      const sdef = getFighter(src.fighterId);
+      const sdef = getFighter(superSourceId ?? src.fighterId);
       const ls = isSuper ? sdef.super.lifesteal : sdef.attack.lifesteal;
-      if (ls && ls > 0 && dealt > 0) src.hp = Math.min(src.maxHp, src.hp + Math.round(dealt * ls));
+      if (ls && ls > 0 && dealt > 0) this.heal(src, Math.round(dealt * ls));
     }
     const killed = u.hp <= 0;
     this.events.push({ type: 'hit', targetId: u.id, sourceId, damage: amount, pos: { ...u.pos }, isSuper, killed });
     if (killed) this.kill(u, sourceId);
+    return dealt;
+  }
+
+  private heal(u: Fighter, amount: number) {
+    if (!u.alive || amount <= 0 || this.over) return;
+    const healed = Math.min(amount, u.maxHp - u.hp);
+    if (healed <= 0) return;
+    u.hp += healed;
+    this.events.push({ type: 'heal', targetId: u.id, amount: healed, pos: { ...u.pos } });
   }
 
   private kill(u: Unit, sourceId: EntityId) {
@@ -1430,6 +1625,13 @@ export class Sim implements SimView {
     if (u.type === 'fighter') {
       u.action = null;
       u.moving = false;
+      u.chainSkillPhase = undefined;
+      if (u.fighterId === 'chainer' && u.copiedSuperId) {
+        u.copiedSuperId = undefined;
+        u.copiedSuperExpiresTick = undefined;
+        u.superCharge = 0;
+      }
+      u.stunnedUntilTick = undefined;
     } else {
       (u as SimDummy).knock = null;
     }
@@ -1509,6 +1711,12 @@ export class Sim implements SimView {
       u.ammo = u.maxAmmo;
       u.action = null;
       u.moving = false;
+      u.chainSkillPhase = undefined;
+      u.chainSkillReadyTick = undefined;
+      u.passiveStacks = 0;
+      u.copiedSuperId = undefined;
+      u.copiedSuperExpiresTick = undefined;
+      u.stunnedUntilTick = undefined;
       u.revealedUntil = 0;
       u.inBush = isInBush(this.grid, u.pos);
     } else {

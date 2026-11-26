@@ -91,6 +91,7 @@ export class OnlineSession implements BattleLike {
   private seq = 0;
   private pendingAttack: { aim: Aim } | null = null;
   private pendingSuper: { aim: Aim } | null = null;
+  private pendingSkill: { aim: Aim } | null = null;
   private readonly eventQueue: { tick: number; events: SimEvent[] }[] = [];
   private meOffset: Vec2 = { x: 0, y: 0 };
   private meShown: Vec2 | null = null;
@@ -173,6 +174,10 @@ export class OnlineSession implements BattleLike {
 
   queueSuper(aim: Aim) {
     this.pendingSuper = { aim };
+  }
+
+  queueSkill(aim: Aim) {
+    this.pendingSkill = { aim };
   }
 
   resize(w: number, h: number) {
@@ -292,13 +297,16 @@ export class OnlineSession implements BattleLike {
     const now = this.now();
     const attack = this.pendingAttack;
     const sup = this.pendingSuper;
+    const skill = this.pendingSkill;
     this.pendingAttack = null;
     this.pendingSuper = null;
+    this.pendingSkill = null;
     if (!this.result && this.transport.connected) {
       const move = quantizeMove(this.controls.move);
       const msg: InputMsg = { t: 'input', seq: ++this.seq, move };
       if (attack) msg.attack = toWireAim(attack.aim);
       if (sup) msg.super = toWireAim(sup.aim);
+      if (skill) msg.skill = toWireAim(skill.aim);
       this.transport.send(msg);
       this.predictor?.applyLocal(this.seq, move);
     }
@@ -401,6 +409,7 @@ export class OnlineSession implements BattleLike {
       case 'melee':
       case 'noAmmo':
       case 'superReady':
+      case 'superCopied':
         return e.unitId === this.playerId;
       default:
         return false;

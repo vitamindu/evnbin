@@ -108,8 +108,8 @@ describe('dash (BOULDER Avalanche Roll)', () => {
     expect(d1!.hp).toBe(d1!.maxHp - S.damage);
     // 돌진 방향(오른쪽)으로 밀려났다
     expect(d1!.pos.x).toBeGreaterThan(center(x1, 3).x + S.knockback / 2);
-    // 궁극기 적중은 충전하지 않는다
-    expect(p.superCharge).toBe(0);
+    // 각 궁극기 적중은 기본 공격의 적중 충전량만큼 게이지를 채운다
+    expect(p.superCharge).toBeCloseTo(hits.length * getFighter('boulder').attack.superChargePerHit, 9);
   });
 });
 

@@ -117,6 +117,9 @@ export interface AimSpec {
   unitId: EntityId;
   which: 'attack' | 'super';
   aim: Vec2;
+  superSourceId?: Fighter['fighterId'];
+  range?: number;
+  kindOverride?: 'dash' | 'chain' | 'melee';
 }
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -469,7 +472,7 @@ export class BattleView {
           const hitFx = this.skinFx(e.sourceId)?.hit;
           if (hitFx) this.fxHit(hitFx, this.shotColor(this.units.get(e.sourceId)?.unit), e.pos, e.isSuper);
           const color = e.targetId === this.followId ? '#ff3658' : e.sourceId === this.followId ? '#ffe14d' : e.isSuper ? '#ff9d37' : '#ffffff';
-          this.hitImpact(e.pos, color, e.targetId === this.followId ? 1.45 : e.sourceId === this.followId ? 1.2 : e.isSuper ? 1 : 0.72);
+          this.hitImpact(e.pos, color, e.targetId === this.followId ? 0.9 : e.sourceId === this.followId ? 0.82 : e.isSuper ? 0.65 : 0.5);
           break;
         }
         case 'death':
@@ -691,12 +694,15 @@ export class BattleView {
     this.aim = spec;
   }
 
-  private aimShape(fighterId: string, which: 'attack' | 'super'): THREE.Object3D {
-    const key = `${fighterId}|${which}`;
+  private aimShape(fighterId: string, which: 'attack' | 'super', rangeOverride?: number, kindOverride?: AimSpec['kindOverride']): THREE.Object3D {
+    const key = `${fighterId}|${which}|${rangeOverride ?? ''}|${kindOverride ?? ''}`;
     let obj = this.aimShapes.get(key);
     if (obj) return obj;
     const def = getFighter(fighterId as Fighter['fighterId']);
-    const d = which === 'attack' ? def.attack : def.super;
+    const sourceDef = which === 'super' && this.aim?.superSourceId ? getFighter(this.aim.superSourceId) : def;
+    const d = which === 'attack' ? def.attack : sourceDef.super;
+    const kind = kindOverride ?? d.kind;
+    const range = rangeOverride ?? d.range;
     const color = which === 'attack' ? '#ffffff' : '#ffd23f';
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
     const group = new THREE.Group();
@@ -706,24 +712,31 @@ export class BattleView {
       group.add(m);
       return m;
     };
-    switch (d.kind) {
+    switch (kind) {
       case 'spread':
       case 'melee': {
-        const spread = THREE.MathUtils.degToRad(Math.max(8, d.spreadDeg));
+        const spread = THREE.MathUtils.degToRad(kindOverride === 'melee' ? 360 : Math.max(8, d.spreadDeg));
         // 로컬 +x 방향을 중심으로 한 부채꼴 (평면 → 회전 후 월드 +x)
-        flat(new THREE.CircleGeometry(d.range, 40, -spread / 2, spread));
+        flat(new THREE.CircleGeometry(range, 40, -spread / 2, spread));
         break;
       }
       case 'burst':
       case 'dash': {
-        const width = d.kind === 'dash' ? 0.9 : 0.45;
-        const geo = new THREE.PlaneGeometry(d.range, width);
-        geo.translate(d.range / 2, 0, 0);
+        const width = kind === 'dash' ? 0.9 : 0.35;
+        const geo = new THREE.PlaneGeometry(range, width);
+        geo.translate(range / 2, 0, 0);
+        flat(geo);
+        break;
+      }
+      case 'chain':
+      case 'steal': {
+        const geo = new THREE.PlaneGeometry(range, 0.35);
+        geo.translate(range / 2, 0, 0);
         flat(geo);
         break;
       }
       case 'radial':
-        flat(new THREE.CircleGeometry(d.range, 48));
+        flat(new THREE.CircleGeometry(range, 48));
         break;
       case 'lob': {
         const r = ('aoeRadius' in d && d.aoeRadius) || 1.5;
@@ -739,8 +752,8 @@ export class BattleView {
     }
     obj = group;
     obj.position.y = 0.03;
-    obj.userData.kind = d.kind;
-    obj.userData.range = d.range;
+    obj.userData.kind = kind;
+    obj.userData.range = range;
     this.aimRoot.add(obj);
     this.aimShapes.set(key, obj);
     return obj;
@@ -778,7 +791,7 @@ export class BattleView {
       this.ballAimGroup.visible = true;
       return;
     }
-    const shape = this.aimShape(v.unit.fighterId, a.which);
+    const shape = this.aimShape(a.which === 'super' && a.superSourceId ? a.superSourceId : v.unit.fighterId, a.which, a.range, a.kindOverride);
     shape.visible = true;
     const p = v.model.root.position;
     const dir = Math.atan2(a.aim.y, a.aim.x);
