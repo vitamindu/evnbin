@@ -28,6 +28,8 @@
 `.claude/agents/`에 역할(gameplay, network, world, ui, qa)이 있다. 서브에이전트를 쓸 수 있으면 **한 번에 하나씩** 돌린다(사용량 절약). 쓸 수 없으면 직접 하되 담당 폴더 밖은 꼭 필요할 때만 건드린다.
 
 ## 2. 작업 순서
+> 모델·스킨·이펙트는 **`docs/07-modeling-guide.md`**, 화면·UI는 **`docs/08-ui-guide.md`** 를 반드시 읽고 따른다.
+
 1. 관련 `docs/`를 읽는다 → 2. 데이터(`src/data`) → 로직(`src/game`) → 화면 순으로 고친다 → 3. 테스트를 같이 추가/수정한다 → 4. 문서를 고친다 → 5. `npm run check` → 6. 커밋(작은 단위, 한국어) → 7. push.
 
 - 새 캐릭터: `FIGHTERS`에 항목 + 모델 빌더 1개(`src/render/fighterModel.ts`) + 계정 기본값(`accountApi.ts`)은 이미 `FIGHTERS`를 돌므로 자동. 목록 화면은 5열이다.

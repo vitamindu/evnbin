@@ -19,3 +19,4 @@
 
 ## 다른 모델·에이전트로 이어서 할 때
 `docs/HANDOFF.md`(개발 방식·명령·현재 상태·FreeLLMAPI 설정)를 먼저 읽는다. 답변·커밋은 한국어. push 전에는 `npm run check`.
+새 파이터·스킨·이펙트는 `docs/07-modeling-guide.md`, 화면·UI는 `docs/08-ui-guide.md`를 먼저 읽는다.
