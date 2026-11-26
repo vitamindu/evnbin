@@ -11,6 +11,23 @@ REAPER(TRUE FORM REAPER)를 넣으면서 실제로 겪은 것들을 적었다. "
 - 기본 모델 만드는 법: `buildHumanoid(root, g, 비율, 색)`로 몸·다리·팔을 만들고(`Proportions`), `addEyes`·`part`·`toon`으로 장식을 붙인다. 손(`rig.handR`)에 무기를 붙이고 `rig.armR.rotation`으로 자세를 잡는다. `FighterDef.palette`(primary/secondary/accent/skin/dark)만 써서 색을 정한다. 새 캐릭터는 `BUILDERS`에 등록하지 않으면 RIVET 모델로 나온다.
 - 사용자가 준 모델은 기본 외형을 **대체하지 않고** 스킨으로 넣는다(HINAKO, REAPER 모두 그렇게 했다).
 
+## 1-1. 기본 도형 모델 만드는 법 (기술, `src/render/fighterModel.ts`)
+좌표: **발바닥 y=0, 정면 +z, 키 약 1.7**. 한 캐릭터 = `buildXxx(def, root, g): Rig` 함수 하나.
+
+1. **비율 정하기**: `Proportions`(torsoW/H/D, headR, headLift, legR/legLen/legX, armR/armLen, shoeH)를 채운다. 기존 값(RIVET 보통, BOULDER 몸통 0.98로 크게, SHARD 머리 0.37로 큼)과 비교해 실루엣이 겹치지 않게 한다. `buildHumanoid(root, g, p, {top, legs, shoes, skin, hands})`가 다리·몸통·머리·팔을 만들고 `Rig`를 돌려준다.
+2. **Rig 구조**: 다리는 엉덩이 높이를 축으로 하는 그룹 2개(`legs`, 걸을 때 `rotation.x`로 흔든다). `body` 그룹 안에 `torso`(둥근 상자), `head`(그룹, 중심 y = 몸통 위 + headR×headLift), 팔 피벗 2개(어깨 높이)가 있다. 팔 피벗 아래로 캡슐 팔과 구 모양 손이 매달려 있어서, **무기·장갑은 손(`rig.handR`)이나 `rig.armR`에 붙여야 팔과 같이 움직인다**(REAPER 낫은 `pole.position.copy(rig.handR.position)` 후 `rig.armR.add`).
+3. **부품 만들기**: `part(geometry, toon('#색'))`. `part`는 메쉬 뒤집힌 외곽선 메쉬(`smoothed(geo)` + `outlineMat`)를 자식으로 붙인다. 아주 작거나 납작한 장식·발광 부분은 `{ outline: false }`.
+   - 빛나는 부분(눈동자, 낫 날, 조준경 렌즈)은 조명을 안 받는 `MeshBasicMaterial`을 쓴다.
+   - `toon(색)`은 같은 색이면 **공유·캐시**하므로 재질을 dispose하지 않는다.
+   - **모든 지오메트리는 `g.add(new THREE.XxxGeometry(...))`로 감싼다**(`GeoBag`). 안 감싸면 모델을 지울 때 GPU 메모리가 샌다.
+4. **얼굴**: `addEyes(rig.head, g, headR, { size, spread, y })`가 구 표면(`onSphere`)에 눈을 붙인다. 머리 장식(두건, 이마 띠, 얼음 가시)은 `rig.head.add`.
+5. **자세**: 빌더 안에서 `rig.armR.rotation.set(...)`으로 기본 자세를 잡는다. `buildFighterModel`이 **빌더가 끝난 뒤의 팔 `rotation.x`를 기준 자세로 기억**하고 그 위에 숨쉬기·걷기·반동을 더한다. 그래서 `rotation.y/z`로 잡은 자세는 그대로 유지되고, `rotation.x`는 기준값 근처에서만 흔들린다.
+6. **등록**: 파일 아래쪽 `BUILDERS` 표에 `id: buildXxx`. 없으면 RIVET 모델로 나온다.
+7. **움직임 조정**: 모든 캐릭터가 같은 애니메이션(`update`)을 쓴다. 캐릭터마다 바꿀 수 있는 건 `IDLE` 표(숨쉬기 속도·폭)와 그림자 크기(`blobShadow`, BOULDER·GRIZZLE만 0.85, 나머지 0.65 — 큰 캐릭터는 이 조건에 추가)뿐이다. 다른 동작이 필요하면 `buildFighterModel`의 `update`를 직접 고친다.
+8. **확인**: 캐릭터 목록 카드(초상화), 상세 화면(큰 모델), 전투 화면(작게, `MODEL_SCALE` 0.85)에서 모두 본다. `tests/new-fighters.spec.ts`처럼 Playwright로 목록·상세 스크린샷을 찍는다.
+
+겪은 점: 열린 원뿔(`openEnded`)은 한쪽 면만 보여서 두건·망토는 바깥에서만 제대로 보인다. 몸통에 붙이는 장식은 몸통 크기(`torsoD/2`)만큼 앞으로 빼야 파묻히지 않는다.
+
 ## 2. 받은 glb 살펴보기와 줄이기
 받은 파일 특징(REAPER 기준, 확인함): 뼈대·애니메이션 없는 **정적 모델**, 34만 정점, 2048×2048 텍스처 3장(baseColor jpeg, normal png, metallicRoughness png), 몸 26MB·무기 9.8MB. 이대로는 웹에서 못 쓴다.
 
