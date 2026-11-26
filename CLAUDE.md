@@ -11,8 +11,11 @@
 - **탄환 색 규칙:** 보는 사람 기준으로 우리 팀 탄환은 무조건 파란색, 상대 팀 탄환은 무조건 빨간색(캐릭터별 색 금지). 폭탄도 같다.
 
 ## 명령
-- `npm run dev` 개발 서버 / `npm run build` 타입 검사 + 빌드 / `npm run preview` 빌드 결과 확인
+- `npm run dev` 개발 서버 / `npm run build` 타입 검사 + 빌드 / `npm run preview` 빌드 결과 확인 / `npm run check` 타입 + 단위 테스트(push 전 필수)
 - 화면 확인: 뷰포트 1280×800(태블릿 CSS 크기), 터치 활성화한 Chromium으로 스크린샷
 
 ## 에이전트 분업
 `.claude/agents/`의 역할(gameplay, network, world, ui, qa)을 쓴다. 메인 세션이 Lead로서 분배·통합한다. 각 역할은 `docs/05-technical-architecture.md`의 담당 폴더만 수정한다.
+
+## 다른 모델·에이전트로 이어서 할 때
+`docs/HANDOFF.md`(개발 방식·명령·현재 상태·FreeLLMAPI 설정)를 먼저 읽는다. 답변·커밋은 한국어. push 전에는 `npm run check`.
