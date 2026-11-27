@@ -144,7 +144,9 @@ export class BattleInput {
     if (chainer) {
       const phase = p.chainSkillPhase;
       const remaining = Math.max(0, (p.chainSkillReadyTick ?? 0) - s.state.tick);
-      this.skillStick.setTag(phase === 'w' ? 'W' : phase === 'chainFlight' ? '…' : remaining > 0 ? `${(remaining / 30).toFixed(1)}` : 'E');
+      // 단계 표시: E1(준비) → E2·W(남은 초) → 대기시간(남은 초)
+      const left = Math.max(0, Math.ceil(((p.chainSkillUntilTick ?? 0) - s.state.tick) / 30));
+      this.skillStick.setTag(phase === 'w' ? `W ${left}` : phase === 'chain' ? `E2 ${left}` : phase === 'chainFlight' ? '…' : remaining > 0 ? `${(remaining / 30).toFixed(1)}` : 'E1');
       this.skillStick.el.classList.toggle('is-cooldown', !phase && remaining > 0);
       this.skillStick.setWReady(phase === 'w');
     }
@@ -336,8 +338,8 @@ export class BattleInput {
       const sourceId = t.which === 'super' ? s.player.copiedSuperId : undefined;
       const skillPhase = s.player.chainSkillPhase;
       const skillKit = getFighter(s.player.fighterId).chainKit;
-      const range = t.which === 'skill' ? (skillPhase === 'w' ? skillKit?.wRange : skillKit?.chainRange) : undefined;
-      const kindOverride = t.which === 'skill' ? (skillPhase === 'w' ? 'melee' : 'chain') : undefined;
+      const range = t.which === 'skill' ? (skillPhase === 'w' ? skillKit?.wRange : skillPhase === 'chain' ? skillKit?.chainRange : skillKit?.dashRange) : undefined;
+      const kindOverride = t.which === 'skill' ? (skillPhase === 'w' ? 'melee' : skillPhase === 'chain' ? 'chain' : 'dash') : undefined;
       s.view.setAim((manual || ballCarrier) && !t.cancel && !t.dead ? { unitId: s.playerId, which: t.which === 'super' ? 'super' : 'attack', aim: t.aim, ...(sourceId ? { superSourceId: sourceId } : {}), ...(range ? { range } : {}), ...(kindOverride ? { kindOverride } : {}) } : null);
     }
   }
@@ -373,7 +375,7 @@ export class BattleInput {
     if (!g) return;
     const p = s.player;
     const def = getFighter(p.fighterId);
-    const range = which === 'attack' ? def.attack.range : which === 'skill' ? (p.chainSkillPhase === 'w' ? def.chainKit?.wRange ?? 1 : def.chainKit?.chainRange ?? 1) : (p.copiedSuperId ? getFighter(p.copiedSuperId).super.range : def.super.range);
+    const range = which === 'attack' ? def.attack.range : which === 'skill' ? (p.chainSkillPhase === 'w' ? def.chainKit?.wRange ?? 1 : p.chainSkillPhase === 'chain' ? def.chainKit?.chainRange ?? 1 : def.chainKit?.dashRange ?? 1) : (p.copiedSuperId ? getFighter(p.copiedSuperId).super.range : def.super.range);
     const dx = (g.x - p.pos.x) / range;
     const dy = (g.y - p.pos.y) / range;
     const l = Math.hypot(dx, dy);

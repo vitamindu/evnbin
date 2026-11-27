@@ -152,7 +152,13 @@ export interface FighterDef {
     passiveRadius: number;
     passiveDamage: number;
     passiveMaxStacks: number;
+    /** E1 재사용 대기시간(초). 콤보(E1→E2→W)가 끝난 순간부터 센다 */
     skillCooldown: number;
+    /** E1: 짧은 돌진 거리(타일)와 속도(타일/초) */
+    dashRange: number;
+    dashSpeed: number;
+    /** E2·W를 쓸 수 있는 제한 시간(초). 넘기면 콤보가 끝나고 E1 대기시간으로 돌아간다 */
+    comboWindow: number;
     /** E: 사슬에 맞은 대상에게 날아가는 속도(타일/초) */
     pullSpeed: number;
     chainRange: number;
@@ -618,6 +624,9 @@ export const FIGHTERS: readonly FighterDef[] = [
       passiveDamage: 500,
       passiveMaxStacks: 3,
       skillCooldown: 7,
+      dashRange: 1.5,
+      dashSpeed: 9,
+      comboWindow: 5,
       pullSpeed: 16,
       chainRange: 4.5,
       chainDamage: 375,

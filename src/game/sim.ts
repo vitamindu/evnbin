@@ -717,6 +717,8 @@ export class Sim implements SimView {
       if (f.ammo > f.maxAmmo - EPS) f.ammo = f.maxAmmo;
     }
     f.moving = false;
+    // Chainer: E2·W 대기 시간이 지나면 콤보가 끝나고 E1 대기시간으로 돌아간다
+    if (f.chainSkillUntilTick !== undefined && this.tick >= f.chainSkillUntilTick) this.endChainCombo(f);
     // 시간이 지나면 저절로 차는 궁극기(FISTER)
     if (def.superChargePerSec && f.superCharge < 1 && !this.over) {
       f.superCharge = Math.min(1, f.superCharge + def.superChargePerSec * TICK_DT);
@@ -882,22 +884,41 @@ export class Sim implements SimView {
       const dealt = this.damage(target, amount, f.id, false);
       if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
       this.addChainStack(f);
-      f.chainSkillPhase = undefined;
+      this.endChainCombo(f);
       this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24 });
       return;
     }
-    // E: 사슬을 던진다. 맞히면 내가 그 대상에게 날아간다(projectileHit). 못 맞히면 사거리 끝에서 끝
+    if (f.chainSkillPhase === 'chain') {
+      // E2: 사슬을 던진다. 맞히면 내가 그 대상에게 날아가고(projectileHit) W 대기로, 못 맞히면 콤보가 끝난다
+      const { dir } = resolveAim(this, f, aim, kit.chainRange);
+      const spec = shotSpec(def, false);
+      f.chainSkillPhase = 'chainFlight';
+      f.chainSkillUntilTick = undefined;
+      f.facing = dir;
+      this.markCombat(f);
+      this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
+      this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange }, dir, 0);
+      this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
+      return;
+    }
+    // E1: 짧게 돌진한다. 이어서 comboWindow 안에 E2를 쓸 수 있다
     if (this.tick < (f.chainSkillReadyTick ?? 0)) return;
-    const { dir } = resolveAim(this, f, aim, kit.chainRange);
-    const spec = shotSpec(def, false);
-    f.chainSkillReadyTick = this.tick + secToTicks(kit.skillCooldown);
-    f.chainSkillPhase = 'chainFlight';
+    const { dir } = resolveAim(this, f, aim, kit.dashRange);
+    f.chainSkillPhase = 'chain';
+    f.chainSkillUntilTick = this.tick + secToTicks(kit.comboWindow);
     this.addChainStack(f);
     f.facing = dir;
     this.markCombat(f);
     this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
-    this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange }, dir, 0);
-    this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
+    f.action = { kind: 'chainDash', dir, remaining: kit.dashRange, speed: kit.dashSpeed };
+  }
+
+  /** 콤보(E1→E2→W)가 끝났다: 처음 단계로 돌아가 E1 재사용 대기시간이 시작된다 */
+  private endChainCombo(f: Fighter) {
+    const kit = getFighter(f.fighterId).chainKit;
+    f.chainSkillPhase = undefined;
+    f.chainSkillUntilTick = undefined;
+    if (kit) f.chainSkillReadyTick = this.tick + secToTicks(kit.skillCooldown);
   }
 
   private launchSuperSteal(f: Fighter, spec: ShotSpec, dir: number) {
@@ -1332,7 +1353,8 @@ export class Sim implements SimView {
       }
       if (p.chainSkill) {
         const owner = this.getUnit(p.ownerId);
-        if (owner?.type === 'fighter' && owner.chainSkillPhase === 'chainFlight') owner.chainSkillPhase = undefined;
+        // 사슬이 아무에게도 안 맞고 끝났다: 콤보 종료(E1 대기시간)
+        if (owner?.type === 'fighter' && owner.chainSkillPhase === 'chainFlight') this.endChainCombo(owner);
       }
       const split = this.splitters.get(p.id);
       if (split) {
@@ -1525,6 +1547,7 @@ export class Sim implements SimView {
       }
       if (owner?.type === 'fighter') {
         owner.chainSkillPhase = 'w';
+        owner.chainSkillUntilTick = this.tick + secToTicks(getFighter(owner.fighterId).chainKit?.comboWindow ?? 5);
         // 사슬이 박힌 대상에게 내가 날아간다(바로 앞까지, 벽에 막히면 거기서 멈춤)
         const kit = getFighter(owner.fighterId).chainKit;
         const gap = dist(owner.pos, u.pos) - owner.radius - u.radius - 0.05;
@@ -1622,6 +1645,7 @@ export class Sim implements SimView {
       u.action = null;
       u.moving = false;
       u.chainSkillPhase = undefined;
+      u.chainSkillUntilTick = undefined;
       if (u.fighterId === 'chainer' && u.copiedSuperId) {
         u.copiedSuperId = undefined;
         u.copiedSuperExpiresTick = undefined;
@@ -1708,6 +1732,7 @@ export class Sim implements SimView {
       u.action = null;
       u.moving = false;
       u.chainSkillPhase = undefined;
+      u.chainSkillUntilTick = undefined;
       u.chainSkillReadyTick = undefined;
       u.passiveStacks = 0;
       u.copiedSuperId = undefined;

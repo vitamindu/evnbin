@@ -56,9 +56,11 @@ export interface Fighter extends UnitBase {
   superCharge: number;
   /** Chainer: 기본 공격에 쓸 사슬 원형 타격 중첩 */
   passiveStacks?: number;
-  /** Chainer: E 사슬 비행 중, 적중 뒤 W 재입력 대기 */
-  chainSkillPhase?: 'chainFlight' | 'w';
-  /** Chainer E/W 공유 쿨타임 종료 틱 */
+  /** Chainer 콤보: E1을 쓴 뒤 E2 대기('chain') → 사슬 비행('chainFlight') → 적중 뒤 W 대기('w'). 없으면 E1 단계 */
+  chainSkillPhase?: 'chain' | 'chainFlight' | 'w';
+  /** E2·W 대기가 끝나는 틱(넘기면 콤보 종료) */
+  chainSkillUntilTick?: number;
+  /** Chainer E1 재사용 가능 틱(콤보가 끝난 뒤부터 센다) */
   chainSkillReadyTick?: number;
   /** Chainer 궁극기로 복사한 파이터. 만료 때 지운다 */
   copiedSuperId?: FighterId;

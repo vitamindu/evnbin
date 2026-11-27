@@ -69,13 +69,20 @@ test('CHAINER Q·E: 총알이 아니라 사슬(조준 미리보기, 내리치기
       });
       return n;
     });
-  // 조준 미리보기: 원 + 사슬 두 가닥
-  await page.evaluate(() => {
-    const b = (window as QaWindow).__fgBattle!;
-    b.view.setAim({ unitId: b.playerId, which: 'attack', aim: { x: 0, y: -1 } });
-  });
-  await page.waitForTimeout(300);
-  expect(await chainMeshes()).toBe(2);
+  // 조준 미리보기: 원 + 사슬 두 가닥(화면이 조준을 지울 수 있어 걸어 가며 기다린다)
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(() => {
+          const b = (window as QaWindow).__fgBattle!;
+          b.view.setAim({ unitId: b.playerId, which: 'attack', aim: { x: 0, y: -1 } });
+        });
+        await page.waitForTimeout(150);
+        return chainMeshes();
+      },
+      { timeout: 5000 },
+    )
+    .toBe(2);
   await page.screenshot({ path: testInfo.outputPath('chainer-q-aim.png') });
   await page.evaluate(() => (window as QaWindow).__fgBattle!.view.setAim(null));
   // Q: 투사체가 아니라 바닥 내리치기 + 사슬 두 가닥
@@ -102,8 +109,10 @@ test('CHAINER Q·E: 총알이 아니라 사슬(조준 미리보기, 내리치기
   await page.screenshot({ path: testInfo.outputPath('chainer-q-burst.png') });
   expect(await page.evaluate(burstCount)).toBeLessThanOrEqual(1);
   await page.waitForTimeout(900);
-  // E: 던진 사슬(투사체 1개 + 사슬 1줄). 던진 직후 같은 화면에서 사슬을 센다
-  await page.evaluate(() => (window as QaWindow).__fgBattle!.queueSkill({ x: -1, y: 0 }));
+  // E2: 던진 사슬(투사체 1개 + 사슬 1줄). 던진 직후 같은 화면에서 사슬을 센다
+  await page.evaluate(() => (window as QaWindow).__fgBattle!.queueSkill({ x: -1, y: 0 })); // E1(짧은 돌진)
+  await page.waitForFunction(() => (window as QaWindow).__fgBattle!.player.chainSkillPhase === 'chain' && !(window as QaWindow).__fgBattle!.player.action, null, { polling: 'raf' });
+  await page.evaluate(() => (window as QaWindow).__fgBattle!.queueSkill({ x: -1, y: 0 })); // E2(사슬 던지기)
   await page.waitForFunction(() => (window as QaWindow).__fgBattle!.sim.projectiles.some((p) => p.chainSkill), null, { polling: 'raf' });
   await page.waitForTimeout(40);
   expect(await chainMeshes()).toBe(1);

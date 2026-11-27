@@ -47,54 +47,108 @@ describe('CHAINER', () => {
     expect(c!.hp).toBe(c!.maxHp);
   });
 
-  it('E: 사슬을 던져 맞히면 내가 그 대상에게 날아간다(기절, 이어서 W로 최대 체력 비율 피해+회복)', () => {
-    const sim = duel(5);
+  const skill = (id: number) => ({ [id]: { move: { x: 0, y: 0 }, skill: { aim: { x: 1, y: 0 } } } });
+  const SEC = 30;
+
+  it('E1: 짧게 돌진하고(스택 +1) E2 대기로 넘어간다, E2·W는 제한 시간(comboWindow)이 있다', () => {
+    const sim = duel(10);
+    const [me] = fighters(sim);
+    const x0 = me!.pos.x;
+    tick(sim, skill(me!.id));
+    expect(me!.chainSkillPhase).toBe('chain');
+    expect(me!.passiveStacks).toBe(1);
+    expect(me!.action?.kind).toBe('chainDash');
+    runUntil(sim, () => me!.action === null, 30);
+    expect(me!.pos.x - x0).toBeCloseTo(KIT.dashRange, 1);
+    expect(me!.chainSkillUntilTick! - sim.tick).toBeGreaterThan((KIT.comboWindow - 0.5) * SEC);
+  });
+
+  it('E2를 5초 안에 못 쓰면 콤보가 끝나고 그 순간부터 E1 재사용 대기시간 7초', () => {
+    const sim = duel(10);
+    const [me] = fighters(sim);
+    tick(sim, skill(me!.id));
+    const startTick = sim.tick;
+    run(sim, KIT.comboWindow * SEC - 3);
+    expect(me!.chainSkillPhase).toBe('chain'); // 아직 E2 가능
+    run(sim, 6);
+    expect(me!.chainSkillPhase).toBeUndefined();
+    const ended = me!.chainSkillReadyTick! - KIT.skillCooldown * SEC;
+    expect(ended).toBeGreaterThanOrEqual(startTick + KIT.comboWindow * SEC);
+    expect(ended).toBeLessThanOrEqual(sim.tick);
+    // 대기시간 중에는 E1을 못 쓴다
+    tick(sim, skill(me!.id));
+    expect(me!.chainSkillPhase).toBeUndefined();
+    runUntil(sim, () => sim.tick >= me!.chainSkillReadyTick!, 400);
+    tick(sim, skill(me!.id));
+    expect(me!.chainSkillPhase).toBe('chain');
+  });
+
+  it('E2를 못 맞히면 곧바로 E1 대기시간 7초 단계(날아가지 않는다)', () => {
+    const sim = duel(10);
+    const [me] = fighters(sim);
+    tick(sim, skill(me!.id));
+    runUntil(sim, () => me!.action === null, 30);
+    const x1 = me!.pos.x;
+    tick(sim, skill(me!.id)); // E2: 맞을 상대가 없다
+    expect(sim.projectiles).toHaveLength(1);
+    expect(me!.chainSkillPhase).toBe('chainFlight');
+    run(sim, 30);
+    expect(me!.pos.x).toBeCloseTo(x1, 5);
+    expect(me!.chainSkillPhase).toBeUndefined();
+    expect(me!.chainSkillReadyTick! - sim.tick).toBeGreaterThan((KIT.skillCooldown - 1.2) * SEC);
+  });
+
+  it('E2를 맞히면 내가 대상에게 날아가고(기절) W 대기 5초, 이어서 W로 최대 체력 비율 피해+회복 뒤 E1 대기시간', () => {
+    const sim = duel(5); // E1 돌진 뒤 E2 사거리 안
     const [me, foe] = fighters(sim);
     me!.hp = 1000;
-    const x0 = me!.pos.x;
-    const skill = { [me!.id]: { move: { x: 0, y: 0 }, skill: { aim: { x: 1, y: 0 } } } };
-    tick(sim, skill);
-    expect(sim.projectiles).toHaveLength(1);
+    tick(sim, skill(me!.id)); // E1
+    runUntil(sim, () => me!.action === null, 30);
+    const x1 = me!.pos.x;
+    tick(sim, skill(me!.id)); // E2
     expect(sim.projectiles[0]).toMatchObject({ chainSkill: true, damage: KIT.chainDamage });
-    expect(me!.chainSkillPhase).toBe('chainFlight');
-    expect(me!.passiveStacks).toBe(1);
     const events = runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
     expect(foe!.maxHp - foe!.hp).toBe(KIT.chainDamage);
     expect(ofType(events, 'stun')).toHaveLength(1);
-    // 대상에게 날아간다: 맞은 뒤 돌진 행동이 시작되고, 끝나면 대상 바로 앞에 선다
-    expect(me!.action?.kind).toBe('chainDash');
+    expect(me!.action?.kind).toBe('chainDash'); // 대상에게 날아간다
     runUntil(sim, () => me!.action === null, 30);
-    expect(me!.pos.x).toBeGreaterThan(x0 + 3);
+    expect(me!.pos.x).toBeGreaterThan(x1 + 1);
     expect(Math.hypot(foe!.pos.x - me!.pos.x, foe!.pos.y - me!.pos.y)).toBeLessThan(me!.radius + foe!.radius + 0.2);
+    expect(me!.chainSkillUntilTick! - sim.tick).toBeLessThanOrEqual(KIT.comboWindow * SEC);
 
     const beforeFoe = foe!.hp;
     const beforeMe = me!.hp;
-    const wEvents = tick(sim, skill);
+    const wEvents = tick(sim, skill(me!.id)); // W
     const damage = Math.round(foe!.maxHp * KIT.wMaxHpDamage);
     expect(beforeFoe - foe!.hp).toBe(damage);
     expect(me!.hp - beforeMe).toBe(damage);
     expect(ofType(wEvents, 'heal')).toEqual([expect.objectContaining({ targetId: me!.id, amount: damage })]);
     expect(me!.passiveStacks).toBe(2);
+    expect(me!.chainSkillPhase).toBeUndefined();
+    expect(me!.chainSkillReadyTick! - sim.tick).toBeGreaterThan((KIT.skillCooldown - 0.2) * SEC);
 
     const hpBeforeAttack = foe!.hp;
-    run(sim, 20); // 전 행동이 끝나길 기다린다
+    run(sim, 20);
     tick(sim, { [me!.id]: attack({ x: 1, y: 0 }) });
-    run(sim, 20); // 내리치기가 터진다
+    run(sim, 20);
     expect(me!.passiveStacks).toBe(1);
     expect(foe!.hp).toBeLessThan(hpBeforeAttack);
   });
 
-  it('E: 못 맞히면 날아가지 않고 사거리 끝에서 끝나며, 쿨타임 동안은 다시 못 던진다', () => {
-    const sim = duel(10);
+  it('W를 5초 안에 안 쓰면 콤보가 끝나고 E1 대기시간 7초', () => {
+    const sim = duel(5);
     const [me] = fighters(sim);
-    const x0 = me!.pos.x;
-    const skill = { [me!.id]: { move: { x: 0, y: 0 }, skill: { aim: { x: 1, y: 0 } } } };
-    tick(sim, skill);
-    run(sim, 30);
-    expect(me!.pos.x).toBeCloseTo(x0, 5);
+    tick(sim, skill(me!.id));
+    runUntil(sim, () => me!.action === null, 30);
+    tick(sim, skill(me!.id));
+    runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
+    runUntil(sim, () => me!.action === null, 30);
+    const until = me!.chainSkillUntilTick!;
+    run(sim, until - sim.tick - 3);
+    expect(me!.chainSkillPhase).toBe('w'); // 5초가 다 되기 직전까지는 W 가능
+    run(sim, 6);
     expect(me!.chainSkillPhase).toBeUndefined();
-    tick(sim, skill);
-    expect(sim.projectiles).toHaveLength(0); // 쿨타임
+    expect(me!.chainSkillReadyTick! - sim.tick).toBeGreaterThan((KIT.skillCooldown - 0.5) * SEC);
   });
 
   it('R: 같은 CHAINER에게 쓰면 무효(복사 없음, 게이지는 이미 쓴 상태)', () => {
