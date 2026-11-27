@@ -160,6 +160,24 @@ describe('CHAINER', () => {
     expect(me!.ammo).toBeLessThan(me!.maxAmmo); // 평타 탄 하나는 쓴다
   });
 
+  it('W는 대상 최대 체력 비율 피해라서 캐릭터 레벨 배율을 곱하지 않는다(레벨 11도 같음)', () => {
+    const wDamage = (power: number) => {
+      const sim = duel(5, 'boulder');
+      const [me, foe] = fighters(sim);
+      (me as { power?: number }).power = power;
+      tick(sim, skill(me!.id));
+      runUntil(sim, () => me!.action === null, 30);
+      tick(sim, skill(me!.id));
+      runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
+      runUntil(sim, () => me!.action === null, 30);
+      const before = foe!.hp;
+      tick(sim, skill(me!.id));
+      return before - foe!.hp;
+    };
+    expect(wDamage(1)).toBe(Math.round(5600 * KIT.wMaxHpDamage));
+    expect(wDamage(11)).toBe(wDamage(1));
+  });
+
   it('W를 5초 안에 안 쓰면 콤보가 끝나고 E1 대기시간 7초', () => {
     const sim = duel(5);
     const [me] = fighters(sim);

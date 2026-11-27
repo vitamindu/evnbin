@@ -54,6 +54,7 @@ test('TRUE FORM REAPER: 전설 스킨 모델·이펙트가 연습장에서 보�
 });
 
 test('CHAINER Q·E: 총알이 아니라 사슬(조준 미리보기, 내리치기, 던진 사슬)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000); // 조준·내리치기·던지기를 차례로 확인하느라 길다(약 40초). 기기가 느릴 때를 대비
   await page.addInitScript(([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer' })), [PROFILE_KEY]);
   await page.goto('/?qa');
   await tapToLobby(page);
@@ -176,7 +177,7 @@ test('CHAINER R: 총알이 아니라 사슬 한 줄(단사슬)이 날아간다',
   await page.screenshot({ path: testInfo.outputPath('chainer-r.png') });
 });
 
-test('CRIMSON WARLORD(Chainer 전설 스킨): 사슬·회오리가 스킨 이미지로 그려진다', async ({ page }, testInfo) => {
+test('CRIMSON CHAINER(Chainer 전설 스킨): 사슬·회오리가 스킨 이미지로 그려진다', async ({ page }, testInfo) => {
   await page.addInitScript(
     ([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer', skins: ['chainer_crimson'], skinSel: { chainer: 'chainer_crimson' } })),
     [PROFILE_KEY],

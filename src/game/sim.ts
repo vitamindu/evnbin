@@ -885,7 +885,7 @@ export class Sim implements SimView {
       if (!target) return;
       this.markCombat(f);
       const amount = Math.round(target.maxHp * kit.wMaxHpDamage);
-      const dealt = this.damage(target, amount, f.id, false);
+      const dealt = this.damage(target, amount, f.id, false, undefined, false); // 최대 체력 비율 피해: 레벨 배율 없음
       if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
       this.addChainStack(f);
       this.endChainCombo(f);
@@ -1635,11 +1635,12 @@ export class Sim implements SimView {
     }
   }
 
-  private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean, superSourceId?: FighterId): number {
+  /** scaleByPower=false: 대상 최대 체력 비율로 정해진 피해(Chainer W)는 캐릭터 레벨 배율을 또 곱하지 않는다 */
+  private damage(u: Unit, amount: number, sourceId: EntityId, isSuper: boolean, superSourceId?: FighterId, scaleByPower = true): number {
     if (!isHittable(u) || amount <= 0 || this.over) return 0;
     // 캐릭터 레벨: 모든 피해(공격·궁극기·폭탄·지대)에 같은 배율
     const src = this.getUnit(sourceId);
-    if (src?.type === 'fighter' && src.power && src.power > 1) amount = Math.round(amount * powerMult(src.power));
+    if (scaleByPower && src?.type === 'fighter' && src.power && src.power > 1) amount = Math.round(amount * powerMult(src.power));
     const dealt = Math.min(u.hp, amount);
     u.hp = Math.max(0, u.hp - amount);
     u.lastCombatTick = this.tick;

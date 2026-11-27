@@ -74,7 +74,7 @@ export const SKINS: readonly SkinDef[] = [
   {
     id: 'chainer_crimson',
     fighterId: 'chainer',
-    name: 'CRIMSON WARLORD',
+    name: 'CRIMSON CHAINER',
     price: RARITY_PRICE.legendary,
     rarity: 'legendary',
     model: { type: 'glb', body: 'models/chainer_crimson.glb' },
