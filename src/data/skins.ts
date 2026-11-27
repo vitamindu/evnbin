@@ -34,6 +34,8 @@ export interface SkinEffects {
   trail?: string;
   hit?: string;
   superCast?: string;
+  /** 스킨 이펙트의 어두운 정도(0~1): 팀 색을 검은색 쪽으로 (1 - shade)만큼 섞는다. 없으면 기본 밝은 팀 색. 작을수록 검은 느낌, 색조는 팀 색(우리 파랑 / 상대 빨강) 그대로 */
+  shade?: number;
   /** Chainer: 모든 사슬(Q·E2·R·조준)을 이 이미지로 그린다. 가로로 눕힌 사슬(왼쪽→오른쪽), 길이에 맞춰 이어 붙인다 */
   chain?: string;
   /** Chainer 패시브(원형 타격): 빠르게 도는 소용돌이 고리 이미지(정사각, 가운데 정렬) */
@@ -83,6 +85,7 @@ export const SKINS: readonly SkinDef[] = [
       whirl: 'effects/chainer_crimson/whirl.png',
       wave: 'effects/chainer_crimson/wave.png',
       blast: 'effects/chainer_crimson/blast.png',
+      shade: 0.5,
     },
   },
 ];

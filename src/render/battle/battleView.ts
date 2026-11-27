@@ -529,7 +529,7 @@ export class BattleView {
           if (e.spreadDeg >= 360 && u?.type === 'fighter' && getFighter(u.fighterId).chainKit) {
             if (fx?.whirl) this.whirlImage(e.unitId, e.range, fx.whirl);
             else this.chainWhirl(e.unitId, e.range);
-          } else if (e.at && fx?.wave) this.waveImage(e.at, this.shotColor(this.units.get(e.unitId)?.unit), fx.wave);
+          } else if (e.at && fx?.wave) this.waveImage(e.at, this.shotColor(this.units.get(e.unitId)?.unit), fx.wave, e.unitId);
           else this.arc(e.unitId, e.dir, e.range, e.spreadDeg);
           break;
         }
@@ -953,17 +953,27 @@ export class BattleView {
     return m;
   }
 
+  /**
+   * 스킨 이펙트 색. 스킨에 shade(0~1)가 있으면 팀 색을 거의 검은색 쪽으로 (1 - shade)만큼 섞어 어둡고 탁하게 만든다
+   * (작을수록 검다). 없으면 팀 색에 fallback 밝기를 곱한다. 색조는 팀 색 그대로라 우리 파랑 / 상대 빨강 규칙은 유지된다.
+   */
+  private fxColor(ownerId: EntityId | undefined, teamColor: string, fallback: number): THREE.Color {
+    const shade = ownerId !== undefined ? this.skinFx(ownerId)?.shade : undefined;
+    const c = new THREE.Color(teamColor);
+    return shade === undefined ? c.multiplyScalar(fallback) : c.lerp(new THREE.Color('#101018'), 1 - shade);
+  }
+
   /** 사슬 한 가닥: 소유자의 스킨에 사슬 이미지가 있으면 이미지 사슬, 없으면 3D 고리 사슬 */
   private makeChain(ownerId: EntityId | undefined, color: string, opacity = 1, width = 0.55): ChainPath {
     const path = ownerId !== undefined ? this.skinFx(ownerId)?.chain : undefined;
-    return path ? new ChainSprite(this.fxTexture(path), color, opacity, 1.9, width) : new ChainLine(this.chainMat(color, opacity));
+    return path ? new ChainSprite(this.fxTexture(path), this.fxColor(ownerId, color, 1.6), opacity, 1.9, width) : new ChainLine(this.chainMat(color, opacity));
   }
 
   /** Chainer 패시브(스킨): 소용돌이 고리 이미지가 몸 둘레에서 빠르게 돈다(두 겹이 서로 반대로) */
   private whirlImage(unitId: EntityId, range: number, path: string) {
     const v = this.units.get(unitId);
     if (!v) return;
-    const color = new THREE.Color(this.shotColor(v.unit)).lerp(new THREE.Color('#ffffff'), 0.2).multiplyScalar(1.6);
+    const color = this.fxColor(unitId, this.shotColor(v.unit), 1.6);
     const group = new THREE.Group();
     group.name = 'chain-whirl-image';
     const size = range * 2.3;
@@ -993,10 +1003,10 @@ export class BattleView {
   }
 
   /** Chainer W(스킨): 맞은 대상에게 겹쳐 터지는 충격파. 이미지의 아래쪽 끝이 터지는 중심 */
-  private waveImage(at: Vec2, teamColor: string, path: string) {
+  private waveImage(at: Vec2, teamColor: string, path: string, ownerId?: EntityId) {
     const mat = new THREE.SpriteMaterial({
       map: this.fxTexture(path),
-      color: new THREE.Color(teamColor).lerp(new THREE.Color('#ffffff'), 0.2).multiplyScalar(1.6),
+      color: this.fxColor(ownerId, teamColor, 1.6),
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -1102,7 +1112,7 @@ export class BattleView {
     const geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
       map: blast ? this.fxTexture(blast) : burstTexture(),
-      color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), blast ? 0.2 : 0.4).multiplyScalar(blast ? 1.7 : 1.4),
+      color: blast ? this.fxColor(ownerId, color, 1.7) : new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.4).multiplyScalar(1.4),
       transparent: true,
       depthWrite: false,
       depthTest: false,

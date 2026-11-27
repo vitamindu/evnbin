@@ -593,7 +593,7 @@ export const FIGHTERS: readonly FighterDef[] = [
     moveSpeed: 2.5,
     attack: {
       name: 'Chain Burst',
-      description: '조준한 바닥(최대 5칸)을 사슬로 내리쳐요. 사슬에 닿으면 500, 0.75초 뒤 사슬이 만난 자리가 터져 작은 원 안의 모든 적이 동시에 750 피해를 받아요.',
+      description: '조준한 바닥(최대 5칸)을 사슬로 내리쳐요. 사슬에 닿으면 250, 0.75초 뒤 사슬이 만난 자리가 터져 작은 원 안의 모든 적이 동시에 750 피해를 받아요.',
       kind: 'chain',
       damage: 750,
       count: 1,
@@ -604,7 +604,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       ammo: 3,
       reload: 2.1,
       superChargePerHit: 0.05,
-      chainSlam: { radius: 0.65, delay: 0.75, chainDamage: 500 },
+      chainSlam: { radius: 0.65, delay: 0.75, chainDamage: 250 }, // 11레벨(×2) 기준 사슬 500 + 폭발 1500
     },
     super: {
       name: 'Stolen Force',

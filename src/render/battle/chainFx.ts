@@ -124,19 +124,19 @@ export function burstTexture(): THREE.CanvasTexture {
 /**
  * 스킨 이미지로 그린 사슬: 가로로 눕힌 사슬 이미지를 길이에 맞춰 이어 붙인 납작한 띠.
  * segLen: 이미지 한 장이 차지하는 길이(타일), width: 띠 굵기(타일). 이미지 왼쪽이 a, 오른쪽이 b 쪽이다.
- * 이미지는 흑백이라 color(팀 색)를 곱해 칠한다. 이어 붙이는 이음매는 따로 맞추지 않는다.
+ * 이미지는 흑백이라 color(팀 색, 밝기는 부르는 쪽이 정한다)를 곱해 칠한다. 이어 붙이는 이음매는 따로 맞추지 않는다.
  */
 export class ChainSprite implements ChainPath {
   readonly mesh: THREE.Mesh;
   private readonly geo: THREE.PlaneGeometry;
   private readonly mat: THREE.MeshBasicMaterial;
 
-  constructor(map: THREE.Texture, color: THREE.ColorRepresentation, opacity = 1, private readonly segLen = 1.9, width = 0.5) {
+  constructor(map: THREE.Texture, color: THREE.Color, opacity = 1, private readonly segLen = 1.9, width = 0.5) {
     map.wrapS = THREE.RepeatWrapping;
     this.geo = new THREE.PlaneGeometry(1, width).rotateX(-Math.PI / 2);
     this.mat = new THREE.MeshBasicMaterial({
       map,
-      color: new THREE.Color(color).multiplyScalar(1.6),
+      color: color.clone(),
       transparent: true,
       opacity,
       depthWrite: false,
