@@ -139,8 +139,8 @@ describe('CHAINER', () => {
     const beforeFoe = foe!.hp;
     const beforeMe = me!.hp;
     const wEvents = tick(sim, skill(me!.id)); // W
-    const damage = Math.round((foe!.maxHp - beforeFoe) * KIT.wLostHpDamage); // 잃은 체력의 25%
-    expect(damage).toBeGreaterThan(0);
+    const damage = KIT.wFlatDamage + Math.round((foe!.maxHp - beforeFoe) * KIT.wLostHpDamage); // 깡딜 + 잃은 체력의 25%(레벨 1)
+    expect(damage).toBeGreaterThan(KIT.wFlatDamage);
     expect(beforeFoe - foe!.hp).toBe(damage);
     expect(me!.hp - beforeMe).toBe(damage);
     expect(ofType(wEvents, 'heal')).toEqual([expect.objectContaining({ targetId: me!.id, amount: damage })]);
@@ -161,7 +161,7 @@ describe('CHAINER', () => {
     expect(me!.ammo).toBeLessThan(me!.maxAmmo); // 평타 탄 하나는 쓴다
   });
 
-  it('W는 대상이 잃은 체력 비율 피해라서 캐릭터 레벨 배율을 곱하지 않는다(레벨 11도 같음)', () => {
+  it('W: 깡딜은 캐릭터 레벨 배율을 받고(11레벨 300), 잃은 체력 비례분은 받지 않는다', () => {
     const wDamage = (power: number) => {
       const sim = duel(5, 'boulder');
       const [me, foe] = fighters(sim);
@@ -175,11 +175,12 @@ describe('CHAINER', () => {
       tick(sim, skill(me!.id));
       return 3000 - foe!.hp;
     };
-    expect(wDamage(1)).toBe(Math.round(2600 * KIT.wLostHpDamage)); // 650
-    expect(wDamage(11)).toBe(wDamage(1));
+    const lost = Math.round(2600 * KIT.wLostHpDamage); // 650(레벨과 무관)
+    expect(wDamage(1)).toBe(KIT.wFlatDamage + lost); // 150 + 650
+    expect(wDamage(11)).toBe(KIT.wFlatDamage * 2 + lost); // 11레벨: 깡딜 300 + 650
   });
 
-  it('W: 체력이 가득 찬 대상에게는 피해·회복이 0(잃은 체력이 없다), 콤보는 끝난다', () => {
+  it('W: 체력이 가득 찬 대상에게는 깡딜만 들어간다(잃은 체력이 없다), 콤보는 끝난다', () => {
     const sim = duel(5, 'boulder');
     const [me, foe] = fighters(sim);
     tick(sim, skill(me!.id));
@@ -190,8 +191,8 @@ describe('CHAINER', () => {
     foe!.hp = foe!.maxHp;
     me!.hp = 1000;
     tick(sim, skill(me!.id));
-    expect(foe!.hp).toBe(foe!.maxHp);
-    expect(me!.hp).toBe(1000);
+    expect(foe!.maxHp - foe!.hp).toBe(KIT.wFlatDamage);
+    expect(me!.hp).toBe(1000 + KIT.wFlatDamage); // 준 피해만큼 회복
     expect(me!.chainSkillPhase).toBeUndefined();
   });
 
