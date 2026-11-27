@@ -119,26 +119,59 @@ test('CHAINER Q·E: 총알이 아니라 사슬(조준 미리보기, 내리치기
   await page.screenshot({ path: testInfo.outputPath('chainer-e.png') });
 });
 
-test('CHAINER 패시브: 사슬을 빠르게 휘두르는 회오리(원형 타격)', async ({ page }, testInfo) => {
+test('CHAINER 패시브: 중첩이 있으면 Q 내리치기 없이 궤도를 도는 빛줄기만 나간다', async ({ page }, testInfo) => {
   await page.addInitScript(([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer' })), [PROFILE_KEY]);
   await page.goto('/?qa');
   await tapToLobby(page);
   await page.locator('.btn-play').tap();
   await waitBattleReady(page, 'chainer');
-  const whirlChains = () =>
+  const whirls = () =>
     page.evaluate(() => {
       let n = 0;
       (window as QaWindow).__fgBattle!.view.scene.traverse((o) => {
-        if ((o as { isInstancedMesh?: boolean }).isInstancedMesh && o.renderOrder === 5 && (o as { count: number }).count > 0) n++;
+        if (o.name === 'chain-whirl') n++;
       });
       return n;
     });
-  // 패시브 중첩이 있어야 기본 공격에 회오리가 붙는다
+  // 패시브 중첩이 있어야 기본 공격이 회오리로 나간다
   await page.evaluate(() => ((window as QaWindow).__fgBattle!.player.passiveStacks = 1));
   await page.keyboard.press('Space');
-  // 내리치기 사슬 2줄 + 회오리 사슬 6줄이 동시에 보이는 순간
-  await expect.poll(whirlChains, { timeout: 3000 }).toBeGreaterThanOrEqual(8);
-  await page.waitForTimeout(80);
-  await page.screenshot({ path: testInfo.outputPath('chainer-whirl.png') });
+  await expect.poll(whirls, { timeout: 3000 }).toBe(1);
+  expect(await page.evaluate(() => (window as QaWindow).__fgBattle!.sim.lobs.length)).toBe(0); // Q는 안 나갔다
   await expect.poll(() => page.evaluate(() => (window as QaWindow).__fgBattle!.player.passiveStacks)).toBe(0);
+  // 중첩이 없으면 다시 Q 내리치기
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Space');
+  await expect
+    .poll(() => page.evaluate(() => (window as QaWindow).__fgBattle!.sim.lobs.filter((l) => l.slam).length), { timeout: 3000 })
+    .toBe(1);
+});
+
+test('CHAINER R: 총알이 아니라 사슬 한 줄(단사슬)이 날아간다', async ({ page }, testInfo) => {
+  await page.addInitScript(([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer' })), [PROFILE_KEY]);
+  await page.goto('/?qa');
+  await tapToLobby(page);
+  await page.locator('.btn-play').tap();
+  await waitBattleReady(page, 'chainer');
+  await page.evaluate(() => ((window as QaWindow).__fgBattle!.player.superCharge = 1));
+  await page.keyboard.press('e'); // 자동 조준 궁극기
+  // 복사 사슬 투사체가 떠 있는 동안: 사슬 메시 정확히 1개(한 줄), 총알 모양 탄 없음
+  const seen = await page.waitForFunction(
+    () => {
+      const b = (window as QaWindow).__fgBattle!;
+      if (!b.sim.projectiles.some((p) => p.stealsSuper)) return false;
+      let chains = 0;
+      b.view.scene.traverse((o) => {
+        if ((o as { isInstancedMesh?: boolean }).isInstancedMesh && o.renderOrder === 5 && (o as { count: number }).count > 0) {
+          for (let p: typeof o | null = o; p; p = p.parent) if (!p.visible) return;
+          chains++;
+        }
+      });
+      return chains;
+    },
+    null,
+    { polling: 'raf', timeout: 5000 },
+  );
+  expect(await seen.jsonValue()).toBe(1);
+  await page.screenshot({ path: testInfo.outputPath('chainer-r.png') });
 });

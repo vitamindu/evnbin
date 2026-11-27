@@ -338,8 +338,10 @@ export class BattleInput {
       const sourceId = t.which === 'super' ? s.player.copiedSuperId : undefined;
       const skillPhase = s.player.chainSkillPhase;
       const skillKit = getFighter(s.player.fighterId).chainKit;
-      const range = t.which === 'skill' ? (skillPhase === 'w' ? skillKit?.wRange : skillPhase === 'chain' ? skillKit?.chainRange : skillKit?.dashRange) : undefined;
-      const kindOverride = t.which === 'skill' ? (skillPhase === 'w' ? 'melee' : skillPhase === 'chain' ? 'chain' : 'dash') : undefined;
+      // Chainer 패시브 중첩이 있으면 평타 조준은 내 주변 원(Q 내리치기가 아니라 회오리)
+      const passiveAim = t.which === 'attack' && s.player.fighterId === 'chainer' && (s.player.passiveStacks ?? 0) > 0;
+      const range = passiveAim ? skillKit?.passiveRadius : t.which === 'skill' ? (skillPhase === 'w' ? skillKit?.wRange : skillPhase === 'chain' ? skillKit?.chainRange : skillKit?.dashRange) : undefined;
+      const kindOverride = passiveAim ? 'melee' : t.which === 'skill' ? (skillPhase === 'w' ? 'melee' : skillPhase === 'chain' ? 'chain' : 'dash') : undefined;
       s.view.setAim((manual || ballCarrier) && !t.cancel && !t.dead ? { unitId: s.playerId, which: t.which === 'super' ? 'super' : 'attack', aim: t.aim, ...(sourceId ? { superSourceId: sourceId } : {}), ...(range ? { range } : {}), ...(kindOverride ? { kindOverride } : {}) } : null);
     }
   }

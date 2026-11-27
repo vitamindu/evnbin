@@ -964,46 +964,72 @@ export class BattleView {
   }
 
   /**
-   * Chainer 패시브: 사슬 여섯 가닥을 빠르게 360도로 휘둘러 회오리처럼 보이게 한다.
-   * 가닥마다 높이와 길이가 달라(위로 갈수록 길다) 나선형으로 말려 올라가는 모양이고, 0.4초 동안 두 바퀴 반을 돈다.
-   * 가닥은 매 프레임 쓴 사람의 현재 위치를 중심으로 다시 놓는다.
+   * Chainer 패시브: 사슬이 몸 둘레의 원 궤도를 따라 고속으로 돈다. 사슬 모양은 거의 안 보이고,
+   * 유성우처럼 꼬리를 끄는 빛줄기 열 개가 궤도를 돌며 지나간다(머리에 아주 짧은 사슬 조각만 비친다).
+   * 빛줄기마다 궤도 반지름·속도·높이·꼬리 길이가 달라 겹겹이 흩날리는 느낌이다. 0.4초.
+   * 중심은 매 프레임 쓴 사람의 현재 위치다.
    */
   private chainWhirl(unitId: EntityId, range: number) {
     const v = this.units.get(unitId);
     if (!v) return;
     const color = this.shotColor(v.unit);
-    const mat = this.chainMat(color, 1).clone();
-    mat.transparent = true;
     const group = new THREE.Group();
-    const chains = Array.from({ length: 6 }, () => {
-      const c = new ChainLine(mat);
-      group.add(c.mesh);
-      return c;
+    group.name = 'chain-whirl';
+    const trailMat = this.glow(color).trail.clone();
+    const linkMat = this.chainMat(color, 1).clone();
+    linkMat.transparent = true;
+    const N = 10;
+    const geos: THREE.BufferGeometry[] = [];
+    const streaks = Array.from({ length: N }, (_, i) => {
+      const len = 1.0 + (i % 3) * 0.4;
+      const geo = trailGeometry(len, 0.34, 0.03);
+      geos.push(geo);
+      const trail = new THREE.Mesh(geo, trailMat);
+      trail.renderOrder = 6;
+      const link = new ChainLine(linkMat);
+      group.add(trail, link.mesh);
+      return {
+        trail,
+        link,
+        phase: (i / N) * Math.PI * 2 + (i % 3) * 0.35,
+        turns: 2.6 + (i % 4) * 0.45, // 0.4초 동안 도는 바퀴 수(고속)
+        r: range * (0.78 + 0.22 * (i / (N - 1))),
+        y: 0.3 + (i % 5) * 0.11,
+      };
     });
-    const ringGeo = new THREE.RingGeometry(range - 0.08, range, 48).rotateX(-Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, depthWrite: false, depthTest: false });
+    const ringGeo = new THREE.RingGeometry(range - 0.05, range, 56).rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, depthWrite: false, depthTest: false });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.renderOrder = 4;
     group.add(ring);
+    trailMat.depthTest = false;
     this.addEffect(group, 0.4, (k) => {
       const p = v.model.root.position;
-      const spin = k * Math.PI * 5;
-      chains.forEach((c, i) => {
-        const a = spin + (i * Math.PI * 2) / chains.length;
-        const len = range * (0.55 + 0.45 * (i / (chains.length - 1)));
-        const y = 0.25 + i * 0.13;
-        c.setPath({ x: p.x, y, z: p.z }, { x: p.x + Math.cos(a) * len, y: y + 0.08, z: p.z + Math.sin(a) * len }, 1);
-      });
+      for (const st of streaks) {
+        const a = st.phase + k * st.turns * Math.PI * 2;
+        const hx = p.x + Math.cos(a) * st.r;
+        const hz = p.z + Math.sin(a) * st.r;
+        st.trail.position.set(hx, st.y, hz);
+        st.trail.rotation.y = -(a + Math.PI / 2); // 진행 방향(반시계)으로 꼬리가 뒤에 남는다
+        const back = a - 0.5 / st.r;
+        st.link.setPath(
+          { x: p.x + Math.cos(back) * st.r, y: st.y, z: p.z + Math.sin(back) * st.r },
+          { x: hx, y: st.y, z: hz },
+          1,
+        );
+      }
       ring.position.set(p.x, 0.05, p.z);
-      ring.scale.setScalar(0.5 + 0.5 * Math.min(1, k * 3));
       const fade = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
-      mat.opacity = fade;
-      ringMat.opacity = 0.4 * fade;
+      trailMat.opacity = fade;
+      linkMat.opacity = 0.7 * fade;
+      ringMat.opacity = 0.25 * fade;
     }, () => {
-      for (const c of chains) c.dispose();
+      for (const st of streaks) st.link.dispose();
+      for (const g of geos) g.dispose();
       ringGeo.dispose();
       ringMat.dispose();
-      mat.dispose();
+      trailMat.dispose();
+      linkMat.dispose();
     });
   }
 

@@ -127,12 +127,15 @@ describe('CHAINER', () => {
     expect(me!.chainSkillPhase).toBeUndefined();
     expect(me!.chainSkillReadyTick! - sim.tick).toBeGreaterThan((KIT.skillCooldown - 0.2) * SEC);
 
+    // 패시브 평타: 중첩이 있으면 Q 내리치기는 나가지 않고, 주변 원형 타격만 나간다
     const hpBeforeAttack = foe!.hp;
     run(sim, 20);
-    tick(sim, { [me!.id]: attack({ x: 1, y: 0 }) });
-    run(sim, 20);
+    const ev = [...tick(sim, { [me!.id]: attack({ x: 1, y: 0 }) }), ...run(sim, 20)];
+    expect(sim.lobs).toHaveLength(0);
     expect(me!.passiveStacks).toBe(1);
-    expect(foe!.hp).toBeLessThan(hpBeforeAttack);
+    expect(ofType(ev, 'melee')).toEqual([expect.objectContaining({ unitId: me!.id, spreadDeg: 360, range: KIT.passiveRadius })]);
+    expect(hpBeforeAttack - foe!.hp).toBe(KIT.passiveDamage);
+    expect(me!.ammo).toBeLessThan(me!.maxAmmo); // 평타 탄 하나는 쓴다
   });
 
   it('W를 5초 안에 안 쓰면 콤보가 끝나고 E1 대기시간 7초', () => {

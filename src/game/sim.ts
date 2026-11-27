@@ -815,6 +815,12 @@ export class Sim implements SimView {
     f.facing = dir;
     this.markCombat(f);
     this.events.push({ type: 'attack', unitId: f.id, isSuper, dir });
+    // Chainer 패시브 평타: 중첩이 있으면 이번 평타는 주변 원형 타격만 나간다(Q 내리치기는 나가지 않는다)
+    if (!isSuper && def.chainKit && f.passiveStacks && f.passiveStacks > 0) {
+      f.passiveStacks--;
+      this.doMelee(f, { ...spec, kind: 'melee', damage: def.chainKit.passiveDamage, range: def.chainKit.passiveRadius, spreadDeg: 360 }, dir);
+      return;
+    }
     switch (spec.kind) {
       case 'spread':
         this.fireSpread(f, spec, dir);
@@ -849,11 +855,6 @@ export class Sim implements SimView {
       case 'zone':
         this.placeZone(f, spec, dir, ratio);
         break;
-    }
-    if (!isSuper && def.chainKit && f.passiveStacks && f.passiveStacks > 0) {
-      f.passiveStacks--;
-      const passive = shotSpec(def, false);
-      this.doMelee(f, { ...passive, kind: 'melee', damage: def.chainKit.passiveDamage, range: def.chainKit.passiveRadius, spreadDeg: 360 }, dir);
     }
   }
 
