@@ -40,12 +40,12 @@ test('lobby: no 소식 button; 상점 opens the shop', async ({ page }) => {
   await expect(page.locator('.side-btn[data-btn="news"]')).toHaveCount(0);
   await page.locator('.side-btn[data-btn="shop"]').tap();
   await expect(page.locator('.shop-screen')).toBeVisible();
-  await expect(page.locator('.shop-card')).toHaveCount(7);
+  await expect(page.locator('.shop-card')).toHaveCount(8);
   // 스킨 카드는 기본 모델이 아니라 그 스킨 모델 초상화(카드마다 다른 이미지)
   const skinSrc = await page.locator('.shop-card.is-skin .shop-art img').evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).src));
-  expect(skinSrc).toHaveLength(2);
+  expect(skinSrc).toHaveLength(3);
   expect(skinSrc.every((src) => src.startsWith('data:image/png'))).toBe(true);
-  expect(new Set(skinSrc).size).toBe(2);
+  expect(new Set(skinSrc).size).toBe(3);
   await page.screenshot({ path: test.info().outputPath('shop-skins.png') });
   // 코인·다이아 표시를 눌러도 상점
   for (const i of [0, 1]) {

@@ -34,6 +34,14 @@ export interface SkinEffects {
   trail?: string;
   hit?: string;
   superCast?: string;
+  /** Chainer: 모든 사슬(Q·E2·R·조준)을 이 이미지로 그린다. 가로로 눕힌 사슬(왼쪽→오른쪽), 길이에 맞춰 이어 붙인다 */
+  chain?: string;
+  /** Chainer 패시브(원형 타격): 빠르게 도는 소용돌이 고리 이미지(정사각, 가운데 정렬) */
+  whirl?: string;
+  /** Chainer W: 맞은 대상에게 겹쳐 터지는 충격파(아래쪽 끝이 터지는 중심) */
+  wave?: string;
+  /** Chainer Q: 두 사슬이 만난 자리의 폭발(에너지 볼, 정사각) */
+  blast?: string;
 }
 
 export const SKINS: readonly SkinDef[] = [
@@ -61,6 +69,20 @@ export const SKINS: readonly SkinDef[] = [
       trail: 'effects/reaper/trail.png',
       superShot: 'effects/reaper/super.png',
       hit: 'effects/reaper/hit.png',
+    },
+  },
+  {
+    id: 'chainer_crimson',
+    fighterId: 'chainer',
+    name: 'CRIMSON WARLORD',
+    price: RARITY_PRICE.legendary,
+    rarity: 'legendary',
+    model: { type: 'glb', body: 'models/chainer_crimson.glb' },
+    effects: {
+      chain: 'effects/chainer_crimson/chain.png',
+      whirl: 'effects/chainer_crimson/whirl.png',
+      wave: 'effects/chainer_crimson/wave.png',
+      blast: 'effects/chainer_crimson/blast.png',
     },
   },
 ];

@@ -889,7 +889,7 @@ export class Sim implements SimView {
       if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
       this.addChainStack(f);
       this.endChainCombo(f);
-      this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24 });
+      this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24, at: { ...target.pos } });
       return;
     }
     if (f.chainSkillPhase === 'chain') {

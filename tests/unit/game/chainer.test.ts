@@ -143,6 +143,8 @@ describe('CHAINER', () => {
     expect(beforeFoe - foe!.hp).toBe(damage);
     expect(me!.hp - beforeMe).toBe(damage);
     expect(ofType(wEvents, 'heal')).toEqual([expect.objectContaining({ targetId: me!.id, amount: damage })]);
+    // W 이펙트는 맞은 대상의 위치에 겹쳐 그린다(스킨 충격파)
+    expect(ofType(wEvents, 'melee')).toEqual([expect.objectContaining({ unitId: me!.id, at: { x: foe!.pos.x, y: foe!.pos.y } })]);
     expect(me!.passiveStacks).toBe(2);
     expect(me!.chainSkillPhase).toBeUndefined();
     expect(me!.chainSkillReadyTick! - sim.tick).toBeGreaterThan((KIT.skillCooldown - 0.2) * SEC);

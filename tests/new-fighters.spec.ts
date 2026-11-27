@@ -175,3 +175,35 @@ test('CHAINER R: 총알이 아니라 사슬 한 줄(단사슬)이 날아간다',
   expect(await seen.jsonValue()).toBe(1);
   await page.screenshot({ path: testInfo.outputPath('chainer-r.png') });
 });
+
+test('CRIMSON WARLORD(Chainer 전설 스킨): 사슬·회오리가 스킨 이미지로 그려진다', async ({ page }, testInfo) => {
+  await page.addInitScript(
+    ([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer', skins: ['chainer_crimson'], skinSel: { chainer: 'chainer_crimson' } })),
+    [PROFILE_KEY],
+  );
+  await page.goto('/?qa');
+  await tapToLobby(page);
+  await page.locator('.btn-play').tap();
+  await waitBattleReady(page, 'chainer');
+  const count = (pred: string) =>
+    page.evaluate((p) => {
+      let n = 0;
+      (window as QaWindow).__fgBattle!.view.scene.traverse((o) => {
+        for (let q: typeof o | null = o; q; q = q.parent) if (!q.visible) return;
+        if (p === 'sprite' && o.userData.chainSprite) n++;
+        if (p === 'ring' && o.type === 'Group' && o.name === 'chain-whirl-image') n++;
+        if (p === 'links' && (o as { isInstancedMesh?: boolean }).isInstancedMesh && o.renderOrder === 5 && (o as { count: number }).count > 0) n++;
+      });
+      return n;
+    }, pred);
+  // Q: 3D 고리 사슬이 아니라 스킨 이미지 사슬 두 가닥
+  await page.keyboard.press('Space');
+  await expect.poll(() => count('sprite'), { timeout: 3000 }).toBe(2);
+  expect(await count('links')).toBe(0);
+  await page.screenshot({ path: testInfo.outputPath('crimson-q.png') });
+  await page.waitForTimeout(1500);
+  // 패시브: 소용돌이 고리 이미지
+  await page.evaluate(() => ((window as QaWindow).__fgBattle!.player.passiveStacks = 1));
+  await page.keyboard.press('Space');
+  await expect.poll(() => count('ring'), { timeout: 3000 }).toBe(1);
+});

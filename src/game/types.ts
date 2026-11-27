@@ -185,7 +185,7 @@ export interface FighterInput {
 /** 시뮬레이션이 매 틱 내보내는 사건(렌더링·효과음·HUD용) */
 export type SimEvent =
   | { type: 'attack'; unitId: EntityId; isSuper: boolean; dir: number }
-  | { type: 'melee'; unitId: EntityId; isSuper: boolean; dir: number; range: number; spreadDeg: number }
+  | { type: 'melee'; unitId: EntityId; isSuper: boolean; dir: number; range: number; spreadDeg: number; /** Chainer W: 맞은 대상의 위치(스킨 이펙트를 거기에 겹쳐 그린다) */ at?: Vec2 }
   | { type: 'hit'; targetId: EntityId; sourceId: EntityId; damage: number; pos: Vec2; isSuper: boolean; killed: boolean }
   | { type: 'heal'; targetId: EntityId; amount: number; pos: Vec2 }
   | { type: 'death'; unitId: EntityId; pos: Vec2 }

@@ -27,7 +27,14 @@ const Q2 = new THREE.Quaternion();
 const ONE = new THREE.Vector3(1, 1, 1);
 const M = new THREE.Matrix4();
 
-export class ChainLine {
+/** 사슬 한 가닥(3D 고리 또는 스킨 이미지). 쓰는 쪽은 둘을 구분하지 않는다 */
+export interface ChainPath {
+  readonly mesh: THREE.Object3D;
+  setPath(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, progress?: number): void;
+  dispose(): void;
+}
+
+export class ChainLine implements ChainPath {
   readonly mesh: THREE.InstancedMesh;
 
   constructor(material: THREE.Material) {
@@ -112,4 +119,62 @@ export function burstTexture(): THREE.CanvasTexture {
   burstTex = new THREE.CanvasTexture(c);
   burstTex.colorSpace = THREE.SRGBColorSpace;
   return burstTex;
+}
+
+/**
+ * 스킨 이미지로 그린 사슬: 가로로 눕힌 사슬 이미지를 길이에 맞춰 이어 붙인 납작한 띠.
+ * segLen: 이미지 한 장이 차지하는 길이(타일), width: 띠 굵기(타일). 이미지 왼쪽이 a, 오른쪽이 b 쪽이다.
+ * 이미지는 흑백이라 color(팀 색)를 곱해 칠한다. 이어 붙이는 이음매는 따로 맞추지 않는다.
+ */
+export class ChainSprite implements ChainPath {
+  readonly mesh: THREE.Mesh;
+  private readonly geo: THREE.PlaneGeometry;
+  private readonly mat: THREE.MeshBasicMaterial;
+
+  constructor(map: THREE.Texture, color: THREE.ColorRepresentation, opacity = 1, private readonly segLen = 1.9, width = 0.5) {
+    map.wrapS = THREE.RepeatWrapping;
+    this.geo = new THREE.PlaneGeometry(1, width).rotateX(-Math.PI / 2);
+    this.mat = new THREE.MeshBasicMaterial({
+      map,
+      color: new THREE.Color(color).multiplyScalar(1.6),
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    this.mesh = new THREE.Mesh(this.geo, this.mat);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 5;
+    this.mesh.userData.chainSprite = true;
+    this.mesh.visible = false;
+  }
+
+  setPath(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, progress = 1) {
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const full = Math.hypot(dx, dz);
+    const len = full * Math.max(0, Math.min(1, progress));
+    if (len < 0.05) {
+      this.mesh.visible = false;
+      return;
+    }
+    this.mesh.visible = true;
+    const k = len / full;
+    this.mesh.position.set(a.x + (dx * k) / 2, a.y + ((b.y - a.y) * k) / 2, a.z + (dz * k) / 2);
+    this.mesh.rotation.y = -Math.atan2(dz, dx);
+    this.mesh.scale.x = len;
+    // 길이만큼 이미지를 반복(오른쪽 끝 정점의 u를 늘린다)
+    const uv = this.geo.attributes.uv!;
+    const rep = len / this.segLen;
+    uv.setX(1, rep);
+    uv.setX(3, rep);
+    uv.needsUpdate = true;
+  }
+
+  dispose() {
+    this.mesh.removeFromParent();
+    this.geo.dispose();
+    this.mat.dispose();
+  }
 }

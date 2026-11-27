@@ -9,7 +9,7 @@ import { buildFighterModel, type FighterModel } from '../fighterModel';
 import { addStandardLights, toon } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
 import { buildDummyModel, type DummyModel } from './dummyModel';
-import { ChainLine, burstTexture } from './chainFx';
+import { ChainLine, ChainSprite, burstTexture, type ChainPath } from './chainFx';
 import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED, CHAIN_HAND_SPREAD, LOB_MIN_DIST } from '../../game/rules';
 
 /**
@@ -39,7 +39,7 @@ interface ShotVisual {
   prev: Vec2;
   curr: Vec2;
   /** 사슬 투사체(Chainer E·R): 쏜 사람 손에서 탄 머리까지 이어지는 사슬 */
-  chain?: ChainLine;
+  chain?: ChainPath;
   ownerId?: EntityId;
 }
 
@@ -143,7 +143,7 @@ export class BattleView {
   private readonly map: MapRenderer;
   private readonly units = new Map<EntityId, UnitVisual>();
   private readonly shots = new Map<EntityId, ShotVisual>();
-  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number; slam?: boolean; chains?: ChainLine[]; ownerId?: EntityId; color?: string; radius?: number }>();
+  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number; slam?: boolean; chains?: ChainPath[]; ownerId?: EntityId; color?: string; radius?: number }>();
   private readonly chainMats = new Map<string, THREE.MeshBasicMaterial>();
   private effects: Effect[] = [];
   private readonly shotGeo = new THREE.SphereGeometry(0.22, 14, 10);
@@ -267,7 +267,8 @@ export class BattleView {
         const owner = sim.getUnit(p.ownerId);
         const isChainShot = !!(p.chainSkill || p.stealsSuper);
         const fxSuper = p.isSuper ? this.skinFx(p.ownerId)?.superShot : undefined;
-        const obj = isChainShot ? this.buildChainHead(owner) : fxSuper ? this.buildFxShot(owner, fxSuper) : this.buildShot(owner, p.isSuper);
+        const skinChain = isChainShot && !!this.skinFx(p.ownerId)?.chain;
+        const obj = skinChain ? new THREE.Group() : isChainShot ? this.buildChainHead(owner) : fxSuper ? this.buildFxShot(owner, fxSuper) : this.buildShot(owner, p.isSuper);
         obj.rotation.y = -Math.atan2(p.vel.y, p.vel.x);
         // 넓은 탄(REAPER 궁극기 등): 판정 반지름에 맞춰 키운다
         const base = p.isSuper ? 0.24 : 0.18;
@@ -275,7 +276,7 @@ export class BattleView {
         this.scene.add(obj);
         s = { obj, prev: { ...p.pos }, curr: { ...p.pos } };
         if (isChainShot) {
-          s.chain = new ChainLine(this.chainMat(this.shotColor(owner), 1));
+          s.chain = this.makeChain(p.ownerId, this.shotColor(owner), 1, 0.45);
           s.ownerId = p.ownerId;
           this.scene.add(s.chain.mesh);
         }
@@ -376,9 +377,9 @@ export class BattleView {
         marker.position.set(l.to.x, 0.04, l.to.y);
         this.scene.add(shell, marker);
         shell.userData.baseColor = baseColor;
-        let chains: ChainLine[] | undefined;
+        let chains: ChainPath[] | undefined;
         if (l.slam) {
-          chains = [new ChainLine(this.chainMat(baseColor, 0.95)), new ChainLine(this.chainMat(baseColor, 0.95))];
+          chains = [this.makeChain(l.ownerId, baseColor, 0.95), this.makeChain(l.ownerId, baseColor, 0.95)];
           for (const c of chains) this.scene.add(c.mesh);
         }
         this.lobs.set(l.id, {
@@ -389,7 +390,7 @@ export class BattleView {
     }
     for (const [id, l] of this.lobs) {
       if (!lobSeen.has(id)) {
-        if (l.slam) this.slamImpact(l.to, l.color ?? '#ff4b4b', l.radius ?? 1);
+        if (l.slam) this.slamImpact(l.to, l.color ?? '#ff4b4b', l.radius ?? 1, l.ownerId);
         for (const c of l.chains ?? []) c.dispose();
         l.shell.removeFromParent();
         l.marker.removeFromParent();
@@ -524,7 +525,11 @@ export class BattleView {
         case 'melee': {
           // Chainer 패시브(주변 360도 원형 타격)는 사슬을 휘두르는 회오리, 그 밖은 부채꼴 휘두르기
           const u = this.units.get(e.unitId)?.unit;
-          if (e.spreadDeg >= 360 && u?.type === 'fighter' && getFighter(u.fighterId).chainKit) this.chainWhirl(e.unitId, e.range);
+          const fx = this.skinFx(e.unitId);
+          if (e.spreadDeg >= 360 && u?.type === 'fighter' && getFighter(u.fighterId).chainKit) {
+            if (fx?.whirl) this.whirlImage(e.unitId, e.range, fx.whirl);
+            else this.chainWhirl(e.unitId, e.range);
+          } else if (e.at && fx?.wave) this.waveImage(e.at, this.shotColor(this.units.get(e.unitId)?.unit), fx.wave);
           else this.arc(e.unitId, e.dir, e.range, e.spreadDeg);
           break;
         }
@@ -750,7 +755,7 @@ export class BattleView {
   }
 
   private aimShape(fighterId: string, which: 'attack' | 'super', rangeOverride?: number, kindOverride?: AimSpec['kindOverride']): THREE.Object3D {
-    const key = `${fighterId}|${which}|${rangeOverride ?? ''}|${kindOverride ?? ''}`;
+    const key = `${fighterId}|${which}|${rangeOverride ?? ''}|${kindOverride ?? ''}|${this.skinOf(this.followId) ?? ''}`;
     let obj = this.aimShapes.get(key);
     if (obj) return obj;
     const def = getFighter(fighterId as Fighter['fighterId']);
@@ -802,7 +807,7 @@ export class BattleView {
         if (slamRadius) {
           // 사슬 내려치기: 목표 원 + 양손에서 뻗어 조준 지점에서 만나는 직선 사슬 두 가닥(위치는 setAim이 매 프레임 갱신)
           flat(new THREE.RingGeometry(r - 0.07, r, 40));
-          const chains = [new ChainLine(this.chainMat(SHOT_COLOR.ally!, 0.75)), new ChainLine(this.chainMat(SHOT_COLOR.ally!, 0.75))]; // 내 조준이라 우리 팀 파랑
+          const chains = [this.makeChain(this.followId, SHOT_COLOR.ally!, 0.75), this.makeChain(this.followId, SHOT_COLOR.ally!, 0.75)]; // 내 조준이라 우리 팀 파랑
           for (const c of chains) group.add(c.mesh);
           group.userData.chains = chains;
           group.userData.slam = true;
@@ -873,7 +878,7 @@ export class BattleView {
         const sz = -Math.sin(dir) * d;
         const px = -Math.sin(dir);
         const pz = Math.cos(dir);
-        (shape.userData.chains as ChainLine[]).forEach((c, i) => {
+        (shape.userData.chains as ChainPath[]).forEach((c, i) => {
           const side = i === 0 ? 1 : -1;
           c.setPath({ x: sx + px * CHAIN_HAND_SPREAD * side, y: 0.5, z: sz + pz * CHAIN_HAND_SPREAD * side }, { x: 0, y: 0.25, z: 0 }, 1);
         });
@@ -946,6 +951,65 @@ export class BattleView {
       this.chainMats.set(key, m);
     }
     return m;
+  }
+
+  /** 사슬 한 가닥: 소유자의 스킨에 사슬 이미지가 있으면 이미지 사슬, 없으면 3D 고리 사슬 */
+  private makeChain(ownerId: EntityId | undefined, color: string, opacity = 1, width = 0.55): ChainPath {
+    const path = ownerId !== undefined ? this.skinFx(ownerId)?.chain : undefined;
+    return path ? new ChainSprite(this.fxTexture(path), color, opacity, 1.9, width) : new ChainLine(this.chainMat(color, opacity));
+  }
+
+  /** Chainer 패시브(스킨): 소용돌이 고리 이미지가 몸 둘레에서 빠르게 돈다(두 겹이 서로 반대로) */
+  private whirlImage(unitId: EntityId, range: number, path: string) {
+    const v = this.units.get(unitId);
+    if (!v) return;
+    const color = new THREE.Color(this.shotColor(v.unit)).lerp(new THREE.Color('#ffffff'), 0.2).multiplyScalar(1.6);
+    const group = new THREE.Group();
+    group.name = 'chain-whirl-image';
+    const size = range * 2.3;
+    const geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2);
+    const layers = [1, 0.78].map((scale, i) => {
+      const mat = new THREE.MeshBasicMaterial({ map: this.fxTexture(path), color, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+      const m = new THREE.Mesh(geo, mat);
+      m.renderOrder = 6 + i;
+      m.scale.setScalar(scale);
+      group.add(m);
+      return { m, mat, dir: i === 0 ? 1 : -1 };
+    });
+    this.addEffect(group, 0.45, (k) => {
+      const p = v.model.root.position;
+      group.position.set(p.x, 0.35, p.z);
+      const fade = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+      const pop = 0.6 + 0.4 * Math.min(1, k * 4);
+      for (const l of layers) {
+        l.m.rotation.y = l.dir * k * Math.PI * 7; // 0.45초 동안 세 바퀴 반(고속)
+        l.m.scale.setScalar((l.dir === 1 ? 1 : 0.78) * pop);
+        l.mat.opacity = (l.dir === 1 ? 1 : 0.75) * fade;
+      }
+    }, () => {
+      geo.dispose();
+      for (const l of layers) l.mat.dispose();
+    });
+  }
+
+  /** Chainer W(스킨): 맞은 대상에게 겹쳐 터지는 충격파. 이미지의 아래쪽 끝이 터지는 중심 */
+  private waveImage(at: Vec2, teamColor: string, path: string) {
+    const mat = new THREE.SpriteMaterial({
+      map: this.fxTexture(path),
+      color: new THREE.Color(teamColor).lerp(new THREE.Color('#ffffff'), 0.2).multiplyScalar(1.6),
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const s = new THREE.Sprite(mat);
+    s.center.set(0.3, 0.12);
+    s.position.set(at.x, 0.2, at.y);
+    s.renderOrder = 7;
+    this.addEffect(s, 0.5, (k) => {
+      const g = 0.75 + Math.min(1, k * 3) * 0.35;
+      s.scale.set(1.9 * g * (356 / 512), 1.9 * g, 1); // 이미지 가로세로 비율(356×512)
+      mat.opacity = k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45;
+    }, () => mat.dispose());
   }
 
   /** 사슬 투사체의 머리(E·R): 뾰족한 갈고리 날. 진행 방향 +x */
@@ -1032,12 +1096,13 @@ export class BattleView {
   }
 
   /** 사슬이 바닥을 내리친 순간: 원 안을 번쩍이는 빛줄기 + 퍼지는 고리 */
-  private slamImpact(to: Vec2, color: string, radius: number) {
-    const size = radius * 2.7;
+  private slamImpact(to: Vec2, color: string, radius: number, ownerId?: EntityId) {
+    const blast = ownerId !== undefined ? this.skinFx(ownerId)?.blast : undefined;
+    const size = radius * (blast ? 3.4 : 2.7);
     const geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({
-      map: burstTexture(),
-      color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.4).multiplyScalar(1.4),
+      map: blast ? this.fxTexture(blast) : burstTexture(),
+      color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), blast ? 0.2 : 0.4).multiplyScalar(blast ? 1.7 : 1.4),
       transparent: true,
       depthWrite: false,
       depthTest: false,
