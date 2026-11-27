@@ -1,4 +1,5 @@
 import type { BattleLike } from '../../battle/types';
+import { CC_NAME, ccOf, type CcKind } from '../../game/status';
 import { el } from '../../core/dom';
 import { TICK_RATE, type EntityId, type SimEvent, type Unit, type Vec2 } from '../../game/types';
 import { iconEl, txt } from '../widgets';
@@ -34,6 +35,10 @@ interface UnitBar {
   gems: HTMLElement;
   gemNum: HTMLElement;
   gemCount: number;
+  /** 닉네임 칸(CC가 걸리면 CC 이름으로 바뀐다) */
+  nameEl: HTMLElement;
+  nameText: string;
+  cc: CcKind | null;
   hp: number;
   maxHp: number;
   x: number;
@@ -197,7 +202,9 @@ export class BattleHud {
     gems.hidden = true;
     // 위에서부터: 크리스탈 → 닉네임 → 체력 막대(체력 숫자는 막대 안)
     const children: HTMLElement[] = [gems];
-    if (name) children.push(txt(name, 'ub-name'));
+    const nameEl = txt(name ?? '', 'ub-name');
+    nameEl.hidden = !name;
+    children.push(nameEl);
     children.push(el('div', 'ub-bar', [lag, fill, num]));
     let ammo: UnitBar['ammo'] = null;
     if (isMe && u.type === 'fighter') {
@@ -216,7 +223,7 @@ export class BattleHud {
     const root = el('div', cls, [el('div', 'ub-in', children)]);
     root.hidden = true;
     this.barLayer.append(root);
-    return { id: u.id, root, fill, lag, num, ammo, gems, gemNum, gemCount: 0, hp: -1, maxHp: -1, x: NaN, y: NaN, shown: false, seen: 0 };
+    return { id: u.id, root, fill, lag, num, ammo, gems, gemNum, gemCount: 0, nameEl, nameText: name ?? '', cc: null, hp: -1, maxHp: -1, x: NaN, y: NaN, shown: false, seen: 0 };
   }
 
   private updateBar(s: BattleLike, u: Unit, ally: boolean) {
@@ -259,6 +266,20 @@ export class BattleHud {
       b.num.textContent = String(Math.ceil(u.hp));
       b.hp = u.hp;
       b.maxHp = u.maxHp;
+    }
+
+    // 군중 제어가 걸리면 닉네임 칸에 보라색 아이콘 + CC 이름("기절" 등)을 보여 준다
+    const cc = ccOf(s.state, u);
+    if (cc !== b.cc) {
+      b.cc = cc;
+      b.nameEl.classList.toggle('is-cc', cc !== null);
+      if (cc) {
+        b.nameEl.replaceChildren(iconEl('ccMark', 'ico ub-cc-ico'), document.createTextNode(CC_NAME[cc]));
+        b.nameEl.hidden = false;
+      } else {
+        b.nameEl.replaceChildren(document.createTextNode(b.nameText));
+        b.nameEl.hidden = !b.nameText;
+      }
     }
 
     const carried = u.type === 'fighter' ? (u.crystals ?? 0) : 0;

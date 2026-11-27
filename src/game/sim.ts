@@ -888,6 +888,13 @@ export class Sim implements SimView {
       const dealt = this.damage(target, amount, f.id, false, undefined, false); // 최대 체력 비율 피해: 레벨 배율 없음
       if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
       this.addChainStack(f);
+      // W에도 대상 쪽으로 짧은 돌진이 있다(이미 붙어 있으면 그대로)
+      const gap = dist(f.pos, target.pos) - f.radius - target.radius - 0.05;
+      const dash = Math.min(kit.wDash, gap);
+      if (dash > 0.05) {
+        f.action = { kind: 'chainDash', dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), remaining: dash, speed: kit.pullSpeed };
+        f.moving = false;
+      }
       this.endChainCombo(f);
       this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24, at: { ...target.pos } });
       return;

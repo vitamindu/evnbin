@@ -3,6 +3,13 @@ const S = 'stroke="var(--ink)" stroke-width="3" stroke-linejoin="round" stroke-l
 const svg = (body: string) => `<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 
 export const ICONS = {
+  /** 군중 제어(CC) 표시: 보라색 소용돌이 고리 */
+  ccMark: svg(
+    `<circle cx="24" cy="24" r="15" fill="none" stroke="var(--ink)" stroke-width="12"/>` +
+      `<circle cx="24" cy="24" r="15" fill="none" stroke="#a65cff" stroke-width="6"/>` +
+      `<path d="M24 9a15 15 0 0 1 15 15" fill="none" stroke="#e3c8ff" stroke-width="4" stroke-linecap="round"/>` +
+      `<circle cx="24" cy="24" r="5.5" fill="#d9b3ff" ${S}/>`,
+  ),
   chain: svg(
     `<path d="M19 29l-5 5a8 8 0 0 1-11-11l8-8a8 8 0 0 1 11 0M29 19l5-5a8 8 0 0 1 11 11l-8 8a8 8 0 0 1-11 0M17 31l14-14" fill="none" stroke="var(--ink)" stroke-width="9" stroke-linecap="round"/>` +
       `<path d="M19 29l-5 5a8 8 0 0 1-11-11l8-8a8 8 0 0 1 11 0M29 19l5-5a8 8 0 0 1 11 11l-8 8a8 8 0 0 1-11 0M17 31l14-14" fill="none" stroke="#e4e8f0" stroke-width="4" stroke-linecap="round"/>`,

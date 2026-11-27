@@ -104,6 +104,15 @@
 .ub.is-enemy .ub-name {
   color: #ff9b9b;
 }
+.ub .ub-name.is-cc {
+  color: #d3a6ff;
+}
+.ub-cc-ico {
+  width: 0.95em;
+  height: 0.95em;
+  vertical-align: -0.14em;
+  margin-right: 3px;
+}
 .ub-bar {
   position: relative;
   width: 76px;

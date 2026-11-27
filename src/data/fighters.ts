@@ -165,6 +165,8 @@ export interface FighterDef {
     chainDamage: number;
     stunDuration: number;
     wRange: number;
+    /** W: 대상 쪽으로 짧게 돌진하는 최대 거리(타일). 이미 붙어 있으면 안 움직인다 */
+    wDash: number;
     wMaxHpDamage: number;
     wHealFraction: number;
     stealRange: number;
@@ -632,6 +634,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       chainDamage: 375,
       stunDuration: 1,
       wRange: 1.5,
+      wDash: 0.8,
       wMaxHpDamage: 0.3,
       wHealFraction: 1,
       stealRange: 7,

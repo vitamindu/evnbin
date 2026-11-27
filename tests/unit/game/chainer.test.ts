@@ -178,6 +178,24 @@ describe('CHAINER', () => {
     expect(wDamage(11)).toBe(wDamage(1));
   });
 
+  it('W에도 대상 쪽으로 짧은 돌진이 있다(멀면 wDash만큼, 붙어 있으면 안 움직인다)', () => {
+    const sim = duel(5);
+    const [me, foe] = fighters(sim);
+    tick(sim, skill(me!.id)); // E1
+    runUntil(sim, () => me!.action === null, 30);
+    tick(sim, skill(me!.id)); // E2: 날아가서 붙는다
+    runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
+    runUntil(sim, () => me!.action === null, 30);
+    // 대상을 W 사거리 안에서 조금 떼어 놓는다
+    foe!.pos = { x: foe!.pos.x + 1.0, y: foe!.pos.y };
+    const x0 = me!.pos.x;
+    tick(sim, skill(me!.id)); // W
+    expect(me!.action?.kind).toBe('chainDash');
+    runUntil(sim, () => me!.action === null, 30);
+    expect(me!.pos.x - x0).toBeCloseTo(KIT.wDash, 1);
+    expect(foe!.hp).toBeLessThan(foe!.maxHp);
+  });
+
   it('W를 5초 안에 안 쓰면 콤보가 끝나고 E1 대기시간 7초', () => {
     const sim = duel(5);
     const [me] = fighters(sim);
