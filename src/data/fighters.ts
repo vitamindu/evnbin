@@ -556,7 +556,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       name: 'Rapid Jab',
       description: '아주 가까이에서 두 번 빠르게 때리고, 준 피해의 25%만큼 체력을 회복한다.',
       kind: 'burst',
-      damage: 1200,
+      damage: 600, // 11레벨(×2) 기준 1200×2연타
       count: 2,
       spreadDeg: 0,
       burstInterval: 0.12,
