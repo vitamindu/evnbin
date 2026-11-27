@@ -167,7 +167,8 @@ export interface FighterDef {
     wRange: number;
     /** W: 대상 쪽으로 짧게 돌진하는 최대 거리(타일). 이미 붙어 있으면 안 움직인다 */
     wDash: number;
-    wMaxHpDamage: number;
+    /** W: 대상이 잃은 체력(최대 체력 − 현재 체력)에 곱하는 비율. 레벨 배율은 곱하지 않는다 */
+    wLostHpDamage: number;
     wHealFraction: number;
     stealRange: number;
     copiedSuperDuration: number;
@@ -635,7 +636,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       stunDuration: 1,
       wRange: 1.5,
       wDash: 0.8,
-      wMaxHpDamage: 0.3,
+      wLostHpDamage: 0.25,
       wHealFraction: 1,
       stealRange: 7,
       copiedSuperDuration: 15,

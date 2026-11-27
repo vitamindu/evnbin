@@ -884,8 +884,9 @@ export class Sim implements SimView {
       }
       if (!target) return;
       this.markCombat(f);
-      const amount = Math.round(target.maxHp * kit.wMaxHpDamage);
-      const dealt = this.damage(target, amount, f.id, false, undefined, false); // 최대 체력 비율 피해: 레벨 배율 없음
+      // 대상이 잃은 체력에 비례(많이 맞은 적일수록 세다). 체력 비율 피해라 캐릭터 레벨 배율은 곱하지 않는다
+      const amount = Math.round((target.maxHp - target.hp) * kit.wLostHpDamage);
+      const dealt = this.damage(target, amount, f.id, false, undefined, false);
       if (dealt > 0) this.heal(f, Math.round(dealt * kit.wHealFraction));
       this.addChainStack(f);
       // W에도 대상 쪽으로 짧은 돌진이 있다(이미 붙어 있으면 그대로)

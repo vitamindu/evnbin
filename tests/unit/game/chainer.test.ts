@@ -139,7 +139,8 @@ describe('CHAINER', () => {
     const beforeFoe = foe!.hp;
     const beforeMe = me!.hp;
     const wEvents = tick(sim, skill(me!.id)); // W
-    const damage = Math.round(foe!.maxHp * KIT.wMaxHpDamage);
+    const damage = Math.round((foe!.maxHp - beforeFoe) * KIT.wLostHpDamage); // 잃은 체력의 25%
+    expect(damage).toBeGreaterThan(0);
     expect(beforeFoe - foe!.hp).toBe(damage);
     expect(me!.hp - beforeMe).toBe(damage);
     expect(ofType(wEvents, 'heal')).toEqual([expect.objectContaining({ targetId: me!.id, amount: damage })]);
@@ -160,7 +161,7 @@ describe('CHAINER', () => {
     expect(me!.ammo).toBeLessThan(me!.maxAmmo); // 평타 탄 하나는 쓴다
   });
 
-  it('W는 대상 최대 체력 비율 피해라서 캐릭터 레벨 배율을 곱하지 않는다(레벨 11도 같음)', () => {
+  it('W는 대상이 잃은 체력 비율 피해라서 캐릭터 레벨 배율을 곱하지 않는다(레벨 11도 같음)', () => {
     const wDamage = (power: number) => {
       const sim = duel(5, 'boulder');
       const [me, foe] = fighters(sim);
@@ -170,12 +171,28 @@ describe('CHAINER', () => {
       tick(sim, skill(me!.id));
       runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
       runUntil(sim, () => me!.action === null, 30);
-      const before = foe!.hp;
+      foe!.hp = 3000; // 잃은 체력 2600으로 맞춘다(E2 피해는 레벨마다 달라서)
       tick(sim, skill(me!.id));
-      return before - foe!.hp;
+      return 3000 - foe!.hp;
     };
-    expect(wDamage(1)).toBe(Math.round(5600 * KIT.wMaxHpDamage));
+    expect(wDamage(1)).toBe(Math.round(2600 * KIT.wLostHpDamage)); // 650
     expect(wDamage(11)).toBe(wDamage(1));
+  });
+
+  it('W: 체력이 가득 찬 대상에게는 피해·회복이 0(잃은 체력이 없다), 콤보는 끝난다', () => {
+    const sim = duel(5, 'boulder');
+    const [me, foe] = fighters(sim);
+    tick(sim, skill(me!.id));
+    runUntil(sim, () => me!.action === null, 30);
+    tick(sim, skill(me!.id));
+    runUntil(sim, () => me!.chainSkillPhase === 'w', 40);
+    runUntil(sim, () => me!.action === null, 30);
+    foe!.hp = foe!.maxHp;
+    me!.hp = 1000;
+    tick(sim, skill(me!.id));
+    expect(foe!.hp).toBe(foe!.maxHp);
+    expect(me!.hp).toBe(1000);
+    expect(me!.chainSkillPhase).toBeUndefined();
   });
 
   it('W에도 대상 쪽으로 짧은 돌진이 있다(멀면 wDash만큼, 붙어 있으면 안 움직인다)', () => {
