@@ -10,7 +10,7 @@ import { addStandardLights, toon } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
 import { buildDummyModel, type DummyModel } from './dummyModel';
 import { ChainLine, burstTexture } from './chainFx';
-import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED, LOB_MIN_DIST } from '../../game/rules';
+import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED, CHAIN_HAND_SPREAD, LOB_MIN_DIST } from '../../game/rules';
 
 /**
  * 전투 화면의 3D 표현. Lead 담당.
@@ -18,8 +18,6 @@ import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED,
  */
 
 const MODEL_SCALE = 0.85;
-/** 사슬 내려치기: 두 사슬이 나오는 양손의 벌어진 정도(중심에서 한쪽으로, 타일) */
-const HAND_SPREAD = 0.8;
 /** 발밑 팀 표시 원: 나 / 아군 / 적 */
 const TEAM_RING = { me: '#3ec8ff', ally: '#4f8bff', enemy: '#ff4f5e' };
 const CAM_PITCH = THREE.MathUtils.degToRad(56);
@@ -634,7 +632,7 @@ export class BattleView {
         const reach = 1 - Math.pow(1 - Math.min(1, (tickF - l.start) / 5), 3);
         (l.chains ?? []).forEach((c, i) => {
           const side = i === 0 ? 1 : -1;
-          c.setPath({ x: op.x + px * HAND_SPREAD * side, y: 0.55, z: op.z + pz * HAND_SPREAD * side }, { x: l.to.x, y: 0.3, z: l.to.y }, reach);
+          c.setPath({ x: op.x + px * CHAIN_HAND_SPREAD * side, y: 0.55, z: op.z + pz * CHAIN_HAND_SPREAD * side }, { x: l.to.x, y: 0.3, z: l.to.y }, reach);
         });
         continue;
       }
@@ -877,7 +875,7 @@ export class BattleView {
         const pz = Math.cos(dir);
         (shape.userData.chains as ChainLine[]).forEach((c, i) => {
           const side = i === 0 ? 1 : -1;
-          c.setPath({ x: sx + px * HAND_SPREAD * side, y: 0.5, z: sz + pz * HAND_SPREAD * side }, { x: 0, y: 0.25, z: 0 }, 1);
+          c.setPath({ x: sx + px * CHAIN_HAND_SPREAD * side, y: 0.5, z: sz + pz * CHAIN_HAND_SPREAD * side }, { x: 0, y: 0.25, z: 0 }, 1);
         });
       }
     } else {

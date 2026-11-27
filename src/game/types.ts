@@ -161,6 +161,10 @@ export interface Lob {
   breaksWalls: boolean;
   /** 사슬 내려치기(Chainer Q): 날아가는 탄 대신 바닥 한 지점을 내리친다. 터질 때 벽 너머는 안 맞는다 */
   slam?: boolean;
+  /** slam: 두 사슬에 닿은 적이 받는 피해(사슬이 다 뻗는 틱에 한 번). 폭발 피해(damage)와 별개 */
+  chainDamage?: number;
+  /** slam: 사슬 피해를 이미 줬는가 */
+  chainDone?: boolean;
 }
 
 /** 조준 입력: 길이 0~1 벡터(방향 + 사거리 비율). null이면 자동 조준 */

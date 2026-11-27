@@ -65,7 +65,7 @@ export interface AttackDef {
   /** 흡혈: 준 피해의 이 비율만큼 내 체력 회복(0~1) */
   lifesteal?: number;
   /** chain: 조준한 바닥 지점을 사슬로 내리친다. delay초 뒤 반지름 radius 안의 모든 적이 동시에 damage를 받는다 */
-  chainSlam?: { radius: number; delay: number };
+  chainSlam?: { radius: number; delay: number; chainDamage: number };
 }
 
 export interface SuperDef {
@@ -593,9 +593,9 @@ export const FIGHTERS: readonly FighterDef[] = [
     moveSpeed: 2.5,
     attack: {
       name: 'Chain Burst',
-      description: '조준한 바닥(최대 5칸)을 사슬로 내리쳐요. 0.5초 뒤 원 안의 모든 적이 동시에 1250 피해를 받아요.',
+      description: '조준한 바닥(최대 5칸)을 사슬로 내리쳐요. 사슬에 닿으면 500, 0.75초 뒤 사슬이 만난 자리가 터져 작은 원 안의 모든 적이 동시에 750 피해를 받아요.',
       kind: 'chain',
-      damage: 1250,
+      damage: 750,
       count: 1,
       spreadDeg: 0,
       burstInterval: 0,
@@ -604,7 +604,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       ammo: 3,
       reload: 2.1,
       superChargePerHit: 0.05,
-      chainSlam: { radius: 1.3, delay: 0.5 },
+      chainSlam: { radius: 0.65, delay: 0.75, chainDamage: 500 },
     },
     super: {
       name: 'Stolen Force',
@@ -632,7 +632,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       chainDamage: 375,
       stunDuration: 1,
       wRange: 1.5,
-      wMaxHpDamage: 0.125,
+      wMaxHpDamage: 0.3,
       wHealFraction: 1,
       stealRange: 7,
       copiedSuperDuration: 15,

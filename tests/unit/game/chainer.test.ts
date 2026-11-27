@@ -12,38 +12,58 @@ const duel = (distance: number, enemy: 'rivet' | 'boulder' = 'rivet') =>
   ], { dummies: false });
 
 describe('CHAINER', () => {
-  it('Q는 조준한 바닥을 내리친다: 0.5초 뒤 원 안의 적이 한 번 피해를 받는다(투사체 없음)', () => {
+  const SLAM = Q.chainSlam!;
+  const TOTAL_Q = SLAM.chainDamage + Q.damage;
+
+  it('Q는 조준한 바닥을 내리친다: 사슬 피해 → 0.5초 뒤 폭발 피해(투사체 없음)', () => {
     const sim = duel(3);
     const [me, foe] = fighters(sim);
     const events = [...tick(sim, { [me!.id]: attack({ x: 3 / Q.range, y: 0 }) })]; // 3타일 앞 바닥
     expect(sim.projectiles).toHaveLength(0);
     expect(sim.lobs).toHaveLength(1);
-    expect(sim.lobs[0]).toMatchObject({ slam: true, damage: Q.damage, aoeRadius: Q.chainSlam!.radius });
+    expect(sim.lobs[0]).toMatchObject({ slam: true, damage: Q.damage, chainDamage: SLAM.chainDamage, aoeRadius: SLAM.radius });
     expect(foe!.hp).toBe(foe!.maxHp); // 아직 맞지 않았다
+    events.push(...run(sim, 10)); // 사슬이 다 뻗은 뒤
+    expect(foe!.maxHp - foe!.hp).toBe(SLAM.chainDamage); // 사슬 피해만
+    expect(ofType(events, 'explode')).toHaveLength(0);
     events.push(...run(sim, 30));
-    expect(foe!.maxHp - foe!.hp).toBe(Q.damage);
+    expect(foe!.maxHp - foe!.hp).toBe(TOTAL_Q); // 사슬 + 폭발
     expect(ofType(events, 'explode')).toHaveLength(1);
     expect(me!.ammo).toBeLessThan(me!.maxAmmo);
   });
 
-  it('Q: 원 안의 모든 적이 같은 틱에 맞고, 원 밖은 안 맞는다', () => {
+  it('Q: 폭발 반지름은 작다(0.65). 사슬만 스친 적은 사슬 피해만, 폭발 원 밖은 안 맞는다', () => {
+    expect(SLAM.radius).toBe(0.65);
+    const sim = duel(3, 'rivet');
+    const [me, foe] = fighters(sim);
+    // 조준 지점은 5.5(3타일 앞). 적은 사슬 길 위 4.0 부근에 선다: 사슬엔 닿고 폭발 원에서는 멀다
+    me!.pos = { x: 2.5, y: 4.5 };
+    foe!.pos = { x: 4.0, y: 4.1 };
+    tick(sim, { [me!.id]: attack({ x: 3 / Q.range, y: 0 }) });
+    run(sim, 40);
+    expect(foe!.maxHp - foe!.hp).toBe(SLAM.chainDamage);
+  });
+
+  it('Q: 원 안의 모든 적이 같은 틱에 폭발 피해를 받고(사슬 피해 포함 합계), 원 밖은 안 맞는다', () => {
     const sim = makeSim(testMap(16, 9, [[2, 4, 'A'], [14, 1, 'Z'], [14, 7, 'Z'], [8, 5, 'X'], [8, 3, 'X']]), [
       { id: 'chainer' }, { id: 'rivet', team: 1 }, { id: 'rivet', team: 1 }, { id: 'rivet', team: 1 },
     ], { dummies: false });
     const [me, a, b, c] = fighters(sim);
     me!.pos = { x: 2.5, y: 4.5 };
     // 조준 지점 = 내 위치에서 3타일 앞 → (5.5, 4.5)
-    a!.pos = { x: 5.5, y: 4.0 };
-    b!.pos = { x: 5.5, y: 5.0 };
+    a!.pos = { x: 5.5, y: 4.2 };
+    b!.pos = { x: 5.5, y: 4.8 };
     c!.pos = { x: 5.5, y: 7.4 }; // 원 밖
     tick(sim, { [me!.id]: attack({ x: 3 / Q.range, y: 0 }) });
-    const hits: Array<{ target: number; tick: number }> = [];
+    const blasts: Array<{ target: number; tick: number }> = [];
     for (let i = 0; i < 40; i++) {
       const t = sim.tick;
-      for (const e of ofType(tick(sim), 'hit')) hits.push({ target: e.targetId, tick: t });
+      for (const e of ofType(tick(sim), 'hit')) if (e.damage === Q.damage) blasts.push({ target: e.targetId, tick: t });
     }
-    expect(hits.map((h) => h.target).sort()).toEqual([a!.id, b!.id].sort());
-    expect(new Set(hits.map((h) => h.tick)).size).toBe(1); // 같은 틱
+    expect(blasts.map((h) => h.target).sort()).toEqual([a!.id, b!.id].sort());
+    expect(new Set(blasts.map((h) => h.tick)).size).toBe(1); // 같은 틱
+    expect(a!.maxHp - a!.hp).toBe(TOTAL_Q);
+    expect(b!.maxHp - b!.hp).toBe(TOTAL_Q);
     expect(c!.hp).toBe(c!.maxHp);
   });
 

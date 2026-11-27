@@ -116,6 +116,11 @@ export const EPS = 1e-9;
 export const LOB_FLIGHT_TICKS = secToTicks(0.5);
 /** lob 최소 던지는 거리(조준을 짧게 해도 이만큼) */
 export const LOB_MIN_DIST = 1;
+
+/** Chainer Q: 두 사슬이 나오는 양손의 벌어진 정도(중심에서 한쪽으로, 타일), 사슬의 굵기(피해 판정 반너비), 사슬이 뻗어 닿는 데 걸리는 틱 */
+export const CHAIN_HAND_SPREAD = 0.8;
+export const CHAIN_HALF_WIDTH = 0.25;
+export const CHAIN_SWEEP_TICKS = 5;
 /** lob 여러 개를 던질 때 조준 방향과 수직으로 벌리는 간격 */
 export const LOB_SPACING = 0.7;
 /** 지대 최소 거리 */

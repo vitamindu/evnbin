@@ -40,6 +40,9 @@ import {
   CRYSTAL_WIN_COUNT,
   LOB_FLIGHT_TICKS,
   LOB_MIN_DIST,
+  CHAIN_HAND_SPREAD,
+  CHAIN_HALF_WIDTH,
+  CHAIN_SWEEP_TICKS,
   LOB_SPACING,
   ZONE_HIT_TICKS,
   ZONE_MIN_DIST,
@@ -167,7 +170,7 @@ export interface ShotSpec {
   /** leap: 폭탄·내려찍기 없이 이동만 */
   moveOnly?: boolean;
   /** Chainer Q: 바닥을 내리치는 사슬(반지름, 터지기까지 틱) */
-  chainSlam?: { radius: number; delayTicks: number };
+  chainSlam?: { radius: number; delayTicks: number; chainDamage: number };
   /** 복사 궁극기 효과 출처 */
   superSourceId?: FighterId;
 }
@@ -226,7 +229,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean, superSourceId?: Figh
     leapTime: DEFAULT_LEAP_TIME,
     fuse: DEFAULT_FUSE,
     lobFuse: a.kind === 'lob' ? (a.fuse ?? 0) : 0,
-    ...(a.chainSlam ? { chainSlam: { radius: a.chainSlam.radius, delayTicks: Math.max(1, secToTicks(a.chainSlam.delay)) } } : {}),
+    ...(a.chainSlam ? { chainSlam: { radius: a.chainSlam.radius, delayTicks: Math.max(1, secToTicks(a.chainSlam.delay)), chainDamage: a.chainSlam.chainDamage } } : {}),
   };
 }
 
@@ -1071,6 +1074,7 @@ export class Sim implements SimView {
       isSuper: false,
       breaksWalls: false,
       slam: true,
+      chainDamage: slam.chainDamage,
     });
   }
 
@@ -1575,10 +1579,31 @@ export class Sim implements SimView {
     }
   }
 
+  /**
+   * Chainer Q 사슬 피해: 양손에서 조준 지점까지 뻗은 직선 사슬 두 가닥에 닿은 적이 chainDamage를 한 번 받는다
+   * (두 가닥에 다 닿아도 한 번, 벽에 가려진 적은 안 맞는다). 폭발 피해(damage)는 따로 endTick에 들어간다.
+   */
+  private sweepChains(l: Lob) {
+    l.chainDone = true;
+    const dx = l.to.x - l.from.x;
+    const dy = l.to.y - l.from.y;
+    const dl = Math.hypot(dx, dy) || 1;
+    const px = -dy / dl;
+    const py = dx / dl;
+    const hands = [-1, 1].map((side) => ({ x: l.from.x + px * CHAIN_HAND_SPREAD * side, y: l.from.y + py * CHAIN_HAND_SPREAD * side }));
+    for (const u of this.units) {
+      if (!isHittable(u) || u.team === l.team) continue;
+      if (!hands.some((h) => segmentCircle(h, l.to, u.pos, CHAIN_HALF_WIDTH + u.radius))) continue;
+      if (!hasLineOfSight(this.grid, l.from, u.pos)) continue;
+      this.damage(u, l.chainDamage!, l.ownerId, false);
+    }
+  }
+
   private stepLobs() {
     if (!this.lobs.length) return;
     const keep: Lob[] = [];
     for (const l of this.lobs) {
+      if (l.slam && l.chainDamage && !l.chainDone && this.tick >= l.startTick + CHAIN_SWEEP_TICKS) this.sweepChains(l);
       if (this.tick < l.endTick) {
         keep.push(l);
         continue;
