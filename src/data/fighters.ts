@@ -153,7 +153,8 @@ export interface FighterDef {
     passiveDamage: number;
     passiveMaxStacks: number;
     skillCooldown: number;
-    dashRange: number;
+    /** E: 사슬에 맞은 대상에게 날아가는 속도(타일/초) */
+    pullSpeed: number;
     chainRange: number;
     chainDamage: number;
     stunDuration: number;
@@ -586,13 +587,13 @@ export const FIGHTERS: readonly FighterDef[] = [
     moveSpeed: 2.5,
     attack: {
       name: 'Chain Burst',
-      description: '조준한 바닥을 사슬로 내리쳐요. 0.5초 뒤 원 안의 모든 적이 동시에 1250 피해를 받아요.',
+      description: '조준한 바닥(최대 5칸)을 사슬로 내리쳐요. 0.5초 뒤 원 안의 모든 적이 동시에 1250 피해를 받아요.',
       kind: 'chain',
       damage: 1250,
       count: 1,
       spreadDeg: 0,
       burstInterval: 0,
-      range: 3,
+      range: 5,
       projectileSpeed: 8,
       ammo: 3,
       reload: 1.2,
@@ -617,7 +618,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       passiveDamage: 500,
       passiveMaxStacks: 3,
       skillCooldown: 7,
-      dashRange: 1.5,
+      pullSpeed: 16,
       chainRange: 4.5,
       chainDamage: 375,
       stunDuration: 1,

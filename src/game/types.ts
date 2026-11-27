@@ -56,8 +56,8 @@ export interface Fighter extends UnitBase {
   superCharge: number;
   /** Chainer: 기본 공격에 쓸 사슬 원형 타격 중첩 */
   passiveStacks?: number;
-  /** Chainer: E 재입력 사슬 대기, 사슬 비행, W 재입력 대기 */
-  chainSkillPhase?: 'chain' | 'chainFlight' | 'w';
+  /** Chainer: E 사슬 비행 중, 적중 뒤 W 재입력 대기 */
+  chainSkillPhase?: 'chainFlight' | 'w';
   /** Chainer E/W 공유 쿨타임 종료 틱 */
   chainSkillReadyTick?: number;
   /** Chainer 궁극기로 복사한 파이터. 만료 때 지운다 */

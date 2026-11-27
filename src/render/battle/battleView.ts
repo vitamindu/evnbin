@@ -9,7 +9,8 @@ import { buildFighterModel, type FighterModel } from '../fighterModel';
 import { addStandardLights, toon } from '../toon';
 import { MapRenderer } from '../world/mapRenderer';
 import { buildDummyModel, type DummyModel } from './dummyModel';
-import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED } from '../../game/rules';
+import { ChainLine, burstTexture } from './chainFx';
+import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED, LOB_MIN_DIST } from '../../game/rules';
 
 /**
  * 전투 화면의 3D 표현. Lead 담당.
@@ -17,6 +18,8 @@ import { BALL_FRICTION, BALL_KICK_SPEED, BALL_POWER_KICK_SPEED, BALL_STOP_SPEED 
  */
 
 const MODEL_SCALE = 0.85;
+/** 사슬 내려치기: 두 사슬이 나오는 양손의 벌어진 정도(중심에서 한쪽으로, 타일) */
+const HAND_SPREAD = 0.8;
 /** 발밑 팀 표시 원: 나 / 아군 / 적 */
 const TEAM_RING = { me: '#3ec8ff', ally: '#4f8bff', enemy: '#ff4f5e' };
 const CAM_PITCH = THREE.MathUtils.degToRad(56);
@@ -37,6 +40,9 @@ interface ShotVisual {
   obj: THREE.Group;
   prev: Vec2;
   curr: Vec2;
+  /** 사슬 투사체(Chainer E·R): 쏜 사람 손에서 탄 머리까지 이어지는 사슬 */
+  chain?: ChainLine;
+  ownerId?: EntityId;
 }
 
 /** 투사체 몸통 색(카툰 명암을 받는다). 빛 테두리·꼬리는 이 색을 흰색 쪽으로 섞은 밝은 색 */
@@ -139,9 +145,8 @@ export class BattleView {
   private readonly map: MapRenderer;
   private readonly units = new Map<EntityId, UnitVisual>();
   private readonly shots = new Map<EntityId, ShotVisual>();
-  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number; slam?: boolean }>();
-  /** 사슬 내려치기(Chainer Q)의 떨어지는 사슬 기둥 */
-  private readonly slamGeo = new THREE.CylinderGeometry(0.13, 0.13, 2.2, 8);
+  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number; slam?: boolean; chains?: ChainLine[]; ownerId?: EntityId; color?: string; radius?: number }>();
+  private readonly chainMats = new Map<string, THREE.MeshBasicMaterial>();
   private effects: Effect[] = [];
   private readonly shotGeo = new THREE.SphereGeometry(0.22, 14, 10);
   private readonly shotKits = new Map<boolean, { core: THREE.BufferGeometry; halo: THREE.BufferGeometry; trail: THREE.BufferGeometry; shadow: THREE.BufferGeometry; r: number }>();
@@ -262,14 +267,20 @@ export class BattleView {
       let s = this.shots.get(p.id);
       if (!s) {
         const owner = sim.getUnit(p.ownerId);
+        const isChainShot = !!(p.chainSkill || p.stealsSuper);
         const fxSuper = p.isSuper ? this.skinFx(p.ownerId)?.superShot : undefined;
-        const obj = fxSuper ? this.buildFxShot(owner, fxSuper) : this.buildShot(owner, p.isSuper);
+        const obj = isChainShot ? this.buildChainHead(owner) : fxSuper ? this.buildFxShot(owner, fxSuper) : this.buildShot(owner, p.isSuper);
         obj.rotation.y = -Math.atan2(p.vel.y, p.vel.x);
         // 넓은 탄(REAPER 궁극기 등): 판정 반지름에 맞춰 키운다
         const base = p.isSuper ? 0.24 : 0.18;
         if (p.radius > base + 0.01) obj.scale.setScalar(p.radius / base);
         this.scene.add(obj);
         s = { obj, prev: { ...p.pos }, curr: { ...p.pos } };
+        if (isChainShot) {
+          s.chain = new ChainLine(this.chainMat(this.shotColor(owner), 1));
+          s.ownerId = p.ownerId;
+          this.scene.add(s.chain.mesh);
+        }
         this.shots.set(p.id, s);
       } else {
         s.prev = s.curr;
@@ -278,6 +289,7 @@ export class BattleView {
     }
     for (const [id, s] of this.shots) {
       if (!shotSeen.has(id)) {
+        s.chain?.dispose();
         s.obj.removeFromParent();
         this.shots.delete(id);
       }
@@ -351,11 +363,12 @@ export class BattleView {
         const owner = sim.getUnit(l.ownerId);
         const baseColor = this.shotColor(owner);
         const shellMat = new THREE.MeshToonMaterial({ color: baseColor });
-        const shell = new THREE.Mesh(l.slam ? this.slamGeo : this.shotGeo, shellMat);
-        const shellGlow = new THREE.Mesh(l.slam ? this.slamGeo : this.shotGeo, this.glow(baseColor).halo);
+        const shell = new THREE.Mesh(this.shotGeo, shellMat);
+        const shellGlow = new THREE.Mesh(this.shotGeo, this.glow(baseColor).halo);
         shellGlow.scale.setScalar(1.4);
         shell.add(shellGlow);
-        shell.scale.setScalar(l.slam ? 1 : 1.1);
+        shell.scale.setScalar(1.1);
+        shell.visible = !l.slam; // 사슬 내려치기는 날아가는 구슬이 없다(사슬이 뻗어 내리친다)
         // 사슬 내려치기는 폭탄이 아니라 공격이라 경고 원도 팀 색(우리 파랑 / 상대 빨강)
         const marker = new THREE.Mesh(
           new THREE.RingGeometry(Math.max(0.1, l.aoeRadius - 0.08), l.aoeRadius, 40),
@@ -365,11 +378,21 @@ export class BattleView {
         marker.position.set(l.to.x, 0.04, l.to.y);
         this.scene.add(shell, marker);
         shell.userData.baseColor = baseColor;
-        this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick, land: l.landTick, ...(l.slam ? { slam: true } : {}) });
+        let chains: ChainLine[] | undefined;
+        if (l.slam) {
+          chains = [new ChainLine(this.chainMat(baseColor, 0.95)), new ChainLine(this.chainMat(baseColor, 0.95))];
+          for (const c of chains) this.scene.add(c.mesh);
+        }
+        this.lobs.set(l.id, {
+          shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick, land: l.landTick,
+          ...(l.slam ? { slam: true, chains, ownerId: l.ownerId, color: baseColor, radius: l.aoeRadius } : {}),
+        });
       }
     }
     for (const [id, l] of this.lobs) {
       if (!lobSeen.has(id)) {
+        if (l.slam) this.slamImpact(l.to, l.color ?? '#ff4b4b', l.radius ?? 1);
+        for (const c of l.chains ?? []) c.dispose();
         l.shell.removeFromParent();
         l.marker.removeFromParent();
         l.marker.geometry.dispose();
@@ -582,13 +605,33 @@ export class BattleView {
     }
     for (const s of this.shots.values()) {
       s.obj.position.set(lerp(s.prev.x, s.curr.x, alpha), 0.6, lerp(s.prev.y, s.curr.y, alpha));
+      if (s.chain) {
+        const owner = s.ownerId !== undefined ? this.units.get(s.ownerId) : undefined;
+        const o = owner ? owner.model.root.position : s.obj.position;
+        const to = s.obj.position;
+        const dx = to.x - o.x;
+        const dz = to.z - o.z;
+        const dl = Math.max(0.001, Math.hypot(dx, dz));
+        s.chain.setPath({ x: o.x + (dx / dl) * 0.3, y: 0.6, z: o.z + (dz / dl) * 0.3 }, { x: to.x, y: 0.6, z: to.z }, 1);
+      }
     }
     for (const l of this.lobs.values()) {
       if (l.slam) {
-        // 위에서 사슬이 떨어져 원 한가운데를 내리친다(끝 틱에 닿는다). 원은 점점 진해진다
+        // 양손에서 직선으로 뻗은 사슬 두 가닥이 조준 지점에서 만난다(처음 0.17초 동안 뻗고, 터질 때까지 팽팽). 원은 점점 진해진다
         const k = Math.min(1, Math.max(0, (tickF - l.start) / Math.max(1, l.end - l.start)));
-        l.shell.position.set(l.to.x, 0.3 + (1 - k * k) * 7, l.to.y);
         (l.marker.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.5 * k;
+        const owner = l.ownerId !== undefined ? this.units.get(l.ownerId) : undefined;
+        const op = owner ? owner.model.root.position : { x: l.from.x, z: l.from.y };
+        const dirX = l.to.x - op.x;
+        const dirZ = l.to.y - op.z;
+        const dl = Math.max(0.001, Math.hypot(dirX, dirZ));
+        const px = -dirZ / dl;
+        const pz = dirX / dl;
+        const reach = 1 - Math.pow(1 - Math.min(1, (tickF - l.start) / 5), 3);
+        (l.chains ?? []).forEach((c, i) => {
+          const side = i === 0 ? 1 : -1;
+          c.setPath({ x: op.x + px * HAND_SPREAD * side, y: 0.55, z: op.z + pz * HAND_SPREAD * side }, { x: l.to.x, y: 0.3, z: l.to.y }, reach);
+        });
         continue;
       }
       const total = Math.max(1, l.end - l.start);
@@ -754,6 +797,14 @@ export class BattleView {
         const r = slamRadius || ('aoeRadius' in d && d.aoeRadius) || 1.5;
         const target = flat(new THREE.CircleGeometry(r, 40));
         target.name = 'lobTarget';
+        if (slamRadius) {
+          // 사슬 내려치기: 목표 원 + 양손에서 뻗어 조준 지점에서 만나는 직선 사슬 두 가닥(위치는 setAim이 매 프레임 갱신)
+          flat(new THREE.RingGeometry(r - 0.07, r, 40));
+          const chains = [new ChainLine(this.chainMat(SHOT_COLOR.ally!, 0.75)), new ChainLine(this.chainMat(SHOT_COLOR.ally!, 0.75))]; // 내 조준이라 우리 팀 파랑
+          for (const c of chains) group.add(c.mesh);
+          group.userData.chains = chains;
+          group.userData.slam = true;
+        }
         break;
       }
       case 'leap': {
@@ -813,6 +864,18 @@ export class BattleView {
       const kk = shape.userData.kind === 'leap' ? Math.max(2 / r, k) : k;
       shape.position.set(p.x + Math.cos(dir) * r * kk, 0.03, p.z + Math.sin(dir) * r * kk);
       shape.rotation.y = 0;
+      if (shape.userData.slam) {
+        // 조준 지점 원을 기준(원점)으로, 내 위치에서 양손 사슬이 모이는 모양. 최소 거리는 sim의 LOB_MIN_DIST와 같다
+        const d = Math.max(LOB_MIN_DIST, r * kk);
+        const sx = -Math.cos(dir) * d;
+        const sz = -Math.sin(dir) * d;
+        const px = -Math.sin(dir);
+        const pz = Math.cos(dir);
+        (shape.userData.chains as ChainLine[]).forEach((c, i) => {
+          const side = i === 0 ? 1 : -1;
+          c.setPath({ x: sx + px * HAND_SPREAD * side, y: 0.5, z: sz + pz * HAND_SPREAD * side }, { x: 0, y: 0.25, z: 0 }, 1);
+        });
+      }
     } else {
       shape.position.set(p.x, 0.03, p.z);
       shape.rotation.y = -dir;
@@ -863,6 +926,59 @@ export class BattleView {
   }
 
   // ───────────── 효과 ─────────────
+
+  // ───────────── 사슬 이펙트(Chainer) ─────────────
+
+  /** 사슬 고리 재질(팀 색을 흰색 쪽으로 조금 섞은 밝은 색). 색·투명도별로 공유 */
+  private chainMat(color: string, opacity: number): THREE.MeshBasicMaterial {
+    const key = `${color}|${opacity}`;
+    let m = this.chainMats.get(key);
+    if (!m) {
+      m = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.35),
+        transparent: opacity < 1,
+        opacity,
+        depthWrite: false,
+        depthTest: false,
+      });
+      this.chainMats.set(key, m);
+    }
+    return m;
+  }
+
+  /** 사슬 투사체의 머리(E·R): 뾰족한 갈고리 날. 진행 방향 +x */
+  private buildChainHead(owner: Unit | undefined): THREE.Group {
+    const color = this.shotColor(owner);
+    const g = new THREE.Group();
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.5, 6).rotateZ(-Math.PI / 2), toon(color));
+    head.position.x = 0.1;
+    head.renderOrder = 6;
+    const glow = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.64, 6).rotateZ(-Math.PI / 2), this.glow(color).halo);
+    glow.position.x = 0.1;
+    g.add(head, glow);
+    return g;
+  }
+
+  /** 사슬이 바닥을 내리친 순간: 원 안을 번쩍이는 빛줄기 + 퍼지는 고리 */
+  private slamImpact(to: Vec2, color: string, radius: number) {
+    const size = radius * 2.7;
+    const geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({
+      map: burstTexture(),
+      color: new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.4).multiplyScalar(1.4),
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(to.x, 0.25, to.y);
+    m.renderOrder = 6;
+    this.addEffect(m, 0.35, (k) => {
+      m.scale.setScalar(0.55 + k * 0.7);
+      m.rotation.y = k * 0.5;
+      mat.opacity = k < 0.25 ? 1 : 1 - (k - 0.25) / 0.75;
+    }, () => (geo.dispose(), mat.dispose()));
+  }
 
   // ───────────── 전설 스킨 이펙트(흑백 이미지 × 팀 색) ─────────────
 

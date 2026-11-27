@@ -886,26 +886,18 @@ export class Sim implements SimView {
       this.events.push({ type: 'melee', unitId: f.id, isSuper: false, dir: angleOf({ x: target.pos.x - f.pos.x, y: target.pos.y - f.pos.y }), range: kit.wRange, spreadDeg: 24 });
       return;
     }
-    if (f.chainSkillPhase === 'chain') {
-      const { dir } = resolveAim(this, f, aim, kit.chainRange);
-      const spec = shotSpec(def, false);
-      this.markCombat(f);
-      f.facing = dir;
-      this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
-      this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange }, dir, 0);
-      this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
-      f.chainSkillPhase = 'chainFlight';
-      return;
-    }
+    // E: 사슬을 던진다. 맞히면 내가 그 대상에게 날아간다(projectileHit). 못 맞히면 사거리 끝에서 끝
     if (this.tick < (f.chainSkillReadyTick ?? 0)) return;
-    const { dir } = resolveAim(this, f, aim, kit.dashRange);
+    const { dir } = resolveAim(this, f, aim, kit.chainRange);
+    const spec = shotSpec(def, false);
     f.chainSkillReadyTick = this.tick + secToTicks(kit.skillCooldown);
-    f.chainSkillPhase = 'chain';
+    f.chainSkillPhase = 'chainFlight';
     this.addChainStack(f);
     f.facing = dir;
     this.markCombat(f);
     this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
-    f.action = { kind: 'chainDash', dir, remaining: kit.dashRange, speed: 9 };
+    this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange }, dir, 0);
+    this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
   }
 
   private launchSuperSteal(f: Fighter, spec: ShotSpec, dir: number) {
@@ -1531,7 +1523,16 @@ export class Sim implements SimView {
         u.moving = false;
         this.events.push({ type: 'stun', unitId: u.id, untilTick });
       }
-      if (owner?.type === 'fighter') owner.chainSkillPhase = 'w';
+      if (owner?.type === 'fighter') {
+        owner.chainSkillPhase = 'w';
+        // 사슬이 박힌 대상에게 내가 날아간다(바로 앞까지, 벽에 막히면 거기서 멈춤)
+        const kit = getFighter(owner.fighterId).chainKit;
+        const gap = dist(owner.pos, u.pos) - owner.radius - u.radius - 0.05;
+        if (kit && gap > 0.05) {
+          owner.action = { kind: 'chainDash', dir: angleOf({ x: u.pos.x - owner.pos.x, y: u.pos.y - owner.pos.y }), remaining: gap, speed: kit.pullSpeed };
+          owner.moving = false;
+        }
+      }
     }
     if (u.alive && p.knockback > 0) {
       // 같은 공격 묶음의 탄은 한 대상을 한 번만 밀어낸다(피해는 탄마다)
