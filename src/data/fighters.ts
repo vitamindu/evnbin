@@ -634,11 +634,11 @@ export const FIGHTERS: readonly FighterDef[] = [
       comboWindow: 5,
       pullSpeed: 16,
       chainRange: 4.5,
-      chainDamage: 375,
+      chainDamage: 625, // E2 사슬. 11레벨(×2) 기준 1250
       stunDuration: 1,
       wRange: 1.5,
       wDash: 0.8,
-      wFlatDamage: 150, // 11레벨(×2) 기준 300
+      wFlatDamage: 500, // 11레벨(×2) 기준 1000
       wLostHpDamage: 0.25,
       wHealFraction: 1,
       stealRange: 7,
