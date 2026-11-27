@@ -87,14 +87,49 @@ test('CHAINER Q·E: 총알이 아니라 사슬(조준 미리보기, 내리치기
   expect(await page.evaluate(() => (window as QaWindow).__fgBattle!.sim.projectiles.length)).toBe(0);
   expect(await chainMeshes()).toBe(2);
   await page.screenshot({ path: testInfo.outputPath('chainer-q.png') });
-  await page.waitForTimeout(330); // 두 사슬이 만난 자리에서 터진다
+  // 두 사슬이 만난 자리에서 터지는 바로 그 순간(내리치기가 끝난 첫 프레임들)
+  await page.waitForFunction(() => (window as QaWindow).__fgBattle!.sim.lobs.filter((l) => l.slam).length === 0, null, { polling: 'raf' });
+  // 내리친 자리의 번쩍임(이미지가 입혀진 이펙트)이 생긴다
+  const burstCount = () =>
+    page.evaluate(() => {
+      let n = 0;
+      (window as QaWindow).__fgBattle!.view.scene.traverse((o) => {
+        const m = (o as unknown as { material?: { map?: unknown } }).material;
+        if (o.renderOrder === 6 && m?.map) n++;
+      });
+      return n;
+    });
+  await expect.poll(burstCount, { timeout: 2000 }).toBe(1);
   await page.screenshot({ path: testInfo.outputPath('chainer-q-burst.png') });
-  await page.waitForTimeout(700);
-  // E: 던진 사슬(투사체 1개 + 사슬 1줄)
-  await page.evaluate(() => (window as QaWindow).__fgBattle!.queueSkill({ x: 0, y: -1 }));
-  await page.waitForTimeout(110);
-  const e = await page.evaluate(() => (window as QaWindow).__fgBattle!.sim.projectiles.filter((p) => p.chainSkill).length);
-  expect(e).toBe(1);
+  await page.waitForTimeout(900);
+  // E: 던진 사슬(투사체 1개 + 사슬 1줄). 던진 직후 같은 화면에서 사슬을 센다
+  await page.evaluate(() => (window as QaWindow).__fgBattle!.queueSkill({ x: -1, y: 0 }));
+  await page.waitForFunction(() => (window as QaWindow).__fgBattle!.sim.projectiles.some((p) => p.chainSkill), null, { polling: 'raf' });
+  await page.waitForTimeout(40);
   expect(await chainMeshes()).toBe(1);
   await page.screenshot({ path: testInfo.outputPath('chainer-e.png') });
+});
+
+test('CHAINER 패시브: 사슬을 빠르게 휘두르는 회오리(원형 타격)', async ({ page }, testInfo) => {
+  await page.addInitScript(([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer' })), [PROFILE_KEY]);
+  await page.goto('/?qa');
+  await tapToLobby(page);
+  await page.locator('.btn-play').tap();
+  await waitBattleReady(page, 'chainer');
+  const whirlChains = () =>
+    page.evaluate(() => {
+      let n = 0;
+      (window as QaWindow).__fgBattle!.view.scene.traverse((o) => {
+        if ((o as { isInstancedMesh?: boolean }).isInstancedMesh && o.renderOrder === 5 && (o as { count: number }).count > 0) n++;
+      });
+      return n;
+    });
+  // 패시브 중첩이 있어야 기본 공격에 회오리가 붙는다
+  await page.evaluate(() => ((window as QaWindow).__fgBattle!.player.passiveStacks = 1));
+  await page.keyboard.press('Space');
+  // 내리치기 사슬 2줄 + 회오리 사슬 6줄이 동시에 보이는 순간
+  await expect.poll(whirlChains, { timeout: 3000 }).toBeGreaterThanOrEqual(8);
+  await page.waitForTimeout(80);
+  await page.screenshot({ path: testInfo.outputPath('chainer-whirl.png') });
+  await expect.poll(() => page.evaluate(() => (window as QaWindow).__fgBattle!.player.passiveStacks)).toBe(0);
 });

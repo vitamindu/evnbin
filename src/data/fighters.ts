@@ -596,7 +596,7 @@ export const FIGHTERS: readonly FighterDef[] = [
       range: 5,
       projectileSpeed: 8,
       ammo: 3,
-      reload: 1.2,
+      reload: 2.1,
       superChargePerHit: 0.05,
       chainSlam: { radius: 1.3, delay: 0.5 },
     },

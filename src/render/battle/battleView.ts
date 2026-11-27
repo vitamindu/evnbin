@@ -523,9 +523,13 @@ export class BattleView {
         case 'explode':
           this.ring(e.pos, e.radius, e.isSuper ? '#ffe14d' : '#ff9a3c');
           break;
-        case 'melee':
-          this.arc(e.unitId, e.dir, e.range, e.spreadDeg);
+        case 'melee': {
+          // Chainer 패시브(주변 360도 원형 타격)는 사슬을 휘두르는 회오리, 그 밖은 부채꼴 휘두르기
+          const u = this.units.get(e.unitId)?.unit;
+          if (e.spreadDeg >= 360 && u?.type === 'fighter' && getFighter(u.fighterId).chainKit) this.chainWhirl(e.unitId, e.range);
+          else this.arc(e.unitId, e.dir, e.range, e.spreadDeg);
           break;
+        }
         case 'wallsBroken':
           for (const t of e.tiles) this.debris({ x: t.x + 0.5, y: t.y + 0.5 });
           break;
@@ -959,6 +963,50 @@ export class BattleView {
     return g;
   }
 
+  /**
+   * Chainer 패시브: 사슬 여섯 가닥을 빠르게 360도로 휘둘러 회오리처럼 보이게 한다.
+   * 가닥마다 높이와 길이가 달라(위로 갈수록 길다) 나선형으로 말려 올라가는 모양이고, 0.4초 동안 두 바퀴 반을 돈다.
+   * 가닥은 매 프레임 쓴 사람의 현재 위치를 중심으로 다시 놓는다.
+   */
+  private chainWhirl(unitId: EntityId, range: number) {
+    const v = this.units.get(unitId);
+    if (!v) return;
+    const color = this.shotColor(v.unit);
+    const mat = this.chainMat(color, 1).clone();
+    mat.transparent = true;
+    const group = new THREE.Group();
+    const chains = Array.from({ length: 6 }, () => {
+      const c = new ChainLine(mat);
+      group.add(c.mesh);
+      return c;
+    });
+    const ringGeo = new THREE.RingGeometry(range - 0.08, range, 48).rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.4, depthWrite: false, depthTest: false });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.renderOrder = 4;
+    group.add(ring);
+    this.addEffect(group, 0.4, (k) => {
+      const p = v.model.root.position;
+      const spin = k * Math.PI * 5;
+      chains.forEach((c, i) => {
+        const a = spin + (i * Math.PI * 2) / chains.length;
+        const len = range * (0.55 + 0.45 * (i / (chains.length - 1)));
+        const y = 0.25 + i * 0.13;
+        c.setPath({ x: p.x, y, z: p.z }, { x: p.x + Math.cos(a) * len, y: y + 0.08, z: p.z + Math.sin(a) * len }, 1);
+      });
+      ring.position.set(p.x, 0.05, p.z);
+      ring.scale.setScalar(0.5 + 0.5 * Math.min(1, k * 3));
+      const fade = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+      mat.opacity = fade;
+      ringMat.opacity = 0.4 * fade;
+    }, () => {
+      for (const c of chains) c.dispose();
+      ringGeo.dispose();
+      ringMat.dispose();
+      mat.dispose();
+    });
+  }
+
   /** 사슬이 바닥을 내리친 순간: 원 안을 번쩍이는 빛줄기 + 퍼지는 고리 */
   private slamImpact(to: Vec2, color: string, radius: number) {
     const size = radius * 2.7;
@@ -973,10 +1021,10 @@ export class BattleView {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(to.x, 0.25, to.y);
     m.renderOrder = 6;
-    this.addEffect(m, 0.35, (k) => {
+    this.addEffect(m, 0.8, (k) => {
       m.scale.setScalar(0.55 + k * 0.7);
       m.rotation.y = k * 0.5;
-      mat.opacity = k < 0.25 ? 1 : 1 - (k - 0.25) / 0.75;
+      mat.opacity = k < 0.4 ? 1 : 1 - (k - 0.4) / 0.6;
     }, () => (geo.dispose(), mat.dispose()));
   }
 
