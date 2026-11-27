@@ -1,4 +1,4 @@
-import type { Unit, Zone } from './types';
+import type { Unit } from './types';
 
 /** 점프(leap) 중인가. 공중에 있는 동안은 피해·넉백을 받지 않고 투사체가 지나간다 */
 export function isAirborne(u: Unit): boolean {
@@ -10,24 +10,21 @@ export function isHittable(u: Unit): boolean {
   return u.alive && !isAirborne(u);
 }
 
-/** 군중 제어(CC) 종류. 여러 개가 겹치면 기절 > 넉백 > 둔화 순으로 하나만 보여 준다 */
-export type CcKind = 'stun' | 'knockback' | 'slow';
+/** 이름표에 보이는 군중 제어(하드 CC). 둔화(슬로우)는 하드 CC가 아니라 보이지 않는다. 겹치면 기절 > 넉백 */
+export type CcKind = 'stun' | 'knockback';
 
 /** 화면(닉네임 칸)에 보일 CC 이름 */
-export const CC_NAME: Record<CcKind, string> = { stun: '기절', knockback: '넉백', slow: '둔화' };
+export const CC_NAME: Record<CcKind, string> = { stun: '기절', knockback: '넉백' };
 
 /**
  * 이 파이터에게 걸려 있는 군중 제어. 없으면 null.
  * - 기절: stunnedUntilTick이 아직 안 지남(Chainer E2 등)
  * - 넉백: 밀려나는 중(action knockback)
- * - 둔화: 적 지대(서리 지대 등) 안에 서 있음
+ * 둔화(적 지대 안)는 하드 CC가 아니라서 표시하지 않는다.
  */
-export function ccOf(view: { readonly tick: number; readonly zones: readonly Zone[] }, u: Unit): CcKind | null {
+export function ccOf(view: { readonly tick: number }, u: Unit): CcKind | null {
   if (u.type !== 'fighter' || !u.alive) return null;
   if ((u.stunnedUntilTick ?? 0) > view.tick) return 'stun';
   if (u.action?.kind === 'knockback') return 'knockback';
-  for (const z of view.zones) {
-    if (z.team !== u.team && Math.hypot(u.pos.x - z.pos.x, u.pos.y - z.pos.y) <= z.radius + u.radius) return 'slow';
-  }
   return null;
 }
