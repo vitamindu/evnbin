@@ -62,9 +62,11 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       if (!isNum(m.seq) || !Number.isInteger(m.seq) || m.seq < 0 || m.seq > 2 ** 31 || !isVec(m.move)) return null;
       if (m.attack !== undefined && !isAim(m.attack)) return null;
       if (m.super !== undefined && !isAim(m.super)) return null;
+      if (m.skill !== undefined && !isAim(m.skill)) return null;
       const out: ClientMsg = { t: 'input', seq: m.seq, move: { x: m.move.x, y: m.move.y } };
       if (m.attack !== undefined) out.attack = m.attack as WireAim;
       if (m.super !== undefined) out.super = m.super as WireAim;
+      if (m.skill !== undefined) out.skill = m.skill as WireAim;
       return out;
     }
     case 'ping':

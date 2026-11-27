@@ -139,7 +139,9 @@ export class BattleView {
   private readonly map: MapRenderer;
   private readonly units = new Map<EntityId, UnitVisual>();
   private readonly shots = new Map<EntityId, ShotVisual>();
-  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number }>();
+  private readonly lobs = new Map<EntityId, { shell: THREE.Mesh; marker: THREE.Mesh; from: Vec2; to: Vec2; start: number; end: number; land?: number; slam?: boolean }>();
+  /** 사슬 내려치기(Chainer Q)의 떨어지는 사슬 기둥 */
+  private readonly slamGeo = new THREE.CylinderGeometry(0.13, 0.13, 2.2, 8);
   private effects: Effect[] = [];
   private readonly shotGeo = new THREE.SphereGeometry(0.22, 14, 10);
   private readonly shotKits = new Map<boolean, { core: THREE.BufferGeometry; halo: THREE.BufferGeometry; trail: THREE.BufferGeometry; shadow: THREE.BufferGeometry; r: number }>();
@@ -349,20 +351,21 @@ export class BattleView {
         const owner = sim.getUnit(l.ownerId);
         const baseColor = this.shotColor(owner);
         const shellMat = new THREE.MeshToonMaterial({ color: baseColor });
-        const shell = new THREE.Mesh(this.shotGeo, shellMat);
-        const shellGlow = new THREE.Mesh(this.shotGeo, this.glow(baseColor).halo);
+        const shell = new THREE.Mesh(l.slam ? this.slamGeo : this.shotGeo, shellMat);
+        const shellGlow = new THREE.Mesh(l.slam ? this.slamGeo : this.shotGeo, this.glow(baseColor).halo);
         shellGlow.scale.setScalar(1.4);
         shell.add(shellGlow);
-        shell.scale.setScalar(1.1);
+        shell.scale.setScalar(l.slam ? 1 : 1.1);
+        // 사슬 내려치기는 폭탄이 아니라 공격이라 경고 원도 팀 색(우리 파랑 / 상대 빨강)
         const marker = new THREE.Mesh(
           new THREE.RingGeometry(Math.max(0.1, l.aoeRadius - 0.08), l.aoeRadius, 40),
-          new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.55, depthWrite: false }),
+          new THREE.MeshBasicMaterial({ color: l.slam ? baseColor : '#ff5a5a', transparent: true, opacity: 0.55, depthWrite: false }),
         );
         marker.rotation.x = -Math.PI / 2;
         marker.position.set(l.to.x, 0.04, l.to.y);
         this.scene.add(shell, marker);
         shell.userData.baseColor = baseColor;
-        this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick, land: l.landTick });
+        this.lobs.set(l.id, { shell, marker, from: l.from, to: l.to, start: l.startTick, end: l.endTick, land: l.landTick, ...(l.slam ? { slam: true } : {}) });
       }
     }
     for (const [id, l] of this.lobs) {
@@ -581,6 +584,13 @@ export class BattleView {
       s.obj.position.set(lerp(s.prev.x, s.curr.x, alpha), 0.6, lerp(s.prev.y, s.curr.y, alpha));
     }
     for (const l of this.lobs.values()) {
+      if (l.slam) {
+        // 위에서 사슬이 떨어져 원 한가운데를 내리친다(끝 틱에 닿는다). 원은 점점 진해진다
+        const k = Math.min(1, Math.max(0, (tickF - l.start) / Math.max(1, l.end - l.start)));
+        l.shell.position.set(l.to.x, 0.3 + (1 - k * k) * 7, l.to.y);
+        (l.marker.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.5 * k;
+        continue;
+      }
       const total = Math.max(1, l.end - l.start);
       const dist = Math.hypot(l.to.x - l.from.x, l.to.y - l.from.y);
       // 짧게 던지는 폭탄(점프 폭탄 등)은 0.3초 만에 떨어져 바닥에서 깜빡이다 터진다. 긴 포물선은 끝까지 날아간다.
@@ -701,7 +711,9 @@ export class BattleView {
     const def = getFighter(fighterId as Fighter['fighterId']);
     const sourceDef = which === 'super' && this.aim?.superSourceId ? getFighter(this.aim.superSourceId) : def;
     const d = which === 'attack' ? def.attack : sourceDef.super;
-    const kind = kindOverride ?? d.kind;
+    // 사슬 내려치기(Chainer Q)는 직선이 아니라 조준 지점의 원
+    const slamRadius = which === 'attack' && !kindOverride && 'chainSlam' in d && d.chainSlam ? d.chainSlam.radius : 0;
+    const kind = slamRadius ? 'lob' : (kindOverride ?? d.kind);
     const range = rangeOverride ?? d.range;
     const color = which === 'attack' ? '#ffffff' : '#ffd23f';
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
@@ -739,7 +751,7 @@ export class BattleView {
         flat(new THREE.CircleGeometry(range, 48));
         break;
       case 'lob': {
-        const r = ('aoeRadius' in d && d.aoeRadius) || 1.5;
+        const r = slamRadius || ('aoeRadius' in d && d.aoeRadius) || 1.5;
         const target = flat(new THREE.CircleGeometry(r, 40));
         target.name = 'lobTarget';
         break;

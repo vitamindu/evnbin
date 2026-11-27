@@ -101,6 +101,14 @@ describe('message validation and wire helpers', () => {
       move: { x: 0.5, y: -0.5 },
       attack: [0.1, 0.2],
     });
+    // CHAINER 스킬 입력(skill)도 서버에서 버려지지 않고 통과한다
+    expect(parseClientMsg('{"t":"input","seq":4,"move":{"x":0,"y":0},"skill":[0.3,0.4]}')).toEqual({
+      t: 'input',
+      seq: 4,
+      move: { x: 0, y: 0 },
+      skill: [0.3, 0.4],
+    });
+    expect(parseClientMsg('{"t":"input","seq":4,"move":{"x":0,"y":0},"skill":"x"}')).toBeNull();
     expect(parseClientMsg('{"t":"input","seq":3,"move":{"x":"a","y":0}}')).toBeNull();
     expect(parseClientMsg('{"t":"input","seq":-1,"move":{"x":0,"y":0}}')).toBeNull();
     expect(parseClientMsg('{"t":"hello","v":1,"name":"A","fighterId":"nobody"}')).toBeNull();

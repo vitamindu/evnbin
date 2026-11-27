@@ -119,9 +119,6 @@ export interface Projectile {
   isSuper: boolean;
   /** 복사한 궁극기의 출처. 후속 피해 특성(예: 흡혈)을 읽는다 */
   superSourceId?: FighterId;
-  /** Chainer Q: 첫 적중/사거리 끝에서 예약되는 지연 폭발 */
-  chainExplosion?: { damage: number; radius: number; delayTicks: number };
-  chainExplosionDueTick?: number;
   /** Chainer E 사슬: 적중 시 기절하고 W를 연다 */
   chainSkill?: boolean;
   /** Chainer 궁극기 사슬 */
@@ -160,6 +157,8 @@ export interface Lob {
   isSuper: boolean;
   superSourceId?: FighterId;
   breaksWalls: boolean;
+  /** 사슬 내려치기(Chainer Q): 날아가는 탄 대신 바닥 한 지점을 내리친다. 터질 때 벽 너머는 안 맞는다 */
+  slam?: boolean;
 }
 
 /** 조준 입력: 길이 0~1 벡터(방향 + 사거리 비율). null이면 자동 조준 */

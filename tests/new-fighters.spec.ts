@@ -52,3 +52,19 @@ test('TRUE FORM REAPER: 전설 스킨 모델·이펙트가 연습장에서 보�
   await page.screenshot({ path: testInfo.outputPath('trueform-super.png') });
   await expect.poll(() => fxOk.sort()).toEqual(['super.png', 'trail.png']);
 });
+
+test('CHAINER Q: 투사체가 아니라 바닥을 내리치는 사슬(원 표시 + 떨어지는 사슬)', async ({ page }, testInfo) => {
+  await page.addInitScript(([key]) => localStorage.setItem(key!, JSON.stringify({ selected: 'chainer' })), [PROFILE_KEY]);
+  await page.goto('/?qa');
+  await tapToLobby(page);
+  await page.locator('.btn-play').tap();
+  await waitBattleReady(page, 'chainer');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(250);
+  const q = await page.evaluate(() => {
+    const s = (window as QaWindow).__fgBattle!.sim;
+    return { shots: s.projectiles.length, slams: s.lobs.filter((l) => l.slam).length };
+  });
+  expect(q).toEqual({ shots: 0, slams: 1 });
+  await page.screenshot({ path: testInfo.outputPath('chainer-q.png') });
+});

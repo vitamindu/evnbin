@@ -166,8 +166,8 @@ export interface ShotSpec {
   projectileRadius?: number;
   /** leap: 폭탄·내려찍기 없이 이동만 */
   moveOnly?: boolean;
-  /** Chainer Q: 지연 폭발 */
-  chainExplosion?: { damage: number; radius: number; delayTicks: number };
+  /** Chainer Q: 바닥을 내리치는 사슬(반지름, 터지기까지 틱) */
+  chainSlam?: { radius: number; delayTicks: number };
   /** 복사 궁극기 효과 출처 */
   superSourceId?: FighterId;
 }
@@ -226,7 +226,7 @@ export function shotSpec(def: FighterDef, isSuper: boolean, superSourceId?: Figh
     leapTime: DEFAULT_LEAP_TIME,
     fuse: DEFAULT_FUSE,
     lobFuse: a.kind === 'lob' ? (a.fuse ?? 0) : 0,
-    ...(a.chainExplosion ? { chainExplosion: { ...a.chainExplosion, delayTicks: secToTicks(a.chainExplosion.delay) } } : {}),
+    ...(a.chainSlam ? { chainSlam: { radius: a.chainSlam.radius, delayTicks: Math.max(1, secToTicks(a.chainSlam.delay)) } } : {}),
   };
 }
 
@@ -252,7 +252,6 @@ interface KnockState {
  * (Lead에게 제안: Dummy 또는 UnitBase에 넉백 상태를 넣기)
  */
 type SimDummy = Dummy & { knock?: KnockState | null };
-interface DelayedExplosion { dueTick: number; pos: Vec2; ownerId: EntityId; team: Team; damage: number; radius: number }
 
 type BurstAction = Extract<FighterAction, { kind: 'burst' }>;
 type DashAction = Extract<FighterAction, { kind: 'dash' }>;
@@ -288,7 +287,6 @@ export class Sim implements SimView {
   private lastHitId: EntityId | null = null;
   /** 지대별·유닛별 아직 주지 않은 소수 피해 */
   private readonly zoneAcc = new Map<string, number>();
-  private delayedExplosions: DelayedExplosion[] = [];
   /** lob id → 넉백 거리 */
   private readonly lobKnock = new Map<EntityId, number>();
   /** 대상별로 이미 넉백을 준 탄 묶음 */
@@ -404,7 +402,6 @@ export class Sim implements SimView {
     for (const u of this.units) if (u.alive && u.type === 'fighter') this.stepFighter(u, over ? undefined : inputs.get(u.id));
     if (!over) for (const u of this.units) if (u.alive && u.type === 'dummy') this.stepDummy(u);
     this.stepProjectiles();
-    this.stepDelayedExplosions();
     this.stepLobs();
     if (!over) this.stepZones();
     if (!over && this.match.mode === 'crystal') this.stepCrystals();
@@ -824,7 +821,7 @@ export class Sim implements SimView {
         this.fireRadial(f, spec, dir);
         break;
       case 'chain':
-        this.spawnShot(f, spec, dir, 0);
+        this.fireChainSlam(f, spec, dir, ratio);
         break;
       case 'steal':
         this.launchSuperSteal(f, spec, dir);
@@ -895,7 +892,7 @@ export class Sim implements SimView {
       this.markCombat(f);
       f.facing = dir;
       this.events.push({ type: 'attack', unitId: f.id, isSuper: false, dir });
-      this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange, chainExplosion: undefined }, dir, 0);
+      this.spawnShot(f, { ...spec, kind: 'chain', damage: kit.chainDamage, range: kit.chainRange }, dir, 0);
       this.projectiles[this.projectiles.length - 1]!.chainSkill = true;
       f.chainSkillPhase = 'chainFlight';
       return;
@@ -912,7 +909,7 @@ export class Sim implements SimView {
   }
 
   private launchSuperSteal(f: Fighter, spec: ShotSpec, dir: number) {
-    this.spawnShot(f, { ...spec, damage: 0, pierce: false, chainExplosion: undefined }, dir, 0);
+    this.spawnShot(f, { ...spec, damage: 0, pierce: false }, dir, 0);
     this.projectiles[this.projectiles.length - 1]!.stealsSuper = true;
   }
 
@@ -1001,8 +998,6 @@ export class Sim implements SimView {
       remaining: spec.range,
       isSuper: spec.isSuper,
       ...(spec.superSourceId ? { superSourceId: spec.superSourceId } : {}),
-      ...(spec.chainExplosion ? { chainExplosion: spec.chainExplosion } : {}),
-      ...(spec.chainExplosion ? { chainExplosionDueTick: this.tick + spec.chainExplosion.delayTicks } : {}),
       breaksWalls: spec.breaksWalls,
       knockback: spec.knockback,
       ...(spec.damageFar !== undefined ? { damageFar: spec.damageFar, range: spec.range } : {}),
@@ -1039,6 +1034,32 @@ export class Sim implements SimView {
    * 포물선: 조준 비율만큼(최소 LOB_MIN_DIST) 떨어진 지점에 count개를 조준과 수직으로 LOB_SPACING 간격으로 나란히.
    * 비행 시간은 데이터 탄속(없으면 LOB_FLIGHT_TICKS). 궁극기 넉백은 폭발 중심에서 밀어낸다.
    */
+  /**
+   * Chainer Q: 조준한 바닥 지점(사거리 안, 최소 LOB_MIN_DIST)을 사슬로 내리친다.
+   * 날아가는 탄이 아니라 지점 판정: delayTicks 뒤 반지름 안의 모든 적이 같은 틱에 피해를 받는다(stepLobs).
+   */
+  private fireChainSlam(f: Fighter, spec: ShotSpec, dir: number, ratio: number) {
+    const slam = spec.chainSlam;
+    if (!slam) return;
+    const d = Math.max(LOB_MIN_DIST, spec.range * Math.max(0, Math.min(1, ratio)));
+    const to = this.clampToMap({ x: f.pos.x + Math.cos(dir) * d, y: f.pos.y + Math.sin(dir) * d });
+    this.lobs.push({
+      id: this.nextId++,
+      type: 'lob',
+      ownerId: f.id,
+      team: f.team,
+      from: { ...f.pos },
+      to,
+      startTick: this.tick,
+      endTick: this.tick + slam.delayTicks,
+      damage: spec.damage,
+      aoeRadius: slam.radius,
+      isSuper: false,
+      breaksWalls: false,
+      slam: true,
+    });
+  }
+
   private fireLob(f: Fighter, spec: ShotSpec, dir: number, ratio: number) {
     const d = Math.max(LOB_MIN_DIST, spec.range * Math.max(0, Math.min(1, ratio)));
     const cx = f.pos.x + Math.cos(dir) * d;
@@ -1317,16 +1338,6 @@ export class Sim implements SimView {
         keep.push(p);
         continue;
       }
-      if (p.chainExplosion && !this.over) {
-        this.delayedExplosions.push({
-          dueTick: Math.max(this.tick, p.chainExplosionDueTick ?? this.tick + p.chainExplosion.delayTicks),
-          pos: { ...p.pos },
-          ownerId: p.ownerId,
-          team: p.team,
-          damage: p.chainExplosion.damage,
-          radius: p.chainExplosion.radius,
-        });
-      }
       if (p.chainSkill) {
         const owner = this.getUnit(p.ownerId);
         if (owner?.type === 'fighter' && owner.chainSkillPhase === 'chainFlight') owner.chainSkillPhase = undefined;
@@ -1338,24 +1349,6 @@ export class Sim implements SimView {
       }
     }
     this.projectiles = keep.concat(shards);
-  }
-
-  private stepDelayedExplosions() {
-    if (!this.delayedExplosions.length) return;
-    const keep: DelayedExplosion[] = [];
-    for (const e of this.delayedExplosions) {
-      if (this.tick < e.dueTick) {
-        keep.push(e);
-        continue;
-      }
-      this.events.push({ type: 'explode', pos: { ...e.pos }, radius: e.radius, isSuper: false });
-      for (const u of this.units) {
-        if (!isHittable(u) || u.team === e.team) continue;
-        if (dist(u.pos, e.pos) > e.radius + u.radius || !hasLineOfSight(this.grid, e.pos, u.pos)) continue;
-        this.damage(u, e.damage, e.ownerId, false);
-      }
-    }
-    this.delayedExplosions = keep;
   }
 
   /**
@@ -1515,7 +1508,8 @@ export class Sim implements SimView {
     this.lastHitId = u.id;
     const owner = this.getUnit(p.ownerId);
     if (p.stealsSuper) {
-      if (u.type === 'fighter' && owner?.type === 'fighter') {
+      // 같은 Chainer(사슬 키트를 가진 파이터)에게는 무효: 아무것도 복사하지 않는다
+      if (u.type === 'fighter' && owner?.type === 'fighter' && !getFighter(u.fighterId).chainKit) {
         const sourceId = u.copiedSuperId ?? u.fighterId;
         const kit = getFighter(owner.fighterId).chainKit;
         if (kit) {
@@ -1569,6 +1563,7 @@ export class Sim implements SimView {
       for (const u of this.units) {
         if (!isHittable(u) || u.team === l.team) continue;
         if (dist(u.pos, l.to) > l.aoeRadius + u.radius) continue;
+        if (l.slam && !hasLineOfSight(this.grid, l.to, u.pos)) continue; // 사슬 내려치기는 벽 너머를 못 때린다
         this.damage(u, l.damage, l.ownerId, l.isSuper, l.superSourceId);
         const kb = this.lobKnock.get(l.id);
         if (kb && u.alive) this.applyKnockback(u, u.pos.x - l.to.x, u.pos.y - l.to.y, kb, angleOf({ x: l.to.x - l.from.x, y: l.to.y - l.from.y }));
